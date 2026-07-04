@@ -30,7 +30,7 @@ export interface Player {
   avatarEmoji: string;
 }
 
-export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'auction' | 'game_over';
+export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'auction' | 'managing' | 'game_over';
 
 export interface AuctionState {
   tileId: number;
@@ -48,6 +48,20 @@ export interface GameLogEntry {
   playerName: string;
   message: string;
   type: 'move' | 'buy' | 'rent' | 'card' | 'jail' | 'bankrupt' | 'ai_quote' | 'system' | 'tax' | 'pass_go' | 'auction';
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  unlockedAt: number | null;
+}
+
+export interface GameStats {
+  timesJailed: number;
+  auctionsWon: number;
+  highestRentPaid: number;
 }
 
 export interface GameState {
@@ -81,6 +95,16 @@ export interface GameState {
   // Auction
   auctionState: AuctionState | null;
 
+  // Mortgage
+  mortgagedTiles: number[];
+
+  // AI Speed (1=normal, 2=fast, 3=fastest)
+  aiSpeed: number;
+
+  // Achievements
+  achievements: Achievement[];
+  stats: GameStats;
+
   // Actions
   startGame: (coalitionId: string) => void;
   rollDice: () => void;
@@ -106,6 +130,15 @@ export interface GameState {
   passBid: (playerId: string) => void;
   resolveAuction: () => void;
   aiAuctionTurn: () => void;
+  mortgageProperty: (tileId: number) => void;
+  unmortgageProperty: (tileId: number) => void;
+  setAISpeed: (speed: number) => void;
+  unlockAchievement: (id: string) => void;
+  saveGame: () => void;
+  loadGame: () => boolean;
+  hasSavedGame: () => boolean;
+  enterManaging: () => void;
+  exitManaging: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -117,8 +150,11 @@ function shuffleDeck<T>(deck: T[]): T[] {
   return shuffled;
 }
 
-function calculateRent(tile: Tile, owner: Player, marketState: MarketState): number {
+function calculateRent(tile: Tile, owner: Player, marketState: MarketState, mortgagedTiles: number[]): number {
   if (!tile.rent || tile.rent.length === 0) return 0;
+
+  // Mortgaged properties produce no rent
+  if (mortgagedTiles.includes(tile.id)) return 0;
 
   // Highway: count owned highways
   if (tile.type === 'highway') {
@@ -157,6 +193,18 @@ function calculateRent(tile: Tile, owner: Player, marketState: MarketState): num
   return Math.round(baseRent * marketState.inflationMultiplier);
 }
 
+const INITIAL_ACHIEVEMENTS: Achievement[] = [
+  { id: 'first_property', name: 'First Seat Won', description: 'Buy your first property', emoji: '🏛️', unlockedAt: null },
+  { id: 'landlord', name: 'Full Color Set', description: 'Own all properties in a color group', emoji: '🌈', unlockedAt: null },
+  { id: 'hotel_mogul', name: 'Hotel Mogul', description: 'Build a hotel on any property', emoji: '🏨', unlockedAt: null },
+  { id: 'banker', name: 'Money Bags', description: 'Accumulate RM3000+', emoji: '💰', unlockedAt: null },
+  { id: 'jailbird', name: 'Jailbird', description: 'Go to jail 3 times', emoji: '⛓️', unlockedAt: null },
+  { id: 'auction_king', name: 'Auction King', description: 'Win 3 auctions', emoji: '🔨', unlockedAt: null },
+  { id: 'survivor', name: 'Survivor', description: 'Still in game after 10 rounds', emoji: '🏆', unlockedAt: null },
+  { id: 'monopolist', name: 'Monopolist', description: 'Own 10+ properties', emoji: '👑', unlockedAt: null },
+  { id: 'high_roller', name: 'High Roller', description: 'Pay over RM500 in a single rent payment', emoji: '🎰', unlockedAt: null },
+];
+
 const AI_COALITION_EMOJIS: Record<string, string> = {
   PH: '🏛️', PN: '🕌', BN: '⭐', GPS: '🦅', GRS: '🏝️', IND: '👤',
 };
@@ -182,6 +230,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   aiThinking: false,
   showPortfolio: false,
   auctionState: null,
+  mortgagedTiles: [],
+  aiSpeed: 1,
+  achievements: INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
+  stats: { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
 
   startGame: (playerCoalitionId: string) => {
     const allCoalitionIds = Object.keys(COALITIONS);
@@ -453,7 +505,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (tile.owner && tile.owner !== currentPlayerId) {
         const owner = state.players.find(p => p.id === tile.owner);
         if (owner && !owner.isBankrupt) {
-          const rent = calculateRent(tile, owner, state.marketState);
+          const rent = calculateRent(tile, owner, state.marketState, state.mortgagedTiles);
           set({
             currentRentPayment: { from: currentPlayerId, to: tile.owner, amount: rent },
             phase: 'paying_rent',
@@ -488,10 +540,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const tile = state.tiles[player.position];
     if (!tile.price || player.money < tile.price) return;
 
+    const newProperties = [...player.properties, tile.id];
+
     set(state => ({
       players: state.players.map(p =>
         p.id === currentPlayerId
-          ? { ...p, money: p.money - tile.price, properties: [...p.properties, tile.id] }
+          ? { ...p, money: p.money - tile.price, properties: newProperties }
           : p
       ),
       tiles: state.tiles.map(t =>
@@ -507,6 +561,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       message: `🏗️ ${player.name} buys ${tile.name} for RM${tile.price}!`,
       type: 'buy',
     });
+
+    // Achievement: first_property (only for human player)
+    if (currentPlayerId === 'player') {
+      get().unlockAchievement('first_property');
+    }
+
+    // Achievement: landlord — check if player now owns full color group
+    if (tile.colorGroup && currentPlayerId === 'player') {
+      const colorGroupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+      const ownsAll = colorGroupTiles.every(t => newProperties.includes(t.id));
+      if (ownsAll) {
+        get().unlockAchievement('landlord');
+      }
+    }
+
+    // Achievement: monopolist — 10+ properties
+    if (newProperties.length >= 10 && currentPlayerId === 'player') {
+      get().unlockAchievement('monopolist');
+    }
+
+    // Achievement: banker — money check happens in endTurn
   },
 
   skipBuy: () => {
@@ -548,6 +623,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentRentPayment: null,
       phase: payerNew < 0 ? 'game_over' : 'landed',
     }));
+
+    // Achievement: high_roller — player pays > RM500 rent in a single payment
+    if (from === 'player' && amount > 500) {
+      const currentHighest = get().stats.highestRentPaid;
+      if (amount > currentHighest) {
+        set(state => ({
+          stats: { ...state.stats, highestRentPaid: amount },
+        }));
+      }
+      get().unlockAchievement('high_roller');
+    }
   },
 
   drawCard: (type: 'chest' | 'chance') => {
@@ -740,12 +826,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedTileId: null,
     });
 
+    // Achievement: survivor — player still in game after 10 rounds
+    const humanPlayer = get().players.find(p => p.id === 'player');
+    if (humanPlayer && !humanPlayer.isBankrupt && newTurnCount >= 10) {
+      get().unlockAchievement('survivor');
+    }
+
+    // Achievement: banker — check if player has RM3000+
+    if (humanPlayer && humanPlayer.money >= 3000) {
+      get().unlockAchievement('banker');
+    }
+
+    // Auto-save after each turn
+    get().saveGame();
+
     // If next player is AI, auto-play
     if (nextPlayer?.isAI) {
       get().setAIThinking(true);
+      const aiDelay = Math.round(1000 / state.aiSpeed);
       setTimeout(() => {
         get().aiTurn();
-      }, 1000);
+      }, aiDelay);
     }
   },
 
@@ -754,6 +855,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     const currentPlayerId = state.turnOrder[state.currentTurnIndex];
     const player = state.players.find(p => p.id === currentPlayerId);
     if (!player) return;
+
+    // Track jail entry for player (jailTurns === 0 means just entered)
+    if (currentPlayerId === 'player' && player.jailTurns === 0) {
+      const newTimesJailed = state.stats.timesJailed + 1;
+      set(s => ({ stats: { ...s.stats, timesJailed: newTimesJailed } }));
+      if (newTimesJailed >= 3) {
+        get().unlockAchievement('jailbird');
+      }
+    }
 
     if (pay || player.hasGetOutOfJailFree) {
       const cost = pay ? 50 : 0;
@@ -841,6 +951,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   aiTurn: async () => {
     const state = get();
+    const speed = state.aiSpeed;
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.round(ms / speed)));
+
     const currentPlayerId = state.turnOrder[state.currentTurnIndex];
     const player = state.players.find(p => p.id === currentPlayerId);
     if (!player || !player.isAI || player.isBankrupt) {
@@ -851,7 +964,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Handle jail for AI
     if (player.isInJail) {
       get().handleJailDecision(Math.random() > 0.5);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await delay(1500);
     }
 
     const currentState = get();
@@ -865,26 +978,26 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().rollDice();
 
     // Wait for move to complete
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await delay(3000);
 
     // Check if we need to pay rent or buy
     const afterMoveState = get();
     if (afterMoveState.phase === 'paying_rent') {
       get().payRent();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await delay(500);
     }
     if (afterMoveState.phase === 'card') {
       const card = afterMoveState.currentCard;
       if (card) {
         get().applyCard(card);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await delay(500);
       }
     }
 
     // Wait for auction to complete if one was triggered
     let auctionWaitCount = 0;
     while (get().phase === 'auction' && auctionWaitCount < 30) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await delay(1000);
       auctionWaitCount++;
     }
 
@@ -905,6 +1018,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!tile || !player || tile.owner !== 'player') return;
     if (tile.type !== 'property' || !tile.housePrice) return;
     if ((tile.houses || 0) >= 5) return;
+
+    // Cannot build on mortgaged properties
+    if (state.mortgagedTiles.includes(tileId)) return;
 
     const cost = tile.housePrice;
     if (player.money < cost) return;
@@ -933,6 +1049,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         : `🏠 Built house ${newHouses}/4 on ${tile.name} (RM${cost})`,
       type: 'buy',
     });
+
+    // Achievement: hotel_mogul — built a hotel (5 houses)
+    if (newHouses === 5) {
+      get().unlockAchievement('hotel_mogul');
+    }
   },
 
   sellProperty: (tileId: number) => {
@@ -941,7 +1062,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const player = state.players.find(p => p.id === 'player');
     if (!tile || !player || tile.owner !== 'player') return;
 
-    const sellPrice = Math.round((tile.mortgageValue || tile.price || 0) * 0.8);
+    // If mortgaged, sell price is reduced (only get mortgage value, not 80% of price)
+    const isMortgaged = state.mortgagedTiles.includes(tileId);
+    const sellPrice = isMortgaged
+      ? Math.round((tile.mortgageValue || tile.price || 0) * 0.5)
+      : Math.round((tile.mortgageValue || tile.price || 0) * 0.8);
     const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);
 
     set(state => ({
@@ -953,6 +1078,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       tiles: state.tiles.map(t =>
         t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t
       ),
+      mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
     }));
     get().addLog({
       playerId: 'player',
@@ -1169,6 +1295,16 @@ export const useGameStore = create<GameState>((set, get) => ({
           message: `🔨 ${winner.name} menang lelangan ${tile.name} untuk RM${auction.highestBid}!`,
           type: 'auction',
         });
+
+        // Track auction wins for player
+        if (auction.highestBidder === 'player') {
+          const newAuctionsWon = get().stats.auctionsWon + 1;
+          set(s => ({ stats: { ...s.stats, auctionsWon: newAuctionsWon } }));
+          if (newAuctionsWon >= 3) {
+            get().unlockAchievement('auction_king');
+          }
+        }
+
         return;
       }
     }
@@ -1239,5 +1375,182 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     get().setAIThinking(false);
+  },
+
+  // --- Mortgage / Unmortgage ---
+  mortgageProperty: (tileId: number) => {
+    const state = get();
+    const tile = state.tiles.find(t => t.id === tileId);
+    const player = state.players.find(p => p.id === 'player');
+    if (!tile || !player || tile.owner !== 'player') return;
+    if (state.mortgagedTiles.includes(tileId)) return;
+
+    // Cannot mortgage if there are houses on the tile
+    if ((tile.houses || 0) > 0) return;
+
+    const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+
+    set(state => ({
+      players: state.players.map(p =>
+        p.id === 'player' ? { ...p, money: p.money + mortgageValue } : p
+      ),
+      mortgagedTiles: [...state.mortgagedTiles, tileId],
+    }));
+
+    get().addLog({
+      playerId: 'player',
+      playerName: player.name,
+      message: `🏦 ${player.name} menggadai ${tile.name} for RM${mortgageValue}! (Mortgaged)`,
+      type: 'buy',
+    });
+  },
+
+  unmortgageProperty: (tileId: number) => {
+    const state = get();
+    const tile = state.tiles.find(t => t.id === tileId);
+    const player = state.players.find(p => p.id === 'player');
+    if (!tile || !player || tile.owner !== 'player') return;
+    if (!state.mortgagedTiles.includes(tileId)) return;
+
+    const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+    const cost = Math.round(mortgageValue * 1.1); // 10% interest
+
+    if (player.money < cost) return;
+
+    set(state => ({
+      players: state.players.map(p =>
+        p.id === 'player' ? { ...p, money: p.money - cost } : p
+      ),
+      mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+    }));
+
+    get().addLog({
+      playerId: 'player',
+      playerName: player.name,
+      message: `🏦 ${player.name} membuka gadai ${tile.name} for RM${cost} (incl. 10% interest)!`,
+      type: 'buy',
+    });
+  },
+
+  // --- AI Speed Control ---
+  setAISpeed: (speed: number) => {
+    set({ aiSpeed: Math.max(1, Math.min(3, speed)) });
+  },
+
+  // --- Achievements ---
+  unlockAchievement: (id: string) => {
+    const state = get();
+    const achievement = state.achievements.find(a => a.id === id);
+    if (!achievement || achievement.unlockedAt !== null) return; // already unlocked
+
+    const now = Date.now();
+    set(state => ({
+      achievements: state.achievements.map(a =>
+        a.id === id ? { ...a, unlockedAt: now } : a
+      ),
+    }));
+
+    get().addLog({
+      playerId: 'system',
+      playerName: 'System',
+      message: `🏆 Achievement Unlocked: ${achievement.emoji} ${achievement.name} — ${achievement.description}!`,
+      type: 'system',
+    });
+  },
+
+  // --- Save / Load Game ---
+  saveGame: () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const state = get();
+      const saveData = {
+        phase: state.phase,
+        players: state.players,
+        tiles: state.tiles,
+        turnOrder: state.turnOrder,
+        currentTurnIndex: state.currentTurnIndex,
+        turnCount: state.turnCount,
+        diceValues: state.diceValues,
+        isDoubles: state.isDoubles,
+        consecutiveDoubles: state.consecutiveDoubles,
+        jawatanMenteriDeck: state.jawatanMenteriDeck,
+        krisisNasionalDeck: state.krisisNasionalDeck,
+        marketState: state.marketState,
+        selectedTileId: state.selectedTileId,
+        gameLog: state.gameLog,
+        winner: state.winner,
+        showPortfolio: state.showPortfolio,
+        auctionState: state.auctionState,
+        mortgagedTiles: state.mortgagedTiles,
+        aiSpeed: state.aiSpeed,
+        achievements: state.achievements,
+        stats: state.stats,
+      };
+      localStorage.setItem('dewan-rakyat-save', JSON.stringify(saveData));
+    } catch {
+      // Silently fail if localStorage not available
+    }
+  },
+
+  loadGame: () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const raw = localStorage.getItem('dewan-rakyat-save');
+      if (!raw) return false;
+      const saveData = JSON.parse(raw);
+
+      set({
+        phase: saveData.phase || 'lobby',
+        players: saveData.players || [],
+        tiles: saveData.tiles || BOARD_TILES.map(t => ({ ...t })),
+        turnOrder: saveData.turnOrder || [],
+        currentTurnIndex: saveData.currentTurnIndex || 0,
+        turnCount: saveData.turnCount || 1,
+        diceValues: saveData.diceValues || null,
+        isDoubles: saveData.isDoubles || false,
+        consecutiveDoubles: saveData.consecutiveDoubles || 0,
+        jawatanMenteriDeck: saveData.jawatanMenteriDeck || shuffleDeck(JAWATAN_MENTERI_CARDS),
+        krisisNasionalDeck: saveData.krisisNasionalDeck || shuffleDeck(KRISIS_NASIONAL_CARDS),
+        marketState: saveData.marketState || DEFAULT_MARKET_STATE,
+        selectedTileId: saveData.selectedTileId || null,
+        currentCard: null, // transient UI state
+        currentRentPayment: null, // transient UI state
+        gameLog: saveData.gameLog || [],
+        winner: saveData.winner || null,
+        aiThinking: false, // transient UI state
+        showPortfolio: saveData.showPortfolio || false,
+        auctionState: saveData.auctionState || null,
+        mortgagedTiles: saveData.mortgagedTiles || [],
+        aiSpeed: saveData.aiSpeed || 1,
+        achievements: saveData.achievements || INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
+        stats: saveData.stats || { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  hasSavedGame: () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return localStorage.getItem('dewan-rakyat-save') !== null;
+    } catch {
+      return false;
+    }
+  },
+
+  // --- Managing Phase ---
+  enterManaging: () => {
+    const state = get();
+    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+    const player = state.players.find(p => p.id === currentPlayerId);
+    if (!player || player.isAI || player.isBankrupt) return;
+    if (state.phase !== 'landed' && state.phase !== 'playing') return;
+    set({ phase: 'managing' });
+  },
+
+  exitManaging: () => {
+    set({ phase: 'landed' });
   },
 }));

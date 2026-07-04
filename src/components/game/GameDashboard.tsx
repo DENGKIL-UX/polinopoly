@@ -5,14 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGameStore, type Player, type AuctionState } from '@/lib/game-store';
+import { useGameStore, type Player, type AuctionState, type Achievement } from '@/lib/game-store';
 import { COALITIONS, BOARD_TILES, COLOR_GROUP_HEX, COLOR_GROUP_COALITION, type GameCard } from '@/lib/game-data';
 import {
   Wallet, ArrowRight, Gavel, CreditCard,
   AlertTriangle, Trophy, MessageSquare, TrendingUp, TrendingDown,
   ChevronRight, SkipForward, DollarSign, Building2, Crown,
   Briefcase, Hammer, Home, X, Landmark, HelpCircle, RotateCw,
-  Volume2, VolumeX,
+  Volume2, VolumeX, Zap, Save, FolderOpen, Medal, Settings,
+  Banknote, ShieldDown, Shield, Gauge, Star,
 } from 'lucide-react';
 import { soundManager, useSoundEnabled } from '@/lib/sound-effects';
 
@@ -236,10 +237,12 @@ function TileDetail() {
   const selectedTileId = useGameStore(s => s.selectedTileId);
   const tiles = useGameStore(s => s.tiles);
   const selectTile = useGameStore(s => s.selectTile);
+  const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
   if (selectedTileId === null) return null;
   const tile = tiles.find(t => t.id === selectedTileId);
   if (!tile) return null;
   const ownerPlayer = tile.owner ? COALITIONS[tile.owner] : null;
+  const isMortgaged = mortgagedTiles.includes(tile.id);
   return (
     <AnimatePresence>
       <motion.div
@@ -270,6 +273,8 @@ function TileDetail() {
               {tile.price && <div className="flex justify-between"><span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{tile.price}</span></div>}
               {tile.rent && <div className="flex justify-between"><span className="text-slate-500">Base Rent</span><span className="text-emerald-400 font-semibold">RM{tile.rent[0]}</span></div>}
               {tile.housePrice && <div className="flex justify-between"><span className="text-slate-500">House Cost</span><span className="text-blue-400">RM{tile.housePrice}</span></div>}
+              {tile.mortgageValue && <div className="flex justify-between"><span className="text-slate-500">Mortgage Value</span><span className="text-orange-400">RM{tile.mortgageValue}</span></div>}
+              {isMortgaged && <div className="flex justify-between"><span className="text-orange-400 font-bold">Status</span><span className="text-orange-300 font-bold">🏦 MORTGAGED</span></div>}
               {tile.houses !== undefined && tile.houses > 0 && (
                 <div className="flex justify-between"><span className="text-slate-500">Houses</span>
                   <span className="text-green-400 font-semibold">{tile.houses >= 5 ? '🏨 Hotel' : `🏠 ×${tile.houses}`}</span>
@@ -456,7 +461,134 @@ function AuctionPanel() {
   );
 }
 
-/* ─── Property Portfolio Panel ─── */
+/* ─── AI Speed Control ─── */
+function AISpeedControl() {
+  const aiSpeed = useGameStore(s => s.aiSpeed);
+  const setAISpeed = useGameStore(s => s.setAISpeed);
+  return (
+    <div className="flex items-center gap-1 bg-slate-800/60 rounded-full px-2 py-1 border border-slate-700/30">
+      <Gauge className="h-3 w-3 text-slate-500" />
+      {[1, 2, 3].map(s => (
+        <button key={s} onClick={() => setAISpeed(s)}
+          className={`w-5 h-5 rounded-full text-[8px] font-black transition-all ${
+            aiSpeed === s
+              ? 'bg-amber-500 text-black shadow-md shadow-amber-500/30 scale-110'
+              : 'bg-slate-700/50 text-slate-500 hover:bg-slate-600/50 hover:text-slate-300'
+          }`}>
+          {s}×
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Achievements Panel ─── */
+function AchievementsPanel() {
+  const achievements = useGameStore(s => s.achievements);
+  const [open, setOpen] = useState(false);
+  const unlocked = achievements.filter(a => a.unlockedAt !== null).length;
+  const total = achievements.length;
+  return (
+    <div className="relative">
+      <motion.button
+        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-800/60 border border-slate-700/30 text-[10px] text-slate-400 font-medium backdrop-blur-sm hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+      >
+        <Medal className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Achievements</span>
+        <span className="text-amber-400 font-bold">{unlocked}/{total}</span>
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            className="absolute top-10 right-0 w-72 z-50"
+          >
+            <Card className="bg-slate-900/98 border-amber-500/20 shadow-2xl shadow-black/40 backdrop-blur-sm">
+              <CardHeader className="p-3 pb-1.5">
+                <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                  <Star className="h-3.5 w-3.5" />
+                  Pencapaian / Achievements
+                  <Badge variant="outline" className="text-[8px] ml-auto border-amber-600/40 text-amber-400">{unlocked}/{total}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 pt-0 max-h-72 overflow-y-auto space-y-1.5">
+                {achievements.map(a => (
+                  <div key={a.id} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all ${
+                    a.unlockedAt
+                      ? 'bg-amber-500/5 border-amber-500/20'
+                      : 'bg-slate-800/20 border-slate-700/10 opacity-50'
+                  }`}>
+                    <span className={`text-base flex-shrink-0 ${a.unlockedAt ? '' : 'grayscale'}`}>{a.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[10px] font-bold ${a.unlockedAt ? 'text-amber-300' : 'text-slate-500'}`}>{a.name}</p>
+                      <p className="text-[8px] text-slate-500 leading-tight">{a.description}</p>
+                    </div>
+                    {a.unlockedAt && <span className="text-[7px] text-amber-500/60 flex-shrink-0">✓</span>}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Save/Load Buttons ─── */
+function SaveLoadButtons() {
+  const saveGame = useGameStore(s => s.saveGame);
+  const loadGame = useGameStore(s => s.loadGame);
+  const hasSavedGame = useGameStore(s => s.hasSavedGame);
+  const [showSaveMsg, setShowSaveMsg] = useState(false);
+  const [showLoadMsg, setShowLoadMsg] = useState(false);
+
+  const handleSave = () => {
+    saveGame();
+    setShowSaveMsg(true);
+    setTimeout(() => setShowSaveMsg(false), 1500);
+  };
+  const handleLoad = () => {
+    const ok = loadGame();
+    setShowLoadMsg(true);
+    setTimeout(() => setShowLoadMsg(false), 1500);
+  };
+
+  return (
+    <div className="flex items-center gap-1 relative">
+      <button onClick={handleSave}
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors backdrop-blur-sm"
+        title="Save game">
+        <Save className="h-3.5 w-3.5" />
+      </button>
+      <button onClick={handleLoad} disabled={!hasSavedGame()}
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-500/40 transition-colors backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed"
+        title={!hasSavedGame() ? 'No saved game' : 'Load game'}>
+        <FolderOpen className="h-3.5 w-3.5" />
+      </button>
+      <AnimatePresence>
+        {showSaveMsg && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            className="absolute -top-8 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[8px] px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            Game saved! ✓
+          </motion.div>
+        )}
+        {showLoadMsg && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg">
+            Game loaded! ✓
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Property Portfolio Panel (enhanced with mortgage) ─── */
 function PropertyPortfolio() {
   const showPortfolio = useGameStore(s => s.showPortfolio);
   const togglePortfolio = useGameStore(s => s.togglePortfolio);
@@ -464,6 +596,9 @@ function PropertyPortfolio() {
   const tiles = useGameStore(s => s.tiles);
   const buildHouse = useGameStore(s => s.buildHouse);
   const sellProperty = useGameStore(s => s.sellProperty);
+  const mortgageProperty = useGameStore(s => s.mortgageProperty);
+  const unmortgageProperty = useGameStore(s => s.unmortgageProperty);
+  const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
   const phase = useGameStore(s => s.phase);
   const turnOrder = useGameStore(s => s.turnOrder);
   const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
@@ -475,7 +610,10 @@ function PropertyPortfolio() {
 
   const ownedTiles = player.properties.map(pid => tiles.find(t => t.id === pid)).filter(Boolean) as typeof BOARD_TILES;
 
-  // Group by color group
+  const totalPropertyValue = ownedTiles.reduce((s, t) => s + (t.price || 0), 0);
+  const totalHouseValue = ownedTiles.reduce((s, t) => s + (t.houses || 0) * (t.housePrice || 0), 0);
+  const mortgagedCount = ownedTiles.filter(t => mortgagedTiles.includes(t.id)).length;
+
   const groups: Record<string, typeof BOARD_TILES> = {};
   ownedTiles.forEach(t => {
     const g = t.colorGroup || 'other';
@@ -485,8 +623,9 @@ function PropertyPortfolio() {
 
   const canBuildAny = ownedTiles.some(t => {
     if (t.type !== 'property' || !t.colorGroup || !t.housePrice || (t.houses || 0) >= 5) return false;
+    if (mortgagedTiles.includes(t.id)) return false;
     const groupTiles = BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup);
-    return groupTiles.every(gt => gt.owner === 'player');
+    return groupTiles.every(gt => gt.owner === 'player' && !mortgagedTiles.includes(gt.id));
   });
 
   return (
@@ -499,6 +638,7 @@ function PropertyPortfolio() {
         <Briefcase className="h-3.5 w-3.5" />
         <span>Portfolio</span>
         <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 border-amber-600/50 text-amber-400">{ownedTiles.length}</Badge>
+        {mortgagedCount > 0 && <Badge className="text-[7px] px-1 py-0 h-3.5 bg-orange-600/80">{mortgagedCount} mortgaged</Badge>}
         {canBuildAny && isPlayerTurn && (
           <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
             className="w-1.5 h-1.5 rounded-full bg-green-400" />
@@ -512,17 +652,33 @@ function PropertyPortfolio() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -300 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="absolute top-16 left-1 z-30 w-64 max-h-[65vh] pointer-events-auto"
+            className="absolute top-16 left-1 z-30 w-72 max-h-[65vh] pointer-events-auto"
           >
             <Card className="bg-slate-900/95 border-slate-600/30 shadow-2xl shadow-black/30 backdrop-blur-sm">
               <CardHeader className="p-3 pb-2 flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
-                  <Crown className="h-3.5 w-3.5" />Your Properties
+                  <Crown className="h-3.5 w-3.5" />Portfolio Hartanah
                 </CardTitle>
                 <button onClick={togglePortfolio} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
               </CardHeader>
               <CardContent className="p-2 pt-0">
-                <div className="h-[50vh] overflow-y-auto space-y-2 pr-1">
+                {/* Summary stats */}
+                <div className="grid grid-cols-3 gap-1.5 mb-2 p-2 rounded-lg bg-slate-800/40 border border-slate-700/20">
+                  <div className="text-center">
+                    <p className="text-[7px] text-slate-500 uppercase tracking-wider">Properties</p>
+                    <p className="text-[11px] font-black text-slate-200">{ownedTiles.length}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-slate-500 uppercase tracking-wider">Value</p>
+                    <p className="text-[11px] font-black text-amber-400">RM{(totalPropertyValue + totalHouseValue).toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-slate-500 uppercase tracking-wider">Houses</p>
+                    <p className="text-[11px] font-black text-green-400">{ownedTiles.reduce((s, t) => s + (t.houses || 0), 0)}</p>
+                  </div>
+                </div>
+
+                <div className="h-[45vh] overflow-y-auto space-y-2 pr-1">
                   {ownedTiles.length === 0 && (
                     <p className="text-[10px] text-slate-500 text-center py-4">No properties yet. Buy some!</p>
                   )}
@@ -531,23 +687,37 @@ function PropertyPortfolio() {
                       <div className="flex items-center gap-1.5 mb-1">
                         <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLOR_GROUP_HEX[group as keyof typeof COLOR_GROUP_HEX] || '#6b7280' }} />
                         <span className="text-[8px] text-slate-500 uppercase font-bold tracking-wider">{group}</span>
+                        {(() => {
+                          const groupSet = gTiles[0]?.colorGroup;
+                          if (!groupSet) return null;
+                          const allOwned = BOARD_TILES.filter(gt => gt.colorGroup === groupSet).every(gt => gt.owner === 'player');
+                          const noneMortgaged = gTiles.every(t => !mortgagedTiles.includes(t.id));
+                          return allOwned && noneMortgaged ? <span className="text-[7px] text-green-400 font-bold">✦ FULL SET</span> : null;
+                        })()}
                       </div>
                       {gTiles.map(t => {
+                        const isMortgaged = mortgagedTiles.includes(t.id);
                         const ownsGroup = t.colorGroup && BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup).every(gt => gt.owner === 'player');
-                        const canBuild = ownsGroup && t.type === 'property' && !!t.housePrice && (t.houses || 0) < 5 && player.money >= (t.housePrice || 0) && isPlayerTurn && phase !== 'rolling' && phase !== 'moving';
+                        const canBuild = ownsGroup && t.type === 'property' && !!t.housePrice && (t.houses || 0) < 5 && !isMortgaged && player.money >= (t.housePrice || 0) && isPlayerTurn && phase !== 'rolling' && phase !== 'moving';
+                        const unmortgageCost = Math.round((t.mortgageValue || 0) * 1.1);
                         return (
-                          <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-800/40 border border-slate-700/20 mb-1">
+                          <div key={t.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border mb-1 transition-all ${
+                            isMortgaged
+                              ? 'bg-orange-950/20 border-orange-500/15'
+                              : 'bg-slate-800/40 border-slate-700/20'
+                          }`}>
                             <div className="w-5 h-5 rounded flex items-center justify-center text-[8px] flex-shrink-0"
-                              style={{ backgroundColor: `${COLOR_GROUP_HEX[t.colorGroup!] || '#6b7280'}40` }}>
-                              🏛️
+                              style={{ backgroundColor: isMortgaged ? 'rgba(234,88,12,0.15)' : `${COLOR_GROUP_HEX[t.colorGroup!] || '#6b7280'}40` }}>
+                              {isMortgaged ? '🏦' : '🏛️'}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-[9px] font-bold text-slate-200 truncate">{t.name}</p>
+                              <p className={`text-[9px] font-bold truncate ${isMortgaged ? 'text-orange-300/60 line-through' : 'text-slate-200'}`}>{t.name}</p>
                               <div className="flex items-center gap-2 text-[8px] text-slate-400">
-                                <span>Rent: RM{t.rent?.[(t.houses || 0)] || t.rent?.[0]}</span>
+                                <span>Rent: {isMortgaged ? <span className="text-orange-400">RM0</span> : `RM${t.rent?.[(t.houses || 0)] || t.rent?.[0]}`}</span>
                                 {(t.houses || 0) > 0 && (
                                   <span className="text-green-400">{t.houses >= 5 ? '🏨' : `🏠×${t.houses}`}</span>
                                 )}
+                                {isMortgaged && <span className="text-orange-400 text-[7px]">MORTGAGED</span>}
                               </div>
                             </div>
                             <div className="flex gap-1 flex-shrink-0">
@@ -560,6 +730,29 @@ function PropertyPortfolio() {
                                 >
                                   <Home className="h-3 w-3" />
                                 </motion.button>
+                              )}
+                              {!isMortgaged && t.mortgageValue && (t.houses || 0) === 0 && (
+                                <button
+                                  onClick={() => { soundManager.playEndTurn(); mortgageProperty(t.id); }}
+                                  className="w-6 h-6 rounded bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-400/60 hover:bg-orange-600/30 hover:text-orange-400 transition-colors"
+                                  title={`Mortgage (get RM${t.mortgageValue})`}
+                                >
+                                  <Banknote className="h-3 w-3" />
+                                </button>
+                              )}
+                              {isMortgaged && (
+                                <button
+                                  onClick={() => unmortgageProperty(t.id)}
+                                  disabled={player.money < unmortgageCost}
+                                  className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${
+                                    player.money < unmortgageCost
+                                      ? 'bg-slate-800/20 border-slate-700/10 text-slate-600 cursor-not-allowed'
+                                      : 'bg-emerald-600/10 border-emerald-500/20 text-emerald-400/60 hover:bg-emerald-600/30 hover:text-emerald-400'
+                                  }`}
+                                  title={`Unmortgage (cost RM${unmortgageCost})`}
+                                >
+                                  <Shield className="h-3 w-3" />
+                                </button>
                               )}
                               <button
                                 onClick={() => sellProperty(t.id)}
@@ -580,12 +773,66 @@ function PropertyPortfolio() {
                     <p className="text-[8px] text-green-400/70">✨ Full set owned — build houses to increase rent!</p>
                   </div>
                 )}
+                {mortgagedCount > 0 && (
+                  <div className="mt-1 pt-1.5 border-t border-orange-500/10 text-center">
+                    <p className="text-[8px] text-orange-400/60">🏦 {mortgagedCount} property mortgaged — no rent collected. Unmortgage to reactivate.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/* ─── Achievement Unlock Toast ─── */
+function AchievementToast() {
+  const achievements = useGameStore(s => s.achievements);
+  const [latestUnlocked, setLatestUnlocked] = useState<Achievement | null>(null);
+  const processedRef = useRef<string>('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const currentKey = achievements.filter(a => a.unlockedAt).map(a => `${a.id}:${a.unlockedAt}`).sort().join('|');
+    if (currentKey === processedRef.current) return;
+    
+    const processedSet = new Set(processedRef.current.split('|').filter(Boolean));
+    const newlyUnlocked = achievements.find(a => a.unlockedAt && !processedSet.has(`${a.id}:${a.unlockedAt}`));
+    
+    if (newlyUnlocked) {
+      processedRef.current = currentKey;
+      setLatestUnlocked(newlyUnlocked);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setLatestUnlocked(null), 3500);
+    }
+  }, [achievements]);
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  if (!latestUnlocked) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 50, scale: 0.8 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.9 }}
+        className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+      >
+        <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-900/90 to-yellow-900/90 border border-amber-500/40 shadow-2xl shadow-amber-500/20 backdrop-blur-sm animate-achievement-glow">
+          <span className="text-2xl">{latestUnlocked.emoji}</span>
+          <div>
+            <p className="text-[9px] text-amber-400/80 uppercase tracking-widest font-bold">Achievement Unlocked!</p>
+            <p className="text-sm font-black text-amber-200">{latestUnlocked.name}</p>
+            <p className="text-[9px] text-amber-300/60">{latestUnlocked.description}</p>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -624,12 +871,18 @@ export default function GameDashboard() {
         </div>
       </div>
 
-      {/* How to Play button top-right */}
+      {/* Top-right controls */}
       <div className="absolute top-8 right-1.5 z-30 pointer-events-auto hidden md:flex items-center gap-1.5">
+        <AISpeedControl />
+        <AchievementsPanel />
+        <SaveLoadButtons />
         <SoundToggleButton />
         <HowToPlayButton />
       </div>
       <div className="absolute top-[4.5rem] right-1.5 z-30 pointer-events-auto flex items-center gap-1.5 md:hidden">
+        <AISpeedControl />
+        <AchievementsPanel />
+        <SaveLoadButtons />
         <SoundToggleButton />
         <HowToPlayButton />
       </div>
@@ -792,7 +1045,7 @@ export default function GameDashboard() {
           )}
 
           {phase === 'landed' && isPlayerTurn && (
-            <motion.div key="end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div key="end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
               <Button onClick={() => { soundManager.playEndTurn(); endTurn(); }} variant="outline"
                 className="px-6 py-2.5 border-yellow-500/40 text-yellow-300 hover:bg-yellow-900/30 hover:text-yellow-200 text-xs font-bold transition-colors animate-end-turn-pulse">
                 Akhir Giliran <ChevronRight className="h-3 w-3 ml-1" />
@@ -855,7 +1108,23 @@ export default function GameDashboard() {
                     <p className="text-[8px] text-slate-600 mt-2">Total turns: {turnCount} · {gameLog.length} events logged</p>
                   </div>
 
-                  <Button onClick={() => { soundManager.playGameOver(); window.location.reload(); }} className="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
+                  <div className="flex gap-2">
+                    <Button onClick={() => { soundManager.playGameOver(); window.location.reload(); }} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
+                  </div>
+                  {/* Achievements summary in game over */}
+                  <div className="border-t border-yellow-500/10 pt-2 mt-1">
+                    <p className="text-[8px] text-amber-400/40 font-bold uppercase tracking-wider mb-1.5">Pencapaian / Achievements Unlocked</p>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {useGameStore.getState().achievements.filter(a => a.unlockedAt).map(a => (
+                        <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[8px] text-amber-300">
+                          {a.emoji} {a.name}
+                        </span>
+                      ))}
+                      {useGameStore.getState().achievements.filter(a => a.unlockedAt).length === 0 && (
+                        <span className="text-[8px] text-slate-600">No achievements unlocked this game.</span>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -881,6 +1150,7 @@ export default function GameDashboard() {
       <AIQuoteBubble />
       <TileDetail />
       <PropertyPortfolio />
+      <AchievementToast />
     </div>
   );
 }

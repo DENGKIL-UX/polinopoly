@@ -81,6 +81,8 @@ function TileView({ tile }: { tile: Tile }) {
   const playersOnTile = players.filter(p => p.position === tile.id && !p.isBankrupt);
   const isPlayerHere = playersOnTile.some(p => p.id === 'player');
   const isSelected = useGameStore(s => s.selectedTileId === tile.id);
+  const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
+  const isMortgaged = mortgagedTiles.includes(tile.id);
 
   // Check if player owns this and can build (full color set, houses < 5)
   const playerProps = players.find(p => p.id === 'player')?.properties || [];
@@ -94,7 +96,7 @@ function TileView({ tile }: { tile: Tile }) {
   return (
     <div
       className={`absolute border transition-all duration-200 group ${
-        isCorner ? 'rounded-lg border-amber-700/50 animate-pulse-glow' : 'rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer'
+        isCorner ? 'rounded-lg border-amber-700/50 animate-pulse-glow' : `rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
       } ${isSelected ? 'ring-2 ring-yellow-400 z-20 scale-105' : ''} ${isPlayerHere ? 'z-10' : ''}`}
       style={{
         ...getTileStyle(tile.id),
@@ -152,7 +154,12 @@ function TileView({ tile }: { tile: Tile }) {
           />
         )}
       </div>
-      {playersOnTile.length > 0 && (
+      {isMortgaged && (
+          <div className="absolute inset-0 bg-orange-900/30 rounded-[inherit] flex items-center justify-center pointer-events-none z-10">
+            <span className="text-[6px] md:text-[7px] font-black text-orange-400/80 bg-orange-900/60 px-1 rounded">MORTGAGE</span>
+          </div>
+        )}
+        {playersOnTile.length > 0 && (
         <div className="absolute -top-2 -right-0.5 flex flex-col gap-[2px]">
           {playersOnTile.map((p, idx) => (
             <motion.div

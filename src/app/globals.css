@@ -197,3 +197,67 @@
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* ─── Achievement Unlock Animation ─── */
+@keyframes achievement-glow {
+  0% { box-shadow: 0 0 0px rgba(251, 191, 36, 0); }
+  30% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.4), 0 0 40px rgba(251, 191, 36, 0.15); }
+  100% { box-shadow: 0 0 0px rgba(251, 191, 36, 0); }
+}
+.animate-achievement-glow {
+  animation: achievement-glow 2s ease-out forwards;
+}
+
+/* ─── Tile hover micro-interaction ─── */
+@keyframes tile-hover-glow {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.15); }
+}
+
+/* ─── Neon text glow for important numbers ─── */
+.text-glow-amber {
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4), 0 0 16px rgba(251, 191, 36, 0.15);
+}
+.text-glow-green {
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+.text-glow-red {
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+.text-glow-emerald {
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+}
+
+/* ─── Glass morphism utility ─── */
+.glass-dark {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+/* ─── Board inner shadow ─── */
+.board-inner-shadow {
+  box-shadow: 
+    inset 0 0 30px rgba(0,0,0,0.4),
+    inset 0 0 60px rgba(0,0,0,0.15),
+    0 20px 60px rgba(0,0,0,0.6);
+}
+
+/* ─── Subtle breathing animation for active player indicator ─── */
+@keyframes breathing {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+.animate-breathing {
+  animation: breathing 2s ease-in-out infinite;
+}
+
+/* ─── Rapid sparkle for speed indicators ─── */
+@keyframes speed-sparkle {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.animate-speed-sparkle {
+  animation: speed-sparkle 0.8s ease-in-out infinite;
+}

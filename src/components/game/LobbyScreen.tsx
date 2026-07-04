@@ -15,6 +15,7 @@ import {
   BookOpen,
   Info,
   ChevronDown,
+  FolderOpen,
 } from 'lucide-react';
 
 const COALITION_LIST = Object.values(COALITIONS);
@@ -142,6 +143,9 @@ export default function LobbyScreen() {
   const [showRules, setShowRules] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
   const startGame = useGameStore(s => s.startGame);
+  const loadGame = useGameStore(s => s.loadGame);
+  const hasSavedGame = useGameStore(s => s.hasSavedGame);
+  const [loadAttempted, setLoadAttempted] = useState(false);
 
   const handleStart = () => {
     if (selectedCoalition) {
@@ -285,8 +289,26 @@ export default function LobbyScreen() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center"
+          className="flex justify-center gap-3"
         >
+          {hasSavedGame() && (
+            <div className="relative">
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => { const ok = loadGame(); if (!ok) setLoadAttempted(true); }}
+                className="px-6 py-6 text-sm font-bold border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/20 hover:text-emerald-200 shadow-xl transition-all duration-300"
+              >
+                <FolderOpen className="h-5 w-5 mr-2" />
+                Sambung Game
+              </Button>
+              {loadAttempted && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[9px] text-red-400 text-center mt-1">
+                  Failed to load. Starting fresh is recommended.
+                </motion.p>
+              )}
+            </div>
+          )}
           <div className="relative" onPointerEnter={() => setConfettiActive(true)} onPointerLeave={() => setConfettiActive(false)}>
             <AnimatePresence>
               {confettiActive && CONFETTI_COLORS.map((color, i) => (
