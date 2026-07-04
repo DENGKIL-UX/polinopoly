@@ -535,6 +535,90 @@ class SoundManager {
       d.stop(now + 0.55);
     });
   }
+
+  // -- New sounds for added features ----------------------------------------
+
+  playMortgage(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.2, now);
+    out.connect(ctx.destination);
+    // Descending "wah wah" — mortgage is bad
+    tone(ctx, out, 440, now, 0.15, 'sawtooth', 0.15);
+    tone(ctx, out, 349, now + 0.12, 0.15, 'sawtooth', 0.12);
+    tone(ctx, out, 261, now + 0.24, 0.3, 'sawtooth', 0.1);
+  }
+
+  playUnmortgage(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.25, now);
+    out.connect(ctx.destination);
+    // Ascending "ding ding ding" — recovering property
+    tone(ctx, out, 523, now, 0.15, 'sine', 0.2);
+    tone(ctx, out, 659, now + 0.12, 0.15, 'sine', 0.2);
+    tone(ctx, out, 784, now + 0.24, 0.25, 'sine', 0.2);
+  }
+
+  playAchievement(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.3, now);
+    out.connect(ctx.destination);
+    // Triumphant 4-note fanfare
+    tone(ctx, out, 523, now, 0.12, 'square', 0.1);
+    tone(ctx, out, 659, now + 0.1, 0.12, 'square', 0.1);
+    tone(ctx, out, 784, now + 0.2, 0.12, 'square', 0.1);
+    tone(ctx, out, 1047, now + 0.3, 0.4, 'square', 0.12);
+  }
+
+  playTradeComplete(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.2, now);
+    out.connect(ctx.destination);
+    // Exchange sound: two tones going opposite directions
+    tone(ctx, out, 440, now, 0.2, 'sine', 0.15);
+    tone(ctx, out, 880, now + 0.15, 0.2, 'sine', 0.15);
+    tone(ctx, out, 660, now + 0.3, 0.15, 'triangle', 0.1);
+  }
+
+  playSave(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.15, now);
+    out.connect(ctx.destination);
+    // Soft "blip" — save confirmation
+    tone(ctx, out, 880, now, 0.08, 'sine', 0.12);
+    tone(ctx, out, 1100, now + 0.06, 0.12, 'sine', 0.1);
+  }
+
+  playSpeedChange(): void {
+    const ctx = this.ensureCtx();
+    const now = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(this._volume * 0.15, now);
+    out.connect(ctx.destination);
+    // Quick "whoosh"
+    const noise = ctx.createBufferSource();
+    noise.buffer = createNoiseBuffer(ctx, 0.15);
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.08, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    const hpf = ctx.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.setValueAtTime(2000, now);
+    noise.connect(hpf);
+    hpf.connect(nGain);
+    nGain.connect(out);
+    noise.start(now);
+    noise.stop(now + 0.2);
+  }
 }
 
 // ---------------------------------------------------------------------------

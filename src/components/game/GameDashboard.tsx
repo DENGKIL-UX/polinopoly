@@ -13,7 +13,7 @@ import {
   ChevronRight, SkipForward, DollarSign, Building2, Crown,
   Briefcase, Hammer, Home, X, Landmark, HelpCircle, RotateCw,
   Volume2, VolumeX, Zap, Save, FolderOpen, Medal, Settings,
-  Banknote, ShieldDown, Shield, Gauge, Star,
+  Banknote, ShieldDown, Shield, Gauge, Star, Handshake, Keyboard,
 } from 'lucide-react';
 import { soundManager, useSoundEnabled } from '@/lib/sound-effects';
 
@@ -66,6 +66,9 @@ function HowToPlayButton() {
                 <p>📜⚡ <b className="text-slate-200">Kad</b> — Jawatan Menteri & Krisis Nasional cards change your fate.</p>
                 <p>🏆 <b className="text-slate-200">Menang</b> — Last coalition standing wins Dewan Rakyat!</p>
                 <p className="text-slate-500 pt-1 border-t border-slate-700/30">AI controls 5 other coalitions automatically.</p>
+                <p className="text-slate-500 pt-1 border-t border-slate-700/30 flex items-center gap-1">
+                  <Keyboard className="h-2.5 w-2.5" /><b className="text-slate-400">Shortcuts:</b> Space/Enter = Roll · B = Buy · P = Pass · S = Sound · Esc = Close
+                </p>
               </CardContent>
             </Card>
           </motion.div>
@@ -128,6 +131,7 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
 /* ─── Market Ticker ─── */
 function MarketTicker() {
   const [ticks, setTicks] = useState({ klci: 1587.3, klciChange: -0.8, cpoPrice: 3950, cpoChange: 2.3, ringgitUsd: 4.47, ringgitChange: -0.2, inflation: 1.0 });
+  const [tickKey, setTickKey] = useState(0);
   useEffect(() => {
     const iv = setInterval(() => {
       setTicks(p => ({
@@ -139,27 +143,60 @@ function MarketTicker() {
         ringgitChange: +((Math.random() - 0.5) * 0.3).toFixed(2),
         inflation: +(0.85 + Math.random() * 0.3).toFixed(2),
       }));
+      setTickKey(k => k + 1);
     }, 5000);
     return () => clearInterval(iv);
   }, []);
+  const items = [
+    { l: 'KLCI', v: ticks.klci.toFixed(1), c: ticks.klciChange },
+    { l: 'CPO', v: `RM${ticks.cpoPrice}`, c: ticks.cpoChange },
+    { l: 'MYR', v: ticks.ringgitUsd.toFixed(2), c: ticks.ringgitChange * 10 },
+    { l: 'INF', v: `×${ticks.inflation}`, c: (ticks.inflation - 1) * 50 },
+  ];
   return (
     <div className="flex items-center gap-3 md:gap-4 overflow-x-auto px-3 py-1.5 bg-slate-950/90 border-b border-slate-700/30 text-[10px] backdrop-blur-sm">
-      <span className="font-bold text-yellow-500 flex items-center gap-1 flex-shrink-0">
-        <TrendingUp className="h-3 w-3" /><span className="hidden sm:inline">BURSA</span><span className="sm:hidden">📈</span>
+      <span className="font-bold text-yellow-500 flex items-center gap-1.5 flex-shrink-0">
+        <TrendingUp className="h-3 w-3" />
+        <span className="hidden sm:inline">BURSA MALAYSIA</span>
+        <span className="sm:hidden">📈</span>
+        <motion.span
+          animate={{ opacity: [1, 0.3, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"
+        />
+        <span className="text-[8px] text-emerald-400 font-medium hidden sm:inline">LIVE</span>
       </span>
-      {[
-        { l: 'KLCI', v: ticks.klci.toFixed(1), c: ticks.klciChange },
-        { l: 'CPO', v: `RM${ticks.cpoPrice}`, c: ticks.cpoChange },
-        { l: 'MYR', v: ticks.ringgitUsd.toFixed(2), c: ticks.ringgitChange * 10 },
-        { l: 'INF', v: `×${ticks.inflation}`, c: (ticks.inflation - 1) * 50 },
-      ].map((item, i) => (
-        <span key={i} className="flex items-center gap-1 flex-shrink-0">
+      {items.map((item, i) => (
+        <motion.span
+          key={i}
+          layout
+          initial={false}
+          className="flex items-center gap-1 flex-shrink-0"
+        >
           <span className="text-slate-500 font-medium">{item.l}</span>
-          <span className="font-bold text-slate-200">{item.v}</span>
-          <span className={item.c >= 0 ? 'text-emerald-400' : 'text-red-400'} style={{ minWidth: 38 }}>
-            {item.c >= 0 ? '▲' : '▼'}{Math.abs(item.c).toFixed(1)}%
-          </span>
-        </span>
+          <motion.span
+            key={`${item.l}-val-${tickKey}`}
+            initial={{ opacity: 0.4, y: 2 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="font-bold text-slate-200"
+          >
+            {item.v}
+          </motion.span>
+          <motion.span
+            key={`${item.l}-chg-${tickKey}`}
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3 }}
+            className={`flex items-center gap-0.5 ${item.c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+            style={{ minWidth: 38 }}
+          >
+            {item.c >= 0
+              ? <TrendingUp className="h-2.5 w-2.5" />
+              : <TrendingDown className="h-2.5 w-2.5" />}
+            {Math.abs(item.c).toFixed(1)}%
+          </motion.span>
+        </motion.span>
       ))}
     </div>
   );
@@ -539,6 +576,313 @@ function AchievementsPanel() {
   );
 }
 
+/* ─── Trade Button + Dropdown ─── */
+function TradeButton() {
+  const phase = useGameStore(s => s.phase);
+  const players = useGameStore(s => s.players);
+  const turnOrder = useGameStore(s => s.turnOrder);
+  const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
+  const tradeState = useGameStore(s => s.tradeState);
+  const initiateTrade = useGameStore(s => s.initiateTrade);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const currentPlayerId = turnOrder[currentTurnIndex];
+  const isPlayerTurn = currentPlayerId === 'player';
+  const canTrade = isPlayerTurn && (phase === 'landed' || phase === 'playing') && !tradeState?.isActive;
+
+  if (!canTrade) return null;
+
+  const tradeTargets = players.filter(p => p.id !== 'player' && !p.isBankrupt);
+
+  const handleSelect = (targetId: string) => {
+    setDropdownOpen(false);
+    initiateTrade(targetId);
+  };
+
+  return (
+    <div className="relative">
+      <motion.button
+        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+        onClick={() => setDropdownOpen(v => !v)}
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors backdrop-blur-sm"
+        title="Trade with another player"
+      >
+        <Handshake className="h-3.5 w-3.5" />
+      </motion.button>
+      <AnimatePresence>
+        {dropdownOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            className="absolute top-10 right-0 w-52 z-50"
+          >
+            <Card className="bg-slate-900/98 border-amber-500/20 shadow-2xl shadow-black/40 backdrop-blur-sm">
+              <CardHeader className="p-3 pb-1.5">
+                <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                  <Handshake className="h-3.5 w-3.5" />Pilih Rakan Dagangan
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-1.5 pt-0 space-y-0.5">
+                {tradeTargets.map(p => {
+                  const coalition = COALITIONS[p.coalitionId];
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSelect(p.id)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-800/60 transition-colors text-left"
+                    >
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 border border-white/10"
+                        style={{ backgroundColor: coalition.color }}
+                      >
+                        {p.avatarEmoji}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold truncate" style={{ color: coalition.color }}>{p.name}</p>
+                        <p className="text-[8px] text-slate-500">RM{p.money.toLocaleString()} · {p.properties.length} properties</p>
+                      </div>
+                      {p.isAI && <Badge variant="outline" className="text-[7px] px-1 py-0 h-3.5 border-slate-600 text-slate-500">AI</Badge>}
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Trade Panel ─── */
+function TradePanel() {
+  const tradeState = useGameStore(s => s.tradeState);
+  const players = useGameStore(s => s.players);
+  const tiles = useGameStore(s => s.tiles);
+  const updateTradeOffer = useGameStore(s => s.updateTradeOffer);
+  const rejectTrade = useGameStore(s => s.rejectTrade);
+  const aiTradeResponse = useGameStore(s => s.aiTradeResponse);
+
+  const [offeredProps, setOfferedProps] = useState<number[]>(tradeState?.offeredProperties || []);
+  const [requestedProps, setRequestedProps] = useState<number[]>(tradeState?.requestedProperties || []);
+  const [offeredCash, setOfferedCash] = useState(String(tradeState?.offeredCash || 0));
+  const [requestedCash, setRequestedCash] = useState(String(tradeState?.requestedCash || 0));
+  const aiResponder = tradeState ? players.find(p => p.id === tradeState.responder) : null;
+  const [aiThinking, setAiThinking] = useState(() => !!aiResponder?.isAI);
+
+  if (!tradeState?.isActive) return null;
+
+  const initiator = players.find(p => p.id === tradeState.initiator);
+  const responder = players.find(p => p.id === tradeState.responder);
+  if (!initiator || !responder) return null;
+
+  const responderCoalition = COALITIONS[responder.coalitionId];
+
+  const isHumanInitiator = initiator.id === 'player';
+  const humanPlayer = isHumanInitiator ? initiator : responder;
+  const otherPlayer = isHumanInitiator ? responder : initiator;
+
+  const humanProperties = humanPlayer.properties
+    .map(pid => tiles.find(t => t.id === pid))
+    .filter(t => t && (t.type === 'property' || t.type === 'highway' || t.type === 'media'));
+
+  const otherProperties = otherPlayer.properties
+    .map(pid => tiles.find(t => t.id === pid))
+    .filter(t => t && (t.type === 'property' || t.type === 'highway' || t.type === 'media'));
+
+  const toggleOfferedProp = (tileId: number) => {
+    setOfferedProps(prev => prev.includes(tileId) ? prev.filter(id => id !== tileId) : [...prev, tileId]);
+  };
+
+  const toggleRequestedProp = (tileId: number) => {
+    setRequestedProps(prev => prev.includes(tileId) ? prev.filter(id => id !== tileId) : [...prev, tileId]);
+  };
+
+  const handlePropose = () => {
+    const oc = Math.max(0, parseInt(offeredCash) || 0);
+    const rc = Math.max(0, parseInt(requestedCash) || 0);
+    updateTradeOffer(offeredProps, oc, requestedProps, rc);
+    // If responder is AI, trigger AI response now
+    if (otherPlayer.isAI) {
+      setAiThinking(true);
+      setTimeout(() => {
+        aiTradeResponse();
+        setAiThinking(false);
+      }, 800);
+    }
+  };
+
+  const handleCancel = () => {
+    setAiThinking(false);
+    rejectTrade();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      className="max-w-md mx-auto w-full"
+    >
+      <Card className="bg-slate-900/95 border-amber-500/30 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+        <CardHeader className="p-3 pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+              <Handshake className="h-3.5 w-3.5" />
+              Dagangan / Trade
+            </CardTitle>
+            <button onClick={handleCancel} className="text-slate-500 hover:text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-[9px] text-slate-400 mt-1">
+            Trading with{' '}
+            <span className="font-bold" style={{ color: responderCoalition.color }}>
+              {otherPlayer.name}
+            </span>
+          </p>
+        </CardHeader>
+        <CardContent className="p-2.5 pt-0 space-y-2.5">
+          {/* Two-column layout */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* You Offer column */}
+            <div className="space-y-1.5">
+              <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                <ArrowRight className="h-2.5 w-2.5 rotate-[-45deg]" />You Offer
+              </p>
+              <div className="h-28 overflow-y-auto space-y-0.5 pr-0.5">
+                {humanProperties.length === 0 && (
+                  <p className="text-[8px] text-slate-600 text-center py-2">No properties</p>
+                )}
+                {humanProperties.map(t => {
+                  if (!t) return null;
+                  const checked = offeredProps.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer transition-colors ${
+                        checked ? 'bg-emerald-500/10 border border-emerald-500/30' : 'hover:bg-slate-800/40 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleOfferedProp(t.id)}
+                        className="w-3 h-3 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/30 accent-emerald-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[8px] font-semibold text-slate-300 truncate">{t.name}</p>
+                        <div className="flex items-center gap-1">
+                          {t.colorGroup && (
+                            <div className="w-1.5 h-1.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLOR_GROUP_HEX[t.colorGroup] || '#6b7280' }} />
+                          )}
+                          <span className="text-[7px] text-slate-500">RM{t.price}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] text-slate-500">Cash:</span>
+                <input
+                  type="number"
+                  value={offeredCash}
+                  onChange={e => setOfferedCash(e.target.value)}
+                  min={0}
+                  className="flex-1 h-6 px-1.5 bg-slate-800/80 border border-slate-600/50 rounded text-[9px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 w-full"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* You Request column */}
+            <div className="space-y-1.5">
+              <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                <ArrowRight className="h-2.5 w-2.5 rotate-[135deg]" />You Request
+              </p>
+              <div className="h-28 overflow-y-auto space-y-0.5 pr-0.5">
+                {otherProperties.length === 0 && (
+                  <p className="text-[8px] text-slate-600 text-center py-2">No properties</p>
+                )}
+                {otherProperties.map(t => {
+                  if (!t) return null;
+                  const checked = requestedProps.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer transition-colors ${
+                        checked ? 'bg-amber-500/10 border border-amber-500/30' : 'hover:bg-slate-800/40 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleRequestedProp(t.id)}
+                        className="w-3 h-3 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30 accent-amber-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[8px] font-semibold text-slate-300 truncate">{t.name}</p>
+                        <div className="flex items-center gap-1">
+                          {t.colorGroup && (
+                            <div className="w-1.5 h-1.5 rounded-sm flex-shrink-0" style={{ backgroundColor: COLOR_GROUP_HEX[t.colorGroup] || '#6b7280' }} />
+                          )}
+                          <span className="text-[7px] text-slate-500">RM{t.price}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] text-slate-500">Cash:</span>
+                <input
+                  type="number"
+                  value={requestedCash}
+                  onChange={e => setRequestedCash(e.target.value)}
+                  min={0}
+                  className="flex-1 h-6 px-1.5 bg-slate-800/80 border border-slate-600/50 rounded text-[9px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* AI thinking indicator */}
+          {aiThinking && (
+            <div className="flex items-center justify-center gap-2 py-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
+              <div className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+              <span className="text-[10px] text-amber-400 font-medium">
+                AI sedang berfikir<motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.2 }}>.</motion.span>
+              </span>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          {!aiThinking && (
+            <div className="flex gap-2 pt-1">
+              <Button
+                onClick={handlePropose}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold h-8 shadow-lg shadow-emerald-600/20"
+              >
+                <Handshake className="h-3 w-3 mr-1" />Propose Trade
+              </Button>
+              <Button
+                onClick={handleCancel}
+                variant="outline"
+                className="flex-1 border-slate-600 text-slate-300 text-xs h-8 hover:bg-slate-800"
+              >
+                <X className="h-3 w-3 mr-1" />Cancel
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 /* ─── Save/Load Buttons ─── */
 function SaveLoadButtons() {
   const saveGame = useGameStore(s => s.saveGame);
@@ -860,6 +1204,52 @@ export default function GameDashboard() {
   const winner = useGameStore(s => s.winner);
   const selectedTileId = useGameStore(s => s.selectedTileId);
   const selectedTile = selectedTileId !== null ? BOARD_TILES[selectedTileId] : null;
+  const tradeState = useGameStore(s => s.tradeState);
+  const showPortfolio = useGameStore(s => s.showPortfolio);
+  const togglePortfolio = useGameStore(s => s.togglePortfolio);
+  const selectTile = useGameStore(s => s.selectTile);
+  const rejectTrade = useGameStore(s => s.rejectTrade);
+  const [, toggleSound] = useSoundEnabled();
+
+  /* ─── Keyboard Shortcuts ─── */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (phase === 'playing' && isPlayerTurn) {
+          soundManager.playDiceRoll();
+          rollDice();
+        }
+      }
+      if (e.key === 'b' || e.key === 'B') {
+        if (phase === 'buying' && isPlayerTurn) {
+          soundManager.playBuy();
+          buyProperty();
+        }
+      }
+      if (e.key === 'p' || e.key === 'P') {
+        if (phase === 'buying' && isPlayerTurn) {
+          soundManager.playAuction();
+          skipBuy();
+        }
+      }
+      if (e.key === 'Escape') {
+        if (tradeState?.isActive) rejectTrade();
+        if (showPortfolio) togglePortfolio();
+        if (selectedTileId !== null) selectTile(null);
+      }
+      if (e.key === 's' || e.key === 'S') {
+        if (phase === 'playing' || phase === 'landed') {
+          toggleSound();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [phase, isPlayerTurn, rollDice, buyProperty, skipBuy, tradeState?.isActive, showPortfolio, selectedTileId, togglePortfolio, selectTile, rejectTrade, toggleSound]);
 
   return (
     <div className="absolute inset-0 pointer-events-none z-20 flex flex-col">
@@ -875,6 +1265,7 @@ export default function GameDashboard() {
       <div className="absolute top-8 right-1.5 z-30 pointer-events-auto hidden md:flex items-center gap-1.5">
         <AISpeedControl />
         <AchievementsPanel />
+        <TradeButton />
         <SaveLoadButtons />
         <SoundToggleButton />
         <HowToPlayButton />
@@ -882,6 +1273,7 @@ export default function GameDashboard() {
       <div className="absolute top-[4.5rem] right-1.5 z-30 pointer-events-auto flex items-center gap-1.5 md:hidden">
         <AISpeedControl />
         <AchievementsPanel />
+        <TradeButton />
         <SaveLoadButtons />
         <SoundToggleButton />
         <HowToPlayButton />
@@ -1041,6 +1433,13 @@ export default function GameDashboard() {
             <motion.div key="auction" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
               className="max-w-xs mx-auto w-full">
               <AuctionPanel />
+            </motion.div>
+          )}
+
+          {tradeState?.isActive && (
+            <motion.div key="trade" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+              className="max-w-md mx-auto w-full">
+              <TradePanel />
             </motion.div>
           )}
 

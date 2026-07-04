@@ -89,7 +89,7 @@ function TiltedCoalitionCard({ coalition, index, selected, onSelect }: {
         className={`cursor-pointer hover:shadow-lg border-2 ${
           selected
             ? 'border-yellow-400 shadow-yellow-400/20 shadow-lg'
-            : 'border-slate-700/50 hover:border-slate-600'
+            : 'border-slate-700/50 hover:border-slate-600 hover:-translate-y-1'
         }`}
         style={{
           backgroundColor: selected
@@ -175,6 +175,28 @@ export default function LobbyScreen() {
       <div className="absolute top-[20%] left-[15%] w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl" />
       <div className="absolute bottom-[10%] right-[10%] w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl" />
       <div className="absolute top-[60%] left-[60%] w-48 h-48 bg-blue-500/5 rounded-full blur-3xl" />
+
+      {/* Floating particles */}
+      {[
+        {x:'10%',y:'20%',color:'#f59e0b',d:0,size:4},
+        {x:'85%',y:'15%',color:'#10b981',d:1.5,size:3},
+        {x:'75%',y:'75%',color:'#ef4444',d:0.8,size:5},
+        {x:'20%',y:'80%',color:'#3b82f6',d:2.0,size:3},
+        {x:'60%',y:'10%',color:'#f472b6',d:1.2,size:4},
+        {x:'40%',y:'90%',color:'#eab308',d:0.5,size:3},
+      ].map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full pointer-events-none opacity-30"
+          style={{
+            left: p.x, top: p.y,
+            width: p.size, height: p.size,
+            backgroundColor: p.color,
+            filter: `blur(${p.size}px)`,
+            animation: `gentle-float ${4 + p.d}s ease-in-out ${p.d}s infinite`,
+          }}
+        />
+      ))}
 
       {/* Header */}
       <motion.div
@@ -384,6 +406,9 @@ export default function LobbyScreen() {
           </p>
         </motion.div>
       </motion.div>
+
+      {/* Version footer */}
+      <div className="absolute bottom-3 text-[9px] text-slate-600 tracking-wider">v1.0 — DENGKIL-UX</div>
     </div>
   );
 }

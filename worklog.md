@@ -308,3 +308,159 @@ Work Log:
 6. Tournament/scoring mode (accumulate points across multiple games)
 7. Mobile layout improvements (bottom sheet for game log, swipe gestures)
 8. Dark/light mode toggle
+
+---
+Task ID: 4
+Agent: Bug Fix & Feature Agent
+Task: Fix critical game logic bugs and add AI house building, market simulation, trade system
+
+Work Log:
+- Fixed `go_to` card bug: replaced `phase: 'landed'` with `setTimeout(() => get().handleLanding(), 500)` so cards that send players to owned/unowned properties correctly trigger rent or buy dialogs
+- Fixed `go_to` position bug: changed `effect.tileId || 0` to `effect.value ?? effect.tileId ?? 0` — card data uses `effect.value` for tile position, not `effect.tileId`, so "Go to Putrajaya" was incorrectly sending players to GO
+- Added post-switch bankruptcy check for `collect_all` and `pay_all` card effects: now checks ALL players (not just current) for negative money after multi-player money transfers, marks bankrupt players, and triggers game over if ≤1 active player
+- Added AI house building in `aiTurn()`: after normal turn actions and auction, AI scans owned properties for complete color groups, builds houses on cheapest properties first, maintains RM200 cash buffer, logs each build action
+- Added `simulateMarket()` function: fluctuates KLCI (1200–2000), CPO (2000–6000), MYR/USD (3.5–5.5) each turn, derives `inflationMultiplier` and `federalRentBonus` from market values
+- Called `simulateMarket()` at start of each turn in `endTurn()` before AI auto-play
+- Added `simulateMarket: () => void` to `GameState` interface
+- Added complete player-to-player trade system: `tradeState` field in interface + initial state, `initiateTrade()`, `updateTradeOffer()`, `acceptTrade()`, `rejectTrade()`, `aiTradeResponse()`
+- Trade system validates property ownership and cash availability, swaps properties + transfers cash, clears mortgage on traded properties, checks post-trade bankruptcy
+- AI trade response uses heuristic: accepts if offered value ≥ 70% of requested value with 25% random rejection chance
+- Fixed missing closing parenthesis in `simulateMarket` Math.max call
+- Lint passes clean: 0 errors, 0 warnings
+
+Stage Summary:
+- **3 critical bugs fixed**: go_to card handleLanding, go_to tileId→value, collect_all/pay_all bankruptcy
+- **1 new AI feature**: AI house building on full color sets with cash buffer
+- **1 new system**: Live market simulation (KLCI, CPO, Ringgit) affecting rent each turn
+- **1 new system**: Player-to-player trade with AI negotiation
+- **~326 lines added** to game-store.ts (types + implementations)
+- **0 lint errors, 0 warnings**
+---
+Task ID: 4b
+Agent: GameBoard Fix Agent
+Task: Fix canBuild bug in GameBoard.tsx
+
+Work Log:
+- Fixed canBuild useMemo to use store tiles instead of static BOARD_TILES
+- Removed unused playerProps variable
+- Kept `houses` variable (still needed for JSX rendering of house icons)
+
+Stage Summary:
+- canBuild now correctly reads owner/houses from dynamic store state via `tiles.find()` lookup
+- Lint passes clean
+
+---
+Task ID: 4c
+Agent: Dashboard Features Agent
+Task: Add trade UI and keyboard shortcuts to GameDashboard
+
+Work Log:
+- Added TradePanel component with property checkboxes and cash inputs
+- Added Trade button with player selection dropdown
+- Added keyboard shortcuts (Space/Enter, B, P, Escape, S)
+- Updated How to Play tooltip with shortcut hints
+
+Stage Summary:
+- Full trade UI with AI auto-response
+- Keyboard shortcuts improve UX
+- Lint passes clean
+---
+Task ID: 5
+Agent: Styling Overhaul Agent
+Task: Major visual polish across all components
+
+Work Log:
+- Added 10+ new CSS animations and utility classes
+- Enhanced GameBoard with more sparkle particles, corner glow, round indicator
+- Enhanced LobbyScreen with floating particles, version number
+- Enhanced market ticker with live indicator and color coding
+
+Stage Summary:
+- Visual quality significantly improved
+- All new animations are performant
+- Lint passes clean
+---
+Task ID: 4d
+Agent: Card Expansion Agent
+Task: Add 5 more cards per deck
+
+Work Log:
+- Added 5 new Jawatan Menteri cards (jm11-jm15)
+- Added 5 new Krisis Nasional cards (kn11-kn15)
+- Total: 15 cards per deck
+
+Stage Summary:
+- More card variety for longer games
+- Lint passes clean
+
+---
+Task ID: 6
+Agent: Main Agent (Round 4)
+Task: Code review, bug fixes, feature additions, styling overhaul, and GitHub push
+
+### Current Project Status
+Game is production-ready with all core Monopoly mechanics, 6 major new features added this round, 3 critical bugs fixed, and significant visual polish. Build passes, lint passes, static server verified.
+
+### Completed Modifications
+
+**Bug Fixes (3 critical):**
+1. `go_to` card now calls `handleLanding()` — fixes missed rent/buy when cards move you (e.g., "Go to Putrajaya" now triggers proper landing)
+2. `go_to` position bug fixed — was reading `effect.tileId` instead of `effect.value`, sending players to GO instead of the intended tile
+3. `collect_all`/`pay_all` cards now check ALL players for bankruptcy (not just current player)
+
+**New Features (7):**
+1. **Player-to-Player Trade System** — Full trade UI with property selection, cash inputs, AI negotiation heuristic (accepts if offered ≥70% value, 25% rejection chance), bankruptcy checks post-trade
+2. **AI House Building** — AI scans for complete color groups after each turn, builds houses cheapest-first with RM200 cash buffer
+3. **Live Market Simulation** — KLCI, CPO, MYR/USD fluctuate each turn; inflationMultiplier and federalRentBonus derived from market values; called in `endTurn()`
+4. **Keyboard Shortcuts** — Space/Enter (roll), B (buy), P (pass), Escape (close panels), S (toggle sound)
+5. **Trade UI Panel** — TradeButton with player dropdown, TradePanel with property checkboxes and cash inputs, AI thinking animation
+6. **5 More Cards Per Deck** — 15 total per deck now (BR1M, PAC Hearing, 1MDB Scandal, Rally Season, Palm Oil Rally, etc.)
+7. **6 New Sound Effects** — mortgage (descending wah), unmortgage (ascending ding), achievement (4-note fanfare), trade complete, save blip, speed change whoosh
+
+**Styling Improvements:**
+- 10+ new CSS animations: gentle-float, corner-glow, card-shine, money-pulse, dice-shake, slide-up-fade, etc.
+- Glassmorphism variants: glass-light, glass-amber
+- 8 sparkle particles on board (up from 4)
+- Corner tiles with stronger 3-layer amber glow
+- Round badge in board center
+- Lobby: 6 floating colored particles, version footer, hover lift on coalition cards
+- Market ticker: LIVE pulsing dot, color-coded arrows (green/red), Framer Motion animated values
+- Page metadata fixed: proper title, description, OG tags for "Dewan Rakyat: Pilihan Raya Edition"
+
+**GameBoard Fix:**
+- `canBuild` useMemo now correctly reads from Zustand store tiles (not static BOARD_TILES)
+
+### Verification
+- `bun run lint`: 0 errors, 0 warnings
+- `npx next build`: compiles successfully, all 7 routes generated
+- Static server on port 3099: HTML verified via curl (all 6 coalitions, start button, title present)
+- Page metadata: title = "Dewan Rakyat: Pilihan Raya Edition", proper OG tags
+
+### Files Modified This Round
+- `src/app/layout.tsx` — metadata fix
+- `src/lib/game-store.ts` — 3 bug fixes + market simulation + AI building + trade system (~326 lines)
+- `src/lib/game-data.ts` — 10 new cards (5 per deck)
+- `src/lib/sound-effects.ts` — 6 new sound effects
+- `src/components/game/GameBoard.tsx` — canBuild fix + visual improvements
+- `src/components/game/GameDashboard.tsx` — trade UI + keyboard shortcuts + market ticker enhancement (~220 lines)
+- `src/components/game/LobbyScreen.tsx` — floating particles + version footer
+- `src/app/globals.css` — 10+ new animations and utility classes
+
+### Unresolved Issues / Risks
+- **Port 3000 instability**: Dev server dies when agent-browser connects. Static server on port 3099 is the reliable access method.
+- **Agent-browser limitation**: Shows Z.ai gateway watermark, not actual page content (sandbox-level, not a code issue).
+- **Managing phase**: Added to store but no dedicated UI button (player manages via Portfolio panel during 'landed' phase).
+- **AI trade AI calls LLM**: The trade AI uses heuristics; LLM integration for trade quotes not yet implemented.
+- **No dark/light mode toggle** yet.
+- **No tournament/scoring mode** yet (accumulate points across games).
+- **Mobile**: Game log bottom sheet and swipe gestures not yet implemented.
+
+### Priority Recommendations for Next Phase
+1. Tournament/scoring mode (points across multiple games)
+2. Dark/light mode toggle with next-themes
+3. Mobile layout improvements (bottom sheet for game log, swipe gestures)
+4. More sophisticated AI decision-making (consider opponent weaknesses, portfolio value)
+5. Undo last action feature
+6. Game statistics dashboard (win rate, avg turns, favorite coalition)
+7. Multi-language support (full BM/EN toggle beyond cards)
+8. Animated dice rolling 3D effect

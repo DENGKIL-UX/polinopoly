@@ -105,6 +105,17 @@ export interface GameState {
   achievements: Achievement[];
   stats: GameStats;
 
+  // Trade
+  tradeState: {
+    initiator: string | null;
+    responder: string | null;
+    offeredProperties: number[];
+    offeredCash: number;
+    requestedProperties: number[];
+    requestedCash: number;
+    isActive: boolean;
+  } | null;
+
   // Actions
   startGame: (coalitionId: string) => void;
   rollDice: () => void;
@@ -139,6 +150,12 @@ export interface GameState {
   hasSavedGame: () => boolean;
   enterManaging: () => void;
   exitManaging: () => void;
+  simulateMarket: () => void;
+  initiateTrade: (targetPlayerId: string) => void;
+  updateTradeOffer: (offeredProperties: number[], offeredCash: number, requestedProperties: number[], requestedCash: number) => void;
+  acceptTrade: () => void;
+  rejectTrade: () => void;
+  aiTradeResponse: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -234,6 +251,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   aiSpeed: 1,
   achievements: INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
   stats: { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
+  tradeState: null,
 
   startGame: (playerCoalitionId: string) => {
     const allCoalitionIds = Object.keys(COALITIONS);
@@ -710,7 +728,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         break;
       }
       case 'go_to': {
-        const targetPos = effect.tileId || 0;
+        const targetPos = effect.value ?? effect.tileId ?? 0;
         const passedGo = player.position > targetPos;
         set(state => ({
           players: state.players.map(p =>
@@ -719,7 +737,6 @@ export const useGameStore = create<GameState>((set, get) => ({
               : p
           ),
           currentCard: null,
-          phase: 'landed',
         }));
         if (passedGo) {
           get().addLog({
@@ -729,6 +746,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             type: 'pass_go',
           });
         }
+        // CRITICAL FIX: Trigger handleLanding after position update
+        setTimeout(() => get().handleLanding(), 500);
         break;
       }
       case 'jail': {
@@ -777,6 +796,25 @@ export const useGameStore = create<GameState>((set, get) => ({
           phase: 'landed',
         }));
         break;
+      }
+    }
+
+    // Check all players for bankruptcy after pay_all / collect_all
+    if (effect.type === 'collect_all' || effect.type === 'pay_all') {
+      const postState = get();
+      const anyBankrupt = postState.players.some(p => p.money < 0 && !p.isBankrupt);
+      if (anyBankrupt) {
+        set(state => ({
+          players: state.players.map(p =>
+            p.money < 0 ? { ...p, isBankrupt: true } : p
+          ),
+        }));
+        // Check game over
+        const activePlayers = get().players.filter(p => !p.isBankrupt);
+        if (activePlayers.length <= 1) {
+          set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+          return;
+        }
       }
     }
 
@@ -839,6 +877,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Auto-save after each turn
     get().saveGame();
+
+    // Simulate market fluctuations at start of each turn
+    get().simulateMarket();
 
     // If next player is AI, auto-play
     if (nextPlayer?.isAI) {
@@ -999,6 +1040,51 @@ export const useGameStore = create<GameState>((set, get) => ({
     while (get().phase === 'auction' && auctionWaitCount < 30) {
       await delay(1000);
       auctionWaitCount++;
+    }
+
+    // AI: Build houses on full color sets
+    const aiState = get();
+    const aiPlayer = aiState.players.find(p => p.id === currentPlayerId);
+    if (aiPlayer && aiPlayer.money > 300) {
+      const aiColorGroups = new Set<string>();
+      for (const tileId of aiPlayer.properties) {
+        const t = aiState.tiles.find(tile => tile.id === tileId);
+        if (t?.colorGroup && t?.type === 'property' && t.housePrice) {
+          aiColorGroups.add(t.colorGroup);
+        }
+      }
+      for (const cg of aiColorGroups) {
+        const groupTiles = aiState.tiles.filter(t => t.colorGroup === cg && t.type === 'property');
+        const ownsAll = groupTiles.every(t => t.owner === currentPlayerId);
+        if (!ownsAll) continue;
+        // Build houses on the cheapest properties first
+        const buildable = groupTiles
+          .filter(t => (t.houses || 0) < 5 && !aiState.mortgagedTiles.includes(t.id))
+          .sort((a, b) => (a.housePrice || 0) - (b.housePrice || 0));
+        for (const bt of buildable) {
+          const currentAI = get().players.find(p => p.id === currentPlayerId);
+          if (!currentAI || currentAI.money < (bt.housePrice || 0)) break;
+          // Only build if we have enough cash buffer (keep 200 RM minimum)
+          if (currentAI.money - (bt.housePrice || 0) < 200) break;
+          const newHouses = (bt.houses || 0) + 1;
+          set(state => ({
+            players: state.players.map(p =>
+              p.id === currentPlayerId ? { ...p, money: p.money - (bt.housePrice || 0) } : p
+            ),
+            tiles: state.tiles.map(t =>
+              t.id === bt.id ? { ...t, houses: newHouses } : t
+            ),
+          }));
+          get().addLog({
+            playerId: currentPlayerId,
+            playerName: currentAI.name,
+            message: newHouses === 5
+              ? `🏨 ${currentAI.name} builds HOTEL on ${bt.name}!`
+              : `🏠 ${currentAI.name} builds house on ${bt.name} (${newHouses}/4)`,
+            type: 'buy',
+          });
+        }
+      }
     }
 
     get().setAIThinking(false);
@@ -1552,5 +1638,245 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   exitManaging: () => {
     set({ phase: 'landed' });
+  },
+
+  // --- Market Simulation ---
+  simulateMarket: () => {
+    const state = get();
+    const klciChange = (Math.random() - 0.5) * 3;
+    const cpoChange = (Math.random() - 0.5) * 5;
+    const ringgitChange = (Math.random() - 0.5) * 0.08;
+
+    const newKlci = Math.max(1200, Math.min(2000, state.marketState.klci + klciChange * 10));
+    const newCpo = Math.max(2000, Math.min(6000, state.marketState.cpoPrice + cpoChange * 50));
+    const newRinggit = Math.max(3.5, Math.min(5.5, state.marketState.ringgitUsd + ringgitChange));
+
+    // Inflation: driven by KLCI and CPO
+    const inflationMultiplier = 0.85 + (newKlci - 1400) / 2000 + (newCpo - 3500) / 20000;
+    const federalRentBonus = 1.0 + (newRinggit - 4.47) * 0.3;
+
+    set({
+      marketState: {
+        klci: Math.round(newKlci * 10) / 10,
+        klciChange: Math.round(klciChange * 10) / 10,
+        cpoPrice: Math.round(newCpo),
+        cpoChange: Math.round(cpoChange * 10) / 10,
+        ringgitUsd: Math.round(newRinggit * 100) / 100,
+        ringgitChange: Math.round(ringgitChange * 100) / 100,
+        inflationMultiplier: Math.round(inflationMultiplier * 100) / 100,
+        federalRentBonus: Math.round(federalRentBonus * 100) / 100,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  },
+
+  // --- Trade System ---
+  initiateTrade: (targetPlayerId: string) => {
+    const state = get();
+    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+    const player = state.players.find(p => p.id === currentPlayerId);
+    if (!player || player.isAI) return;
+    if (state.phase !== 'landed' && state.phase !== 'playing') return;
+
+    const target = state.players.find(p => p.id === targetPlayerId);
+    if (!target || target.isBankrupt || target.isBankrupt === undefined) return;
+
+    set({
+      tradeState: {
+        initiator: currentPlayerId,
+        responder: targetPlayerId,
+        offeredProperties: [],
+        offeredCash: 0,
+        requestedProperties: [],
+        requestedCash: 0,
+        isActive: true,
+      },
+    });
+
+    // If responder is AI, trigger AI evaluation after a short delay
+    if (target.isAI) {
+      setTimeout(() => get().aiTradeResponse(), 1500);
+    }
+  },
+
+  updateTradeOffer: (offeredProperties: number[], offeredCash: number, requestedProperties: number[], requestedCash: number) => {
+    const state = get();
+    if (!state.tradeState) return;
+    set({
+      tradeState: {
+        ...state.tradeState,
+        offeredProperties,
+        offeredCash,
+        requestedProperties,
+        requestedCash,
+      },
+    });
+  },
+
+  acceptTrade: () => {
+    const state = get();
+    const trade = state.tradeState;
+    if (!trade || !trade.initiator || !trade.responder) return;
+
+    const initiator = state.players.find(p => p.id === trade.initiator);
+    const responder = state.players.find(p => p.id === trade.responder);
+    if (!initiator || !responder) return;
+
+    // Validate that players own the properties they're offering
+    const initiatorOwnsOffered = trade.offeredProperties.every(id => initiator.properties.includes(id));
+    const responderOwnsRequested = trade.requestedProperties.every(id => responder.properties.includes(id));
+    if (!initiatorOwnsOffered || !responderOwnsRequested) {
+      get().addLog({
+        playerId: 'system',
+        playerName: 'System',
+        message: `❌ Trade failed — invalid property ownership!`,
+        type: 'system',
+      });
+      set({ tradeState: null });
+      return;
+    }
+
+    // Validate cash availability
+    if (initiator.money < trade.offeredCash || responder.money < trade.requestedCash) {
+      get().addLog({
+        playerId: 'system',
+        playerName: 'System',
+        message: `❌ Trade failed — insufficient funds!`,
+        type: 'system',
+      });
+      set({ tradeState: null });
+      return;
+    }
+
+    // Execute trade: swap properties and transfer cash
+    const initiatorNewProperties = [
+      ...initiator.properties.filter(id => !trade.offeredProperties.includes(id)),
+      ...trade.requestedProperties,
+    ];
+    const responderNewProperties = [
+      ...responder.properties.filter(id => !trade.requestedProperties.includes(id)),
+      ...trade.offeredProperties,
+    ];
+
+    set(state => ({
+      players: state.players.map(p => {
+        if (p.id === trade.initiator) {
+          return {
+            ...p,
+            properties: initiatorNewProperties,
+            money: p.money - trade.offeredCash + trade.requestedCash,
+          };
+        }
+        if (p.id === trade.responder) {
+          return {
+            ...p,
+            properties: responderNewProperties,
+            money: p.money - trade.requestedCash + trade.offeredCash,
+          };
+        }
+        return p;
+      }),
+      tiles: state.tiles.map(t => {
+        if (trade.offeredProperties.includes(t.id)) {
+          return { ...t, owner: trade.responder };
+        }
+        if (trade.requestedProperties.includes(t.id)) {
+          return { ...t, owner: trade.initiator };
+        }
+        return t;
+      }),
+      mortgagedTiles: [
+        ...state.mortgagedTiles.filter(id => !trade.offeredProperties.includes(id) && !trade.requestedProperties.includes(id)),
+      ],
+      tradeState: null,
+    }));
+
+    // Log the trade
+    const offeredDesc = [
+      ...trade.offeredProperties.map(id => state.tiles.find(t => t.id === id)?.name).filter(Boolean),
+      trade.offeredCash > 0 ? `RM${trade.offeredCash}` : null,
+    ].filter(Boolean).join(', ');
+
+    const requestedDesc = [
+      ...trade.requestedProperties.map(id => state.tiles.find(t => t.id === id)?.name).filter(Boolean),
+      trade.requestedCash > 0 ? `RM${trade.requestedCash}` : null,
+    ].filter(Boolean).join(', ');
+
+    get().addLog({
+      playerId: trade.initiator,
+      playerName: initiator.name,
+      message: `🤝 ${initiator.name} trades [${offeredDesc}] with ${responder.name} for [${requestedDesc}]!`,
+      type: 'system',
+    });
+
+    // Check bankruptcy after trade
+    const postTrade = get();
+    const anyBankrupt = postTrade.players.some(p => p.money < 0 && !p.isBankrupt);
+    if (anyBankrupt) {
+      set(state => ({
+        players: state.players.map(p =>
+          p.money < 0 ? { ...p, isBankrupt: true } : p
+        ),
+      }));
+      const activePlayers = get().players.filter(p => !p.isBankrupt);
+      if (activePlayers.length <= 1) {
+        set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+      }
+    }
+  },
+
+  rejectTrade: () => {
+    const state = get();
+    const trade = state.tradeState;
+    if (!trade) return;
+
+    const responder = state.players.find(p => p.id === trade.responder);
+    get().addLog({
+      playerId: trade.responder,
+      playerName: responder?.name || trade.responder,
+      message: `🚫 ${responder?.name || 'Opponent'} rejected the trade offer!`,
+      type: 'system',
+    });
+
+    set({ tradeState: null });
+  },
+
+  aiTradeResponse: () => {
+    const state = get();
+    const trade = state.tradeState;
+    if (!trade || !trade.responder) return;
+
+    const responder = state.players.find(p => p.id === trade.responder);
+    if (!responder || !responder.isAI) return;
+
+    // Calculate total value offered to AI (responder)
+    let offeredValue = trade.offeredCash;
+    for (const tileId of trade.offeredProperties) {
+      const t = state.tiles.find(tile => tile.id === tileId);
+      if (t) offeredValue += Math.round((t.price || 0) * 0.8);
+    }
+
+    // Calculate total value requested from AI
+    let requestedValue = trade.requestedCash;
+    for (const tileId of trade.requestedProperties) {
+      const t = state.tiles.find(tile => tile.id === tileId);
+      if (t) requestedValue += Math.round((t.price || 0) * 0.8);
+    }
+
+    // Heuristic: accept if offered value is reasonably close to requested, with randomness
+    const ratio = offeredValue / Math.max(1, requestedValue);
+    const shouldAccept = ratio > 0.7 && Math.random() > 0.25;
+
+    if (shouldAccept && responder.money >= trade.requestedCash) {
+      get().addLog({
+        playerId: trade.responder,
+        playerName: responder.name,
+        message: `🤝 ${responder.name} accepts the trade! "Deal lah, bro!"`,
+        type: 'system',
+      });
+      get().acceptTrade();
+    } else {
+      get().rejectTrade();
+    }
   },
 }));

@@ -234,6 +234,11 @@ export const JAWATAN_MENTERI_CARDS: GameCard[] = [
     id: 'jm10', title: 'Raya Angpow', description: 'Open house collection! Collect RM25 from every player.',
     effect: { type: 'collect_all', value: 25 },
   },
+  { id: 'jm11', title: 'BR1M Handout', description: 'Government announces BR1M aid! Collect RM150 from the Treasury.', effect: { type: 'money', value: 150 } },
+  { id: 'jm12', title: 'PAC Hearing', description: 'Public Accounts Committee summons you! Pay RM75 in legal fees.', effect: { type: 'money', value: -75 } },
+  { id: 'jm13', title: 'Election Petition', description: 'Your seat is challenged! Go directly to Tahanan SPR.', effect: { type: 'jail', value: 0 } },
+  { id: 'jm14', title: 'Tabung Haji Dividend', description: 'Tabung Haji declares bonus! Collect RM100 from every player.', effect: { type: 'collect_all', value: 100 } },
+  { id: 'jm15', title: 'Political Donation', description: 'Anonymous donor contributes RM200 to your campaign!', effect: { type: 'money', value: 200 } },
 ];
 
 export const KRISIS_NASIONAL_CARDS: GameCard[] = [
@@ -277,6 +282,11 @@ export const KRISIS_NASIONAL_CARDS: GameCard[] = [
     id: 'kn10', title: 'Infrastructure Upgrade', description: 'New highway in your area! Collect RM200.',
     effect: { type: 'money', value: 200 },
   },
+  { id: 'kn11', title: 'Budget Day!', description: 'Budget 2025 tabled! Move forward 5 spaces to celebrate.', effect: { type: 'move', value: 5 } },
+  { id: 'kn12', title: '1MDB Scandal!', description: 'Legacy financial scandal! Pay RM150 to every player.', effect: { type: 'pay_all', value: 150 } },
+  { id: 'kn13', title: 'Rally Season', description: 'Political rallies boost your popularity! Collect RM100 from each player.', effect: { type: 'collect_all', value: 100 } },
+  { id: 'kn14', title: 'Go to Pilihan Raya', description: 'Back to basics! Go to GO and collect RM200.', effect: { type: 'go_to', value: 0 } },
+  { id: 'kn15', title: 'Palm Oil Rally', description: 'CPO hits RM5000! Your plantations profit. Collect RM250.', effect: { type: 'money', value: 250 } },
 ];
 
 // --- Simulated Market Data ---

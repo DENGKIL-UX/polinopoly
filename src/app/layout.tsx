@@ -14,24 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+  title: "Dewan Rakyat: Pilihan Raya Edition — Malaysian Political Satire Monopoly",
+  description: "Navigate the Malaysian political landscape! Buy influence, collect rent, avoid jail, and outmaneuver 5 AI-controlled coalitions in this satirical board game.",
+  keywords: ["Malaysia", "politics", "monopoly", "board game", "Dewan Rakyat", "Pilihan Raya", "satire", "game"],
+  authors: [{ name: "DENGKIL-UX" }],
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Dewan Rakyat: Pilihan Raya Edition",
+    description: "A Malaysian Political Satire Monopoly Game — Buy influence, collect rent, and control Dewan Rakyat!",
+    siteName: "Polinopoly",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Dewan Rakyat: Pilihan Raya Edition",
+    description: "A Malaysian Political Satire Monopoly Game",
   },
 };
 

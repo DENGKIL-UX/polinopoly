@@ -85,18 +85,21 @@ function TileView({ tile }: { tile: Tile }) {
   const isMortgaged = mortgagedTiles.includes(tile.id);
 
   // Check if player owns this and can build (full color set, houses < 5)
-  const playerProps = players.find(p => p.id === 'player')?.properties || [];
   const canBuild = useMemo(() => {
-    if (tile.owner !== 'player' || tile.type !== 'property' || !tile.colorGroup || !tile.housePrice) return false;
-    if (houses >= 5) return false;
+    const ct = tiles.find(t => t.id === tile.id);
+    if (!ct || ct.owner !== 'player' || tile.type !== 'property' || !tile.colorGroup || !tile.housePrice) return false;
+    if ((ct.houses || 0) >= 5) return false;
     const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
-    return groupTiles.every(t => t.owner === 'player');
-  }, [tile, houses, playerProps]);
+    return groupTiles.every(t => {
+      const gt = tiles.find(st => st.id === t.id);
+      return gt?.owner === 'player';
+    });
+  }, [tile, tiles]);
 
   return (
     <div
       className={`absolute border transition-all duration-200 group ${
-        isCorner ? 'rounded-lg border-amber-700/50 animate-pulse-glow' : `rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
+        isCorner ? 'rounded-lg border-amber-700/50 animate-corner-glow' : `rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
       } ${isSelected ? 'ring-2 ring-yellow-400 z-20 scale-105' : ''} ${isPlayerHere ? 'z-10' : ''}`}
       style={{
         ...getTileStyle(tile.id),
@@ -226,7 +229,7 @@ export default function GameBoard() {
         </div>
 
         {/* Board base with wood-like gradient */}
-        <div className="absolute inset-0 rounded-xl overflow-hidden"
+        <div className="absolute inset-0 rounded-xl overflow-hidden animate-pulse-glow"
           style={{
             boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 3px rgba(180,130,60,0.3), inset 0 0 30px rgba(0,0,0,0.3)',
           }}
@@ -302,16 +305,20 @@ export default function GameBoard() {
               ))}
             </div>
 
+            {/* Round badge */}
+            <div className="mt-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+              <span className="text-[7px] md:text-[8px] font-black tracking-wider text-amber-400/70">R{turnCount}</span>
+            </div>
+
             {/* Current turn indicator */}
             {currentPlayer && (
               <motion.div key={currentPlayer.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 border border-white/5">
+                className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 border border-white/5">
                 <div className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: COALITIONS[currentPlayer.coalitionId]?.color, boxShadow: `0 0 6px ${COALITIONS[currentPlayer.coalitionId]?.color}` }} />
                 <span className="text-[8px] md:text-[10px] font-bold" style={{ color: COALITIONS[currentPlayer.coalitionId]?.color }}>
                   {currentPlayer.name}
                 </span>
-                <span className="text-[7px] text-slate-500">R{turnCount}</span>
               </motion.div>
             )}
 
@@ -341,7 +348,12 @@ export default function GameBoard() {
         </div>
 
         {/* Sparkle particles */}
-        {[{x:'18%',y:'22%',d:0},{x:'78%',y:'35%',d:1.2},{x:'30%',y:'75%',d:2.5},{x:'85%',y:'80%',d:0.8}].map((s, i) => (
+        {[
+          {x:'15%',y:'20%',d:0},{x:'82%',y:'18%',d:0.5},
+          {x:'10%',y:'78%',d:1.2},{x:'85%',y:'82%',d:0.8},
+          {x:'50%',y:'10%',d:2.0},{x:'48%',y:'88%',d:1.5},
+          {x:'92%',y:'50%',d:2.5},{x:'5%',y:'50%',d:1.8},
+        ].map((s, i) => (
           <div key={i} className="absolute w-1 h-1 rounded-full bg-yellow-300 pointer-events-none"
             style={{
               left: s.x, top: s.y,
