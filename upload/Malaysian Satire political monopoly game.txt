@@ -1,0 +1,741 @@
+Based on software engineering best practices—emphasizing modularity, separation of concerns, state-driven UI, and serverless-first architecture (principles championed by structured scaffolding projects like `ponytail`)—here is the fully reconciled architectural blueprint for **"Dewan Rakyat: Pilihan Raya Edition"**.
+
+We will use **Vite + Three.js** for the frontend, **Cloudflare Workers + Durable Objects** for authoritative game state and real-time multiplayer, **Cloudflare KV** for caching external data (Tindak Malaysia & PasarAPI), and a **GLM 5.2 API integration** for the AI political agents.
+
+---
+
+### ??? 1. Architectural Philosophy & Scaffold
+
+To keep the codebase maintainable, we strictly separate the **Presentation Layer (Three.js)**, the **State Authority (Durable Objects)**, and the **Intelligence/Data Layer (Workers + KV + GLM)**.
+
+#### Project Directory Structure
+```text
+dewan-rakyat/
+??? frontend/                  # Vite + Three.js Application
+?   ??? src/
+?   ?   ??? main.js            # Entry point, Three.js init
+?   ?   ??? scene/             # Board, Tiles, Lights, Camera
+?   ?   ??? entities/          # Tokens, 3D Parliament, UI Overlays
+?   ?   ??? network/           # WebSocket client to Durable Object
+?   ?   ??? state/             # Local Zustand store (synced with server)
+?   ??? package.json
+??? backend/                   # Cloudflare Workers
+?   ??? src/
+?   ?   ??? index.js           # Worker router (fetch & websocket upgrade)
+?   ?   ??? GameDurable.js     # Durable Object: Authoritative game state
+?   ?   ??? ai-agent.js        # GLM 5.2 API integration & prompts
+?   ?   ??? data-ingest.js     # Cron job for PasarAPI & Tindak Malaysia
+?   ?   ??? schemas.js         # Zod schemas for data validation
+?   ??? wrangler.toml          # Cloudflare config (Free Tier)
+?   ??? package.json
+??? README.md
+```
+
+---
+
+### ?? 2. Cloudflare Free Tier Configuration (`wrangler.toml`)
+
+This configuration stays strictly within the no-credit-card free tier limits.
+
+```toml
+name = "dewan-rakyat-backend"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Free Tier KV for caching Tindak Malaysia & PasarAPI data
+[[kv_namespaces]]
+binding = "MARKET_KV"
+id = "your-kv-namespace-id"
+
+# Durable Objects for real-time multiplayer game state
+[[durable_objects.bindings]]
+name = "GAME_STATE"
+class_name = "GameDurable"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GameDurable"]
+
+# Cron Triggers to update market/election data daily
+[triggers]
+crons = ["0 6 * * *"] # Runs daily at 6 AM
+
+# Secret keys (GLM 5.2 API Key) - set via `wrangler secret put`
+# [vars]
+# GLM_API_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+```
+
+---
+
+### ?? 3. The Game Phases (State Machine)
+
+The Durable Object manages the game as a strict state machine to prevent desyncs between Three.js clients.
+
+1. **Phase 1: Penggal (Session Start)**
+   * Players join via WebSocket. Empty slots are assigned to AI Coalitions.
+2. **Phase 2: Undi (Roll Dice)**
+   * Current player rolls. Three.js animates. Server calculates target tile.
+3. **Phase 3: Dewan (Action Resolution)**
+   * Evaluate tile: Buy, Pay Rent, or Draw Card.
+   * *If AI turn:* Server pauses, calls GLM 5.2, waits for AI decision, executes.
+4. **Phase 4: Krisis (Event Phase)**
+   * If doubles rolled, trigger GLM 5.2 to generate a "Krisis Nasional" based on real-time market data.
+5. **Phase 5: Pembubaran (End Game)**
+   * Player reaches 112 Seats (Properties) or bankrupts others.
+
+---
+
+### ?? 4. GLM 5.2 Agent Integration & Prompt Engineering
+
+The AI acts as both the "Speaker of the House" (Narrator) and the independent political candidates. We use a structured system prompt to enforce JSON output, making it easy for the Durable Object to parse the AI's decisions.
+
+```javascript
+// backend/src/ai-agent.js
+
+const GLM_SYSTEM_PROMPT = `
+You are the Game Master and AI Political Agent for "Dewan Rakyat", a Malaysian Political Monopoly game.
+You simulate cynical, satirical Malaysian politicians. You speak in a mix of formal Malay and Manglish.
+
+CURRENT WORLD STATE:
+- Market (PasarAPI): KLCI is {klcChange}%, CPO is RM{cpoPrice}.
+- Seat Demographics (Tindak Malaysia): {demographicBreakdown}
+
+YOUR ROLE:
+1. If asked to decide a move for an AI player, respond with a JSON object.
+2. Evaluate the property cost vs AI's current votes. Consider demographic advantages.
+3. Provide a 1-sentence satirical quote in Manglish/Malay.
+
+RESPONSE FORMAT (Strict JSON):
+{
+  "action": "BUY" | "IGNORE" | "TRADE",
+  "quote": "Your satirical quote here.",
+  "reasoning": "Brief internal logic."
+}
+`;
+
+export async function getAIMove(gameState, env) {
+  const marketData = JSON.parse(await env.MARKET_KV.get("market_state"));
+  
+  const promptPayload = {
+    klcChange: marketData.klciChange,
+    cpoPrice: marketData.cpo,
+    demographicBreakdown: gameState.currentTile.demographics,
+    aiVotes: gameState.currentPlayer.votes,
+    tilePrice: gameState.currentTile.price
+  };
+
+  const response = await fetch(env.GLM_API_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.GLM_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "glm-5.2", // Target GLM 5.2
+      messages: [
+        { role: "system", content: GLM_SYSTEM_PROMPT.replace(/{(\w+)}/g, (_, k) => promptPayload[k] || '') },
+        { role: "user", content: `You landed on ${gameState.currentTile.name}. Do you buy it?` }
+      ],
+      temperature: 0.7 // Slightly creative but logical
+    })
+  });
+
+  const data = await response.json();
+  
+  try {
+    // Extract JSON from GLM response
+    const content = data.choices[0].message.content;
+    const jsonStart = content.indexOf('{');
+    const jsonEnd = content.lastIndexOf('}');
+    return JSON.parse(content.substring(jsonStart, jsonEnd + 1));
+  } catch (e) {
+    // Fallback if GLM hallucinates
+    return { action: "IGNORE", quote: "Macham, saya kenot brain sekarang.", reasoning: "Parse error" };
+  }
+}
+```
+
+---
+
+### ?? 5. Authoritative Game State (Durable Object)
+
+This is the brain of the multiplayer game. It handles WebSocket connections, processes turns, and calls the AI agent.
+
+```javascript
+// backend/src/GameDurable.js
+
+import { getAIMove } from './ai-agent.js';
+
+export class GameDurable {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.sessions = new Map(); // WebSocket clients
+  }
+
+  async fetch(request) {
+    const pair = new WebSocketPair();
+    const [client, server] = pair;
+
+    this.handleSession(server);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async handleSession(websocket) {
+    this.state.acceptWebSocket(websocket);
+    this.sessions.add(websocket);
+
+    websocket.addEventListener('message', async (event) => {
+      const msg = JSON.parse(event.data);
+      
+      if (msg.type === 'ROLL_DICE') {
+        await this.processTurn(msg.playerId);
+      }
+    });
+  }
+
+  async broadcast(message) {
+    const msgStr = JSON.stringify(message);
+    for (const ws of this.sessions) {
+      ws.send(msgStr);
+    }
+  }
+
+  async processTurn(playerId) {
+    const dice1 = Math.floor(Math.random() * 6) + 1;
+    const dice2 = Math.floor(Math.random() * 6) + 1;
+    const total = dice1 + dice2;
+    
+    // Update position
+    const player = this.gameState.players[playerId];
+    player.position = (player.position + total) % 40;
+    const tile = this.gameState.board[player.position];
+
+    await this.broadcast({ type: 'DICE_ROLLED', dice: [dice1, dice2], playerId });
+
+    // If player is AI, ask GLM 5.2 what to do
+    if (player.isAI) {
+      // Broadcast "AI is thinking..."
+      await this.broadcast({ type: 'AI_THINKING', playerId });
+      
+      const aiDecision = await getAIMove({
+        currentPlayer: player,
+        currentTile: tile
+      }, this.env);
+
+      if (aiDecision.action === 'BUY' && player.votes >= tile.price) {
+        player.votes -= tile.price;
+        tile.owner = playerId;
+      }
+
+      await this.broadcast({ 
+        type: 'AI_ACTION', 
+        playerId, 
+        action: aiDecision.action, 
+        quote: aiDecision.quote 
+      });
+    }
+
+    // Check for doubles or pass to next player
+    if (dice1 !== dice2) {
+      this.gameState.currentTurn = (this.gameState.currentTurn + 1) % this.gameState.players.length;
+    }
+
+    await this.broadcast({ type: 'STATE_UPDATE', state: this.gameState });
+  }
+}
+```
+
+---
+
+### ?? 6. Data Ingestion: Tindak Malaysia & PasarAPI
+
+A separate Cloudflare Worker (triggered by Cron) fetches and formats data into KV. This prevents the game from making real-time API calls during gameplay.
+
+```javascript
+// backend/src/data-ingest.js
+
+export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(updateMarketData(env));
+    ctx.waitUntil(updateElectoralData(env));
+  }
+};
+
+async function updateMarketData(env) {
+  // PasarAPI Fetch
+  const res = await fetch('https://pasarapi.xyz/api/bursa/klci');
+  const data = await res.json();
+  
+  const marketState = {
+    klci: data.value,
+    klciChange: data.change_percent,
+    // Calculate Monopoly modifiers based on real data
+    inflationMultiplier: data.change_percent < 0 ? 1.1 : 1.0,
+    timestamp: Date.now()
+  };
+  
+  await env.MARKET_KV.put("market_state", JSON.stringify(marketState));
+}
+
+async function updateElectoralData(env) {
+  // Tindak Malaysia GitHub Raw Fetch
+  const res = await fetch('https://raw.githubusercontent.com/TindakMalaysia/General-Election-Data/main/GE15_Results.json');
+  const seats = await res.json();
+  
+  const seatStats = {};
+  for (const seat of seats) {
+    // Calculate margin to determine if it's a "Marginal" or "Safe" seat
+    const margin = (seat.winner_votes - seat.runner_up_votes) / seat.total_votes;
+    seatStats[seat.name] = {
+      type: margin < 0.05 ? "MARGINAL" : (margin > 0.4 ? "SAFE" : "NORMAL"),
+      rentMultiplier: margin < 0.05 ? 5 : 1
+    };
+  }
+  
+  await env.MARKET_KV.put("ge15_seat_stats", JSON.stringify(seatStats));
+}
+```
+
+---
+
+### ?? 7. Frontend: Three.js Integration (State-Driven)
+
+The frontend does *not* calculate game logic. It receives state updates from the Durable Object via WebSocket and interpolates the 3D scene accordingly using GSAP.
+
+```javascript
+// frontend/src/network/websocket.js
+
+import { movePlayer, showSpeechBubble } from '../entities/tokens.js';
+import { focusCameraOnTile } from '../scene/camera.js';
+import { updateUI } from '../ui/dashboard.js';
+
+let socket;
+
+export function initWebSocket() {
+  socket = new WebSocket('wss://your-worker.workers.dev');
+
+  socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    switch (msg.type) {
+      case 'DICE_ROLLED':
+        // Trigger 3D dice physics animation
+        animateDice(msg.dice);
+        break;
+
+      case 'AI_THINKING':
+        // Show loading spinner above AI token
+        showSpeechBubble(msg.playerId, "Sedang berfikir...");
+        break;
+
+      case 'AI_ACTION':
+        // GLM 5.2 generated quote appears
+        showSpeechBubble(msg.playerId, msg.quote);
+        break;
+
+      case 'STATE_UPDATE':
+        // Sync local Three.js tokens with server position
+        syncBoardState(msg.state);
+        updateUI(msg.state); // Update HTML KWSP/Votes overlay
+        break;
+    }
+  };
+}
+```
+
+### Summary of Execution
+
+1. **Zero Cost:** Everything runs on Cloudflare Free Tier (Workers, DO, KV, Cron). 
+2. **Data-Driven:** Tindak Malaysia data defines tile volatility; PasarAPI defines live inflation.
+3. **Intelligent AI:** GLM 5.2 makes strategic decisions for AI coalitions, generating funny, context-aware quotes based on real-world economic data.
+4. **Scalable SE Pattern:** The strict separation of UI (Three.js), State (Durable Objects), and Data/AI (Workers + KV + GLM) ensures the game is maintainable and bug-resistant.
+
+You are absolutely right. I focused so much on the backend, AI, and data architecture that I missed the actual **3D physical board geometry and the token movement logic** in the frontend. 
+
+To build this following modular software engineering principles, we need a dedicated module to generate the 40 tiles in a square loop and a controller to animate the token hopping from box to box when the dice are rolled.
+
+Here is the missing frontend piece: the **3D Board Generator** and the **Token Movement Animator** using Three.js and GSAP.
+
+### 1. The 3D Board Generator (`scene/BoardBuilder.js`)
+
+This module calculates the (x, z) coordinates for all 40 spaces in a square loop and renders them as 3D meshes.
+
+```javascript
+import * as THREE from 'three';
+
+// The 40 spaces (simplified for brevity, mapping to previous JSON)
+const BOARD_SPACES = [
+  { id: 0, name: 'Pilihan Raya', type: 'go', color: 0x00FF00 },
+  { id: 1, name: 'MUDA', type: 'property', color: 0x8B4513 },
+  // ... spaces 2 to 38 ...
+  { id: 39, name: 'Kuala Lumpur', type: 'property', color: 0x000080 }
+];
+
+export class BoardBuilder {
+  constructor(scene) {
+    this.scene = scene;
+    this.tiles = [];
+    this.tileSize = 4; // Size of each square
+    this.boardWidth = 11 * this.tileSize; // 11 tiles per side
+  }
+
+  build() {
+    const boardGroup = new THREE.Group();
+
+    BOARD_SPACES.forEach((space, index) => {
+      const tileMesh = this.createTile(space, index);
+      boardGroup.add(tileMesh);
+      this.tiles.push(tileMesh);
+    });
+
+    // Add center base
+    const baseGeo = new THREE.BoxGeometry(this.boardWidth, 0.5, this.boardWidth);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = -0.3;
+    boardGroup.add(base);
+
+    this.scene.add(boardGroup);
+    return this.tiles;
+  }
+
+  // Calculate (x, z) for a tile in a square loop
+  getTilePosition(index) {
+    const step = this.tileSize;
+    const halfBoard = this.boardWidth / 2;
+    const halfStep = step / 2;
+    const tilesPerSide = 10; // 10 non-corner tiles per side + 4 corners = 11 per side
+
+    let x, z;
+
+    if (index < tilesPerSide + 1) {
+      // Side 1: Right side (Bottom to Top) - Spaces 0 to 10
+      x = halfBoard - halfStep;
+      z = halfBoard - halfStep - (index * step);
+    } else if (index < (tilesPerSide * 2) + 1) {
+      // Side 2: Top side (Right to Left) - Spaces 11 to 20
+      x = halfBoard - halfStep - ((index - (tilesPerSide + 1)) * step);
+      z = -halfBoard + halfStep;
+    } else if (index < (tilesPerSide * 3) + 1) {
+      // Side 3: Left side (Top to Bottom) - Spaces 21 to 30
+      x = -halfBoard + halfStep;
+      z = -halfBoard + halfStep + ((index - (tilesPerSide * 2 + 1)) * step);
+    } else {
+      // Side 4: Bottom side (Left to Right) - Spaces 31 to 39
+      x = -halfBoard + halfStep + ((index - (tilesPerSide * 3 + 1)) * step);
+      z = halfBoard - halfStep;
+    }
+
+    return { x, z };
+  }
+
+  createTile(space, index) {
+    const pos = this.getTilePosition(index);
+    
+    const geometry = new THREE.BoxGeometry(this.tileSize * 0.95, 0.2, this.tileSize * 0.95);
+    const material = new THREE.MeshStandardMaterial({ 
+      color: space.color || 0x333333,
+      roughness: 0.6 
+    });
+    
+    const tile = new THREE.Mesh(geometry, material);
+    tile.position.set(pos.x, 0, pos.z);
+    tile.receiveShadow = true;
+    tile.userData = { spaceId: index, name: space.name };
+
+    return tile;
+  }
+}
+```
+
+### 2. The Token Movement Controller (`entities/TokenController.js`)
+
+When the WebSocket sends a `DICE_ROLLED` event, the token cannot just teleport. It needs to hop step-by-step through the 3D tiles. We use **GSAP** (an animation library) to sequence the jumps so it looks like a physical game piece.
+
+```javascript
+import * as THREE from 'three';
+import { gsap } from 'gsap';
+
+export class TokenController {
+  constructor(scene, boardTiles) {
+    this.scene = scene;
+    this.boardTiles = boardTiles; // Array of 3D tile meshes
+    
+    // Create a simple red token for PH
+    const geo = new THREE.ConeGeometry(0.8, 2, 8);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    this.token = new THREE.Mesh(geo, mat);
+    this.token.position.y = 1; // Hover above board
+    this.scene.add(this.token);
+  }
+
+  // Called when server says "DICE_ROLLED" with a target index
+  async movePlayer(targetTileIndex) {
+    const currentTileIndex = this.token.userData.currentTile || 0;
+    let stepsToMove = targetTileIndex - currentTileIndex;
+    
+    // Handle board wraparound (e.g., moving from space 39 to space 5)
+    if (stepsToMove < 0) {
+      stepsToMove += 40;
+    }
+
+    // Create an animation timeline for sequential hops
+    const timeline = gsap.timeline();
+
+    for (let i = 1; i <= stepsToMove; i++) {
+      const nextTileIndex = (currentTileIndex + i) % 40;
+      const targetTile = this.boardTiles[nextTileIndex];
+      
+      // Add a hop animation to the timeline
+      timeline.to(this.token.position, {
+        x: targetTile.position.x,
+        z: targetTile.position.z,
+        duration: 0.3,
+        ease: "power1.inOut",
+        // Add a "hop" in the middle of the movement
+        onUpdate: () => {
+          // Simple sine wave for the hop height
+          const progress = timeline.progress();
+          this.token.position.y = 1 + Math.sin(progress * Math.PI) * 2;
+        }
+      });
+    }
+
+    // Update current position
+    this.token.userData.currentTile = targetTileIndex;
+
+    // Return a promise that resolves when animation finishes
+    return new Promise(resolve => timeline.then(resolve));
+  }
+}
+```
+
+### 3. Tying it together in the Game Loop (`main.js`)
+
+Now, when the server broadcasts a movement, we trigger the token controller to physically walk the board.
+
+```javascript
+import * as THREE from 'three';
+import { BoardBuilder } from './scene/BoardBuilder.js';
+import { TokenController } from './entities/TokenController.js';
+
+// 1. Setup Three.js Basics
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 40, 40);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const light = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(light);
+
+// 2. Build the 40-tile board
+const boardBuilder = new BoardBuilder(scene);
+const tiles = boardBuilder.build();
+
+// 3. Initialize Token Controller
+const tokenController = new TokenController(scene, tiles);
+
+// 4. Mock WebSocket Event (Simulating server telling us to move)
+function mockServerMessage(targetIndex) {
+  console.log(`Moving to tile ${targetIndex}`);
+  tokenController.movePlayer(targetIndex);
+}
+
+// Move player to tile 5 (e.g., they rolled a 5)
+setTimeout(() => mockServerMessage(5), 1000);
+// Then move to tile 12 (they rolled a 7)
+setTimeout(() => mockServerMessage(12), 4000);
+
+// 5. Render Loop
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+```
+
+### Why this architecture matters:
+1. **Separation of Concerns:** `BoardBuilder` handles the math of the square. `TokenController` only cares about moving a mesh from point A to point B. Neither knows about the AI or the game rules.
+2. **Deterministic Movement:** The server (Durable Object) calculates the *final target tile index* (e.g., space 12). The frontend just says, "Okay, hop from my current space to space 12."
+3. **GSAP Timeline:** By chaining the hops in a timeline, the token physically bounces through spaces 6, 7, 8, 9, 10, 11, and 12, rather than gliding in a straight line across the center of the board.
+
+Here is the complete, satirical 40-space board configuration for **"Dewan Rakyat: Pilihan Raya Edition"**. 
+
+This maps the classic Monopoly board layout (Bottom, Left, Top, Right) to the Malaysian political landscape, integrating the coalitions, mega-projects, media assets, and satirical events we discussed.
+
+---
+
+### ?? SIDE 1: The Bottom Row (GO to Jail)
+*The starting line. Cheap independents and PH component parties.*
+
+*   **0. Pilihan Raya Umum (GO)**
+    *   *Type:* Corner
+    *   *Effect:* Collect 200 Votes (Undi) as you pass. Campaign season funded!
+*   **1. MUDA (Independent)**
+    *   *Type:* Property (Brown)
+    *   *Price:* 60 Votes
+    *   *Effect:* Low rent, but if a player lands here, they must roll a 6 to leave (youth activism blocking the exit).
+*   **2. Jawatan Menteri (Community Chest)**
+    *   *Type:* Card
+    *   *Effect:* Draw a "Cabinet Position" card. (e.g., "Appointed Menteri Kewangan, collect 50 Votes from each player").
+*   **3. PSM (Independent)**
+    *   *Type:* Property (Brown)
+    *   *Price:* 60 Votes
+    *   *Effect:* Rent is always 0. Socialists reject capitalist rent, but owner cannot build anything on it either.
+*   **4. Cukai SST / GST (Income Tax)**
+    *   *Type:* Tax
+    *   *Effect:* Pay 200 Votes to Bank Negara or take a 10% wealth audit risk (10% chance MACC takes all your cash).
+*   **5. ECRL (Highway/Railroad)**
+    *   *Type:* Infrastructure
+    *   *Price:* 200 Votes
+    *   *Effect:* Rent is based on dice roll. If PasarAPI reports high global steel prices, maintenance cost goes up; owner pays the bank 50 Votes.
+*   **6. Amanah (PH Coalition)**
+    *   *Type:* Property (Light Blue)
+    *   *Price:* 100 Votes
+    *   *Effect:* Moderate rent.
+*   **7. Krisis Nasional (Chance)**
+    *   *Type:* Card
+    *   *Effect:* GLM 5.2 generates a crisis. (e.g., "Sheraton Move 2.0, lose your next turn negotiating").
+*   **8. PKR (PH Coalition)**
+    *   *Type:* Property (Light Blue)
+    *   *Price:* 100 Votes
+    *   *Effect:* Rent is volatile. Every turn, roll a die; if odd, rent doubles (leadership election season).
+*   **9. DAP (PH Coalition)**
+    *   *Type:* Property (Light Blue)
+    *   *Price:* 120 Votes
+    *   *Effect:* Solid, reliable rent. +20% bonus to rent if the owner also owns KL (Tile 39).
+*   **10. Tahanan SPR (Jail)**
+    *   *Type:* Corner
+    *   *Effect:* Just Visiting (under investigation) or Trapped (MACC Raid). Pay 50 Votes bail or roll doubles to escape.
+
+---
+
+### ?? SIDE 2: The Left Row (Jail to Free Parking)
+*The opposition and old-guard territories.*
+
+*   **11. Gerakan (PN Coalition)**
+    *   *Type:* Property (Pink)
+    *   *Price:* 140 Votes
+    *   *Effect:* Rent is 50% off for players with fewer than 500 Votes (fighting for the common man).
+*   **12. RTM (Media/Utility)**
+    *   *Type:* Media Asset
+    *   *Price:* 150 Votes
+    *   *Effect:* If owner lands on a "Krisis" tile, they can manipulate the news: pay RTM 50 Votes to ignore the negative card effect.
+*   **13. Bersatu (PN Coalition)**
+    *   *Type:* Property (Pink)
+    *   *Price:* 140 Votes
+    *   *Effect:* High "frogging" risk. Every 5 turns, the GLM AI rolls a die; if 6, this property defects to the player on the right.
+*   **14. PAS (PN Coalition)**
+    *   *Type:* Property (Pink)
+    *   *Price:* 160 Votes
+    *   *Effect:* Cannot build "Ministries" (Hotels) here, only "Wakaf Rakyat" (Houses) which are very cheap to build but cap at level 3.
+*   **15. MRT3 Circle Line (Highway/Railroad)**
+    *   *Type:* Infrastructure
+    *   *Price:* 200 Votes
+    *   *Effect:* Standard dice-based rent.
+*   **16. MIC (BN Coalition)**
+    *   *Type:* Property (Orange)
+    *   *Price:* 180 Votes
+    *   *Effect:* Rent increases by 10 Votes for every "Cukai" tile on the board.
+*   **17. Jawatan Menteri (Community Chest)**
+    *   *Type:* Card
+    *   *Effect:* (e.g., "Made a Senator to bypass elections. Advance to GO").
+*   **18. MCA (BN Coalition)**
+    *   *Type:* Property (Orange)
+    *   *Price:* 180 Votes
+    *   *Effect:* Owner can communicate in the "Parliament Chat" in Mandarin/Japanese. Other players must pay a translator fee of 20 Votes to read it.
+*   **19. UMNO (BN Coalition)**
+    *   *Type:* Property (Orange)
+    *   *Price:* 200 Votes
+    *   *Effect:* High rent. If KLCI (PasarAPI) drops below 1500 points, rent is halved ("Ekonomi merundum").
+*   **20. Istana Negara (Free Parking)**
+    *   *Type:* Corner
+    *   *Effect:* Royal Audience. Player is completely immune to "Krisis Nasional" cards and rent payments for 1 full turn cycle.
+
+---
+
+### ?? SIDE 3: The Top Row (Free Parking to Go To Jail)
+*The Borneo Blocs. High autonomy, resource-heavy.*
+
+*   **21. PRS (GPS Sarawak)**
+    *   *Type:* Property (Red)
+    *   *Price:* 220 Votes
+    *   *Effect:* Standard rent.
+*   **22. Krisis Nasional (Chance)**
+    *   *Type:* Card
+    *   *Effect:* GLM 5.2 generates a crisis. (e.g., "Floods in Klang Valley! Pay 25 Votes per property owned to repair drains").
+*   **23. PDP (GPS Sarawak)**
+    *   *Type:* Property (Red)
+    *   *Price:* 220 Votes
+    *   *Effect:* Standard rent.
+*   **24. SUPP (GPS Sarawak)**
+    *   *Type:* Property (Red)
+    *   *Price:* 240 Votes
+    *   *Effect:* If owner owns all 3 GPS tiles, they declare "Sarawak Autonomy." They no longer pay the 200 Votes tax on Tile 4 and Tile 38.
+*   **25. Pan Borneo Highway (Highway/Railroad)**
+    *   *Type:* Infrastructure
+    *   *Price:* 200 Votes
+    *   *Effect:* Rent is paid in "Subsidies" from the bank, not by the player landing on it. Free money for the owner.
+*   **26. SAPP (GRS Sabah)**
+    *   *Type:* Property (Yellow)
+    *   *Price:* 260 Votes
+    *   *Effect:* Rent fluctuates wildly with PasarAPI Crude Palm Oil (CPO) prices.
+*   **27. Astro / Media Prima (Media/Utility)**
+    *   *Type:* Media Asset
+    *   *Price:* 150 Votes
+    *   *Effect:* Rent is 10x the dice roll ONLY if the KLCI is green (up). If red (down), rent is 0 (advertisers pulled out).
+*   **28. STAR (GRS Sabah)**
+    *   *Type:* Property (Yellow)
+    *   *Price:* 260 Votes
+    *   *Effect:* High volatility.
+*   **29. PBS (GRS Sabah)**
+    *   *Type:* Property (Yellow)
+    *   *Price:* 280 Votes
+    *   *Effect:* "Cross-Party Alliances" allowed. If an opponent lands here, they can choose to form a coalition, sharing the tile's rent income 50/50 instead of paying it.
+*   **30. Disyorkan ke SPR (Go to Jail)**
+    *   *Type:* Corner
+    *   *Effect:* Contempt of Court / Royal Snub. Go directly to Tahanan SPR. Do not pass GO, do not collect 200 Votes.
+
+---
+
+### ?? SIDE 4: The Right Row (Go To Jail to GO)
+*The East Coast Green Wave and Federal Powerhouses. Endgame tiles.*
+
+*   **31. PN Pahang (East Coast Bloc)**
+    *   *Type:* Property (Green)
+    *   *Price:* 300 Votes
+    *   *Effect:* Rent is immune to PasarAPI economic crashes. Safe haven asset.
+*   **32. PAS Terengganu (East Coast Bloc)**
+    *   *Type:* Property (Green)
+    *   *Price:* 300 Votes
+    *   *Effect:* Oil Royalty Tile. If global oil prices (PasarAPI) are high, owner collects 100 Votes directly from the bank every turn.
+*   **33. Jawatan Menteri (Community Chest)**
+    *   *Type:* Card
+    *   *Effect:* (e.g., "GLM AI caught sleeping in Dewan. Lose 50 Votes for public embarrassment").
+*   **34. PAS Kelantan (East Coast Bloc)**
+    *   *Type:* Property (Green)
+    *   *Price:* 320 Votes
+    *   *Effect:* Cannot be traded. "Kubu Kuat" (Stronghold). Once bought, it stays with that player until bankruptcy.
+*   **35. RTS Johor Link (Highway/Railroad)**
+    *   *Type:* Infrastructure
+    *   *Price:* 200 Votes
+    *   *Effect:* Rent is paid in SGD (simulated). +20% value conversion bonus.
+*   **36. Krisis Nasional (Chance)**
+    *   *Type:* Card
+    *   *Effect:* GLM 5.2 generates a crisis. (e.g., "TikTok Viral Scandal! Advance 3 spaces backward to avoid reporters").
+*   **37. Putrajaya (Federal Power)**
+    *   *Type:* Property (Dark Blue)
+    *   *Price:* 350 Votes
+    *   *Effect:* "Admin Power". If you own this, you can see the top card of the "Krisis Nasional" deck before drawing.
+*   **38. Cukai Kekayaan / Yacht Maintenance (Luxury Tax)**
+    *   *Type:* Tax
+    *   *Effect:* Pay 100 Votes to maintain your superyacht.
+*   **39. Kuala Lumpur (Federal Power)**
+    *   *Type:* Property (Dark Blue)
+    *   *Price:* 400 Votes
+    *   *Effect:* The ultimate prize. Rent is astronomical. If a player owns both KL and Putrajaya, they trigger the "Confidence Vote" mechanic, allowing them to force a trade with any player once per game.

@@ -1,0 +1,832 @@
+     1→import { create } from 'zustand';
+     2→import {
+     3→  BOARD_TILES,
+     4→  COALITIONS,
+     5→  JAWATAN_MENTERI_CARDS,
+     6→  KRISIS_NASIONAL_CARDS,
+     7→  DEFAULT_MARKET_STATE,
+     8→  getRandomQuote,
+     9→  type Tile,
+    10→  type Coalition,
+    11→  type GameCard,
+    12→  type MarketState,
+    13→  type ColorGroup,
+    14→} from './game-data';
+    15→
+    16→// --- Types ---
+    17→export interface Player {
+    18→  id: string;
+    19→  coalitionId: string;
+    20→  name: string;
+    21→  position: number;
+    22→  money: number;
+    23→  isAI: boolean;
+    24→  isInJail: boolean;
+    25→  jailTurns: number;
+    26→  hasGetOutOfJailFree: boolean;
+    27→  properties: number[]; // tile IDs owned
+    28→  isBankrupt: boolean;
+    29→  quote?: string;
+    30→  avatarEmoji: string;
+    31→}
+    32→
+    33→export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'game_over';
+    34→
+    35→export interface GameLogEntry {
+    36→  id: string;
+    37→  turn: number;
+    38→  playerId: string;
+    39→  playerName: string;
+    40→  message: string;
+    41→  type: 'move' | 'buy' | 'rent' | 'card' | 'jail' | 'bankrupt' | 'ai_quote' | 'system' | 'tax' | 'pass_go';
+    42→}
+    43→
+    44→export interface GameState {
+    45→  // Game setup
+    46→  phase: GamePhase;
+    47→  players: Player[];
+    48→  tiles: Tile[];
+    49→  turnOrder: string[];
+    50→  currentTurnIndex: number;
+    51→  turnCount: number;
+    52→  diceValues: [number, number] | null;
+    53→  isDoubles: boolean;
+    54→  consecutiveDoubles: number;
+    55→
+    56→  // Cards
+    57→  jawatanMenteriDeck: GameCard[];
+    58→  krisisNasionalDeck: GameCard[];
+    59→
+    60→  // Market
+    61→  marketState: MarketState;
+    62→
+    63→  // UI State
+    64→  selectedTileId: number | null;
+    65→  currentCard: GameCard | null;
+    66→  currentRentPayment: { from: string; to: string; amount: number } | null;
+    67→  gameLog: GameLogEntry[];
+    68→  winner: string | null;
+    69→  aiThinking: boolean;
+    70→
+    71→  // Actions
+    72→  startGame: (coalitionId: string) => void;
+    73→  rollDice: () => void;
+    74→  movePlayer: () => void;
+    75→  handleLanding: () => void;
+    76→  buyProperty: () => void;
+    77→  skipBuy: () => void;
+    78→  payRent: () => void;
+    79→  drawCard: (type: 'chest' | 'chance') => GameCard;
+    80→  applyCard: (card: GameCard) => void;
+    81→  endTurn: () => void;
+    82→  handleJailDecision: (pay: boolean) => void;
+    83→  selectTile: (tileId: number | null) => void;
+    84→  addLog: (entry: Omit<GameLogEntry, 'id' | 'turn'>) => void;
+    85→  setAIThinking: (thinking: boolean) => void;
+    86→  aiTurn: () => Promise<void>;
+    87→  getMarketState: () => MarketState;
+    88→}
+    89→
+    90→function shuffleDeck<T>(deck: T[]): T[] {
+    91→  const shuffled = [...deck];
+    92→  for (let i = shuffled.length - 1; i > 0; i--) {
+    93→    const j = Math.floor(Math.random() * (i + 1));
+    94→    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    95→  }
+    96→  return shuffled;
+    97→}
+    98→
+    99→function calculateRent(tile: Tile, owner: Player, marketState: MarketState): number {
+   100→  if (!tile.rent || tile.rent.length === 0) return 0;
+   101→
+   102→  // Highway: count owned highways
+   103→  if (tile.type === 'highway') {
+   104→    const highwayTiles = BOARD_TILES.filter(t => t.type === 'highway');
+   105→    const ownedCount = highwayTiles.filter(t => owner.properties.includes(t.id)).length;
+   106→    const baseRent = tile.rent[Math.min(ownedCount - 1, tile.rent.length - 1)] || tile.rent[0];
+   107→    return Math.round(baseRent * marketState.inflationMultiplier);
+   108→  }
+   109→
+   110→  // Media: count owned media
+   111→  if (tile.type === 'media') {
+   112→    const mediaTiles = BOARD_TILES.filter(t => t.type === 'media');
+   113→    const ownedCount = mediaTiles.filter(t => owner.properties.includes(t.id)).length;
+   114→    const baseRent = tile.rent[Math.min(ownedCount - 1, tile.rent.length - 1)] || tile.rent[0];
+   115→    return Math.round(baseRent * marketState.inflationMultiplier);
+   116→  }
+   117→
+   118→  // Regular property
+   119→  const houses = tile.houses || 0;
+   120→  const baseRent = tile.rent[Math.min(houses, tile.rent.length - 1)] || tile.rent[0];
+   121→  
+   122→  // Check if owner has full color group
+   123→  if (tile.colorGroup) {
+   124→    const colorGroupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+   125→    const ownsAll = colorGroupTiles.every(t => owner.properties.includes(t.id));
+   126→    if (ownsAll) {
+   127→      return Math.round(baseRent * 2 * marketState.inflationMultiplier);
+   128→    }
+   129→  }
+   130→
+   131→  // Federal power bonus
+   132→  if (tile.colorGroup === 'darkblue') {
+   133→    return Math.round(baseRent * marketState.federalRentBonus * marketState.inflationMultiplier);
+   134→  }
+   135→
+   136→  return Math.round(baseRent * marketState.inflationMultiplier);
+   137→}
+   138→
+   139→const AI_COALITION_EMOJIS: Record<string, string> = {
+   140→  PH: '🏛️', PN: '🕌', BN: '⭐', GPS: '🦅', GRS: '🏝️', IND: '👤',
+   141→};
+   142→
+   143→export const useGameStore = create<GameState>((set, get) => ({
+   144→  phase: 'lobby',
+   145→  players: [],
+   146→  tiles: BOARD_TILES.map(t => ({ ...t })),
+   147→  turnOrder: [],
+   148→  currentTurnIndex: 0,
+   149→  turnCount: 0,
+   150→  diceValues: null,
+   151→  isDoubles: false,
+   152→  consecutiveDoubles: 0,
+   153→  jawatanMenteriDeck: shuffleDeck(JAWATAN_MENTERI_CARDS),
+   154→  krisisNasionalDeck: shuffleDeck(KRISIS_NASIONAL_CARDS),
+   155→  marketState: DEFAULT_MARKET_STATE,
+   156→  selectedTileId: null,
+   157→  currentCard: null,
+   158→  currentRentPayment: null,
+   159→  gameLog: [],
+   160→  winner: null,
+   161→  aiThinking: false,
+   162→
+   163→  startGame: (playerCoalitionId: string) => {
+   164→    const allCoalitionIds = Object.keys(COALITIONS);
+   165→    const aiCoalitions = allCoalitionIds.filter(c => c !== playerCoalitionId);
+   166→
+   167→    const player: Player = {
+   168→      id: 'player',
+   169→      coalitionId: playerCoalitionId,
+   170→      name: COALITIONS[playerCoalitionId].name,
+   171→      position: 0,
+   172→      money: 1500,
+   173→      isAI: false,
+   174→      isInJail: false,
+   175→      jailTurns: 0,
+   176→      hasGetOutOfJailFree: false,
+   177→      properties: [],
+   178→      isBankrupt: false,
+   179→      avatarEmoji: '🎮',
+   180→    };
+   181→
+   182→    const aiPlayers: Player[] = aiCoalitions.map((cId, i) => ({
+   183→      id: `ai_${cId}`,
+   184→      coalitionId: cId,
+   185→      name: COALITIONS[cId].name,
+   186→      position: 0,
+   187→      money: 1500,
+   188→      isAI: true,
+   189→      isInJail: false,
+   190→      jailTurns: 0,
+   191→      hasGetOutOfJailFree: false,
+   192→      properties: [],
+   193→      isBankrupt: false,
+   194→      avatarEmoji: AI_COALITION_EMOJIS[cId] || '🤖',
+   195→    }));
+   196→
+   197→    const allPlayers = [player, ...aiPlayers];
+   198→    const turnOrder = allPlayers.map(p => p.id);
+   199→
+   200→    set({
+   201→      phase: 'playing',
+   202→      players: allPlayers,
+   203→      turnOrder,
+   204→      currentTurnIndex: 0,
+   205→      turnCount: 1,
+   206→      gameLog: [{
+   207→        id: crypto.randomUUID(),
+   208→        turn: 1,
+   209→        playerId: 'system',
+   210→        playerName: 'System',
+   211→        message: '🗳️ Pilihan Raya dimulakan! The game has begun!',
+   212→        type: 'system',
+   213→      }],
+   214→    });
+   215→  },
+   216→
+   217→  rollDice: () => {
+   218→    const d1 = Math.floor(Math.random() * 6) + 1;
+   219→    const d2 = Math.floor(Math.random() * 6) + 1;
+   220→    const doubles = d1 === d2;
+   221→    const state = get();
+   222→    const newConsecutive = doubles ? state.consecutiveDoubles + 1 : 0;
+   223→
+   224→    set({
+   225→      diceValues: [d1, d2],
+   226→      isDoubles: doubles,
+   227→      consecutiveDoubles: newConsecutive,
+   228→      phase: 'rolling',
+   229→    });
+   230→
+   231→    // Check for 3 consecutive doubles = go to jail
+   232→    if (newConsecutive >= 3) {
+   233→      const cp = state.players.find(p => p.id === state.turnOrder[state.currentTurnIndex]);
+   234→      if (cp) {
+   235→        set(state => ({
+   236→          players: state.players.map(p =>
+   237→            p.id === cp.id ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   238→          ),
+   239→          phase: 'jail_decision',
+   240→        }));
+   241→        get().addLog({
+   242→          playerId: cp.id,
+   243→          playerName: cp.name,
+   244→          message: `🎲 Tiga kali doubles! ${cp.name} dihantar ke Tahanan SPR! (3 consecutive doubles = jail)`,
+   245→          type: 'jail',
+   246→        });
+   247→      }
+   248→      return;
+   249→    }
+   250→
+   251→    // Auto-move after short delay is handled by the UI
+   252→    setTimeout(() => get().movePlayer(), 800);
+   253→  },
+   254→
+   255→  movePlayer: () => {
+   256→    const state = get();
+   257→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   258→    const player = state.players.find(p => p.id === currentPlayerId);
+   259→    if (!player || !state.diceValues) return;
+   260→
+   261→    const total = state.diceValues[0] + state.diceValues[1];
+   262→    let newPosition = player.position + total;
+   263→
+   264→    // Pass GO
+   265→    if (newPosition >= 40) {
+   266→      newPosition = newPosition % 40;
+   267→      set(state => ({
+   268→        players: state.players.map(p =>
+   269→          p.id === currentPlayerId ? { ...p, money: p.money + 200 } : p
+   270→        ),
+   271→      }));
+   272→      get().addLog({
+   273→        playerId: currentPlayerId,
+   274→        playerName: player.name,
+   275→        message: `💰 Lalu Pilihan Raya! Collected RM200 campaign funds from KWSP Bank!`,
+   276→        type: 'pass_go',
+   277→      });
+   278→    }
+   279→
+   280→    set(state => ({
+   281→      players: state.players.map(p =>
+   282→        p.id === currentPlayerId ? { ...p, position: newPosition } : p
+   283→      ),
+   284→      phase: 'moving',
+   285→    }));
+   286→
+   287→    // After movement animation, handle landing
+   288→    setTimeout(() => get().handleLanding(), 1500);
+   289→  },
+   290→
+   291→  handleLanding: () => {
+   292→    const state = get();
+   293→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   294→    const player = state.players.find(p => p.id === currentPlayerId);
+   295→    if (!player) return;
+   296→
+   297→    const tile = state.tiles[player.position];
+   298→
+   299→    // Go to Jail tile
+   300→    if (tile.id === 30) {
+   301→      set(state => ({
+   302→        players: state.players.map(p =>
+   303→          p.id === currentPlayerId ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   304→        ),
+   305→        phase: 'jail_decision',
+   306→      }));
+   307→      get().addLog({
+   308→        playerId: currentPlayerId,
+   309→        playerName: player.name,
+   310→        message: `⛓️ ${player.name} disyorkan ke SPR! Off to Tahanan!`,
+   311→        type: 'jail',
+   312→      });
+   313→      return;
+   314→    }
+   315→
+   316→    // Tax tiles
+   317→    if (tile.type === 'tax') {
+   318→      const amount = tile.id === 4 ? 200 : 100;
+   319→      const newMoney = player.money - amount;
+   320→      const isBankrupt = newMoney < 0;
+   321→      set(state => ({
+   322→        players: state.players.map(p =>
+   323→          p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt } : p
+   324→        ),
+   325→        phase: isBankrupt ? 'game_over' : 'landed',
+   326→      }));
+   327→      get().addLog({
+   328→        playerId: currentPlayerId,
+   329→        playerName: player.name,
+   330→        message: `💸 ${player.name} pays RM${amount} in ${tile.name}! (${tile.description})`,
+   331→        type: 'tax',
+   332→      });
+   333→      return;
+   334→    }
+   335→
+   336→    // Card tiles
+   337→    if (tile.type === 'chest' || tile.type === 'chance') {
+   338→      const card = get().drawCard(tile.type === 'chest' ? 'chest' : 'chance');
+   339→      set({ currentCard: card, phase: 'card' });
+   340→      get().addLog({
+   341→        playerId: currentPlayerId,
+   342→        playerName: player.name,
+   343→        message: `🃏 ${player.name} draws: "${card.title}"`,
+   344→        type: 'card',
+   345→      });
+   346→      return;
+   347→    }
+   348→
+   349→    // Property / Highway / Media
+   350→    if (tile.type === 'property' || tile.type === 'highway' || tile.type === 'media') {
+   351→      // Unowned
+   352→      if (!tile.owner) {
+   353→        if (player.money >= (tile.price || 0)) {
+   354→          if (player.isAI) {
+   355→            // AI decides
+   356→            set({ aiThinking: true });
+   357→            setTimeout(() => {
+   358→              const shouldBuy = Math.random() > 0.2; // 80% chance AI buys
+   359→              if (shouldBuy && player.money >= (tile.price || 0)) {
+   360→                get().buyProperty();
+   361→                // AI quote
+   362→                const quote = getRandomQuote(player.coalitionId);
+   363→                set(state => ({
+   364→                  players: state.players.map(p =>
+   365→                    p.id === currentPlayerId ? { ...p, quote } : p
+   366→                  ),
+   367→                  aiThinking: false,
+   368→                }));
+   369→                get().addLog({
+   370→                  playerId: currentPlayerId,
+   371→                  playerName: player.name,
+   372→                  message: `🤖 ${player.name}: "${quote}"`,
+   373→                  type: 'ai_quote',
+   374→                });
+   375→              } else {
+   376→                get().skipBuy();
+   377→                set({ aiThinking: false });
+   378→              }
+   379→            }, 1200);
+   380→          } else {
+   381→            set({ phase: 'buying', selectedTileId: tile.id });
+   382→          }
+   383→        } else {
+   384→          get().addLog({
+   385→            playerId: currentPlayerId,
+   386→            playerName: player.name,
+   387→            message: `😅 ${player.name} cannot afford ${tile.name} (RM${tile.price})!`,
+   388→            type: 'move',
+   389→          });
+   390→          set({ phase: 'landed' });
+   391→        }
+   392→        return;
+   393→      }
+   394→
+   395→      // Owned by someone else
+   396→      if (tile.owner && tile.owner !== currentPlayerId) {
+   397→        const owner = state.players.find(p => p.id === tile.owner);
+   398→        if (owner && !owner.isBankrupt) {
+   399→          const rent = calculateRent(tile, owner, state.marketState);
+   400→          set({
+   401→            currentRentPayment: { from: currentPlayerId, to: tile.owner, amount: rent },
+   402→            phase: 'paying_rent',
+   403→          });
+   404→          get().addLog({
+   405→            playerId: currentPlayerId,
+   406→            playerName: player.name,
+   407→            message: `🏠 ${player.name} pays RM${rent} rent to ${owner.name} for ${tile.name}!`,
+   408→            type: 'rent',
+   409→          });
+   410→        } else {
+   411→          set({ phase: 'landed' });
+   412→        }
+   413→        return;
+   414→      }
+   415→
+   416→      // Owned by self
+   417→      set({ phase: 'landed' });
+   418→      return;
+   419→    }
+   420→
+   421→    // Corner or other
+   422→    set({ phase: 'landed' });
+   423→  },
+   424→
+   425→  buyProperty: () => {
+   426→    const state = get();
+   427→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   428→    const player = state.players.find(p => p.id === currentPlayerId);
+   429→    if (!player) return;
+   430→
+   431→    const tile = state.tiles[player.position];
+   432→    if (!tile.price || player.money < tile.price) return;
+   433→
+   434→    set(state => ({
+   435→      players: state.players.map(p =>
+   436→        p.id === currentPlayerId
+   437→          ? { ...p, money: p.money - tile.price, properties: [...p.properties, tile.id] }
+   438→          : p
+   439→      ),
+   440→      tiles: state.tiles.map(t =>
+   441→        t.id === tile.id ? { ...t, owner: currentPlayerId } : t
+   442→      ),
+   443→      phase: 'landed',
+   444→      selectedTileId: null,
+   445→    }));
+   446→
+   447→    get().addLog({
+   448→      playerId: currentPlayerId,
+   449→      playerName: player.name,
+   450→      message: `🏗️ ${player.name} buys ${tile.name} for RM${tile.price}!`,
+   451→      type: 'buy',
+   452→    });
+   453→  },
+   454→
+   455→  skipBuy: () => {
+   456→    const state = get();
+   457→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   458→    const player = state.players.find(p => p.id === currentPlayerId);
+   459→    if (!player) return;
+   460→
+   461→    const tile = state.tiles[player.position];
+   462→    get().addLog({
+   463→      playerId: currentPlayerId,
+   464→      playerName: player.name,
+   465→      message: `🚶 ${player.name} passes on ${tile.name}.`,
+   466→      type: 'move',
+   467→    });
+   468→
+   469→    set({ phase: 'landed', selectedTileId: null });
+   470→  },
+   471→
+   472→  payRent: () => {
+   473→    const state = get();
+   474→    if (!state.currentRentPayment) return;
+   475→
+   476→    const { from, to, amount } = state.currentRentPayment;
+   477→    const payer = state.players.find(p => p.id === from);
+   478→    const payee = state.players.find(p => p.id === to);
+   479→    if (!payer || !payee) return;
+   480→
+   481→    const payerNew = payer.money - amount;
+   482→    const payeeNew = payee.money + amount;
+   483→
+   484→    set(state => ({
+   485→      players: state.players.map(p => {
+   486→        if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 };
+   487→        if (p.id === to) return { ...p, money: payeeNew };
+   488→        return p;
+   489→      }),
+   490→      currentRentPayment: null,
+   491→      phase: payerNew < 0 ? 'game_over' : 'landed',
+   492→    }));
+   493→  },
+   494→
+   495→  drawCard: (type: 'chest' | 'chance') => {
+   496→    const state = get();
+   497→    if (type === 'chest') {
+   498→      const card = state.jawatanMenteriDeck[0];
+   499→      const remaining = state.jawatanMenteriDeck.slice(1);
+   500→      if (remaining.length === 0) {
+   501→        set({ jawatanMenteriDeck: shuffleDeck(JAWATAN_MENTERI_CARDS), currentCard: card });
+   502→      } else {
+   503→        set({ jawatanMenteriDeck: remaining, currentCard: card });
+   504→      }
+   505→      return card;
+   506→    } else {
+   507→      const card = state.krisisNasionalDeck[0];
+   508→      const remaining = state.krisisNasionalDeck.slice(1);
+   509→      if (remaining.length === 0) {
+   510→        set({ krisisNasionalDeck: shuffleDeck(KRISIS_NASIONAL_CARDS), currentCard: card });
+   511→      } else {
+   512→        set({ krisisNasionalDeck: remaining, currentCard: card });
+   513→      }
+   514→      return card;
+   515→    }
+   516→  },
+   517→
+   518→  applyCard: (card: GameCard) => {
+   519→    const state = get();
+   520→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   521→    const player = state.players.find(p => p.id === currentPlayerId);
+   522→    if (!player) return;
+   523→
+   524→    const { effect } = card;
+   525→
+   526→    switch (effect.type) {
+   527→      case 'money': {
+   528→        const newMoney = player.money + effect.value;
+   529→        set(state => ({
+   530→          players: state.players.map(p =>
+   531→            p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt: newMoney < 0 } : p
+   532→          ),
+   533→          currentCard: null,
+   534→          phase: newMoney < 0 ? 'game_over' : 'landed',
+   535→        }));
+   536→        break;
+   537→      }
+   538→      case 'move': {
+   539→        let newPos = player.position + effect.value;
+   540→        if (newPos < 0) newPos += 40;
+   541→        if (newPos >= 40) {
+   542→          newPos = newPos % 40;
+   543→          // Pass GO
+   544→          set(state => ({
+   545→            players: state.players.map(p =>
+   546→              p.id === currentPlayerId ? { ...p, money: p.money + 200, position: newPos } : p
+   547→            ),
+   548→            currentCard: null,
+   549→            phase: 'landed',
+   550→          }));
+   551→          get().addLog({
+   552→            playerId: currentPlayerId,
+   553→            playerName: player.name,
+   554→            message: `💰 Passed GO during card! +RM200!`,
+   555→            type: 'pass_go',
+   556→          });
+   557→        } else {
+   558→          set(state => ({
+   559→            players: state.players.map(p =>
+   560→              p.id === currentPlayerId ? { ...p, position: newPos } : p
+   561→            ),
+   562→            currentCard: null,
+   563→            phase: 'landed',
+   564→          }));
+   565→        }
+   566→        break;
+   567→      }
+   568→      case 'go_to': {
+   569→        const targetPos = effect.tileId || 0;
+   570→        const passedGo = player.position > targetPos;
+   571→        set(state => ({
+   572→          players: state.players.map(p =>
+   573→            p.id === currentPlayerId
+   574→              ? { ...p, position: targetPos, money: passedGo ? p.money + 200 : p.money }
+   575→              : p
+   576→          ),
+   577→          currentCard: null,
+   578→          phase: 'landed',
+   579→        }));
+   580→        if (passedGo) {
+   581→          get().addLog({
+   582→            playerId: currentPlayerId,
+   583→            playerName: player.name,
+   584→            message: `💰 Passed GO during card! +RM200!`,
+   585→            type: 'pass_go',
+   586→          });
+   587→        }
+   588→        break;
+   589→      }
+   590→      case 'jail': {
+   591→        set(state => ({
+   592→          players: state.players.map(p =>
+   593→            p.id === currentPlayerId ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   594→          ),
+   595→          currentCard: null,
+   596→          phase: 'jail_decision',
+   597→        }));
+   598→        break;
+   599→      }
+   600→      case 'collect_all': {
+   601→        const amount = effect.value;
+   602→        const totalCollected = (state.players.length - 1) * amount;
+   603→        set(state => ({
+   604→          players: state.players.map(p => {
+   605→            if (p.id === currentPlayerId) return { ...p, money: p.money + totalCollected };
+   606→            return { ...p, money: p.money - amount };
+   607→          }),
+   608→          currentCard: null,
+   609→          phase: 'landed',
+   610→        }));
+   611→        break;
+   612→      }
+   613→      case 'pay_all': {
+   614→        const amount = effect.value;
+   615→        const totalPaid = (state.players.length - 1) * amount;
+   616→        set(state => ({
+   617→          players: state.players.map(p => {
+   618→            if (p.id === currentPlayerId) return { ...p, money: p.money - totalPaid };
+   619→            return { ...p, money: p.money + amount };
+   620→          }),
+   621→          currentCard: null,
+   622→          phase: 'landed',
+   623→        }));
+   624→        break;
+   625→      }
+   626→      case 'repair': {
+   627→        const cost = effect.value;
+   628→        set(state => ({
+   629→          players: state.players.map(p =>
+   630→            p.id === currentPlayerId ? { ...p, money: p.money - cost } : p
+   631→          ),
+   632→          currentCard: null,
+   633→          phase: 'landed',
+   634→        }));
+   635→        break;
+   636→      }
+   637→    }
+   638→
+   639→    // Check for bankruptcy
+   640→    const newState = get();
+   641→    const updatedPlayer = newState.players.find(p => p.id === currentPlayerId);
+   642→    if (updatedPlayer && updatedPlayer.money < 0) {
+   643→      set({ phase: 'game_over' });
+   644→    }
+   645→  },
+   646→
+   647→  endTurn: () => {
+   648→    const state = get();
+   649→    
+   650→    // Check game over
+   651→    const activePlayers = state.players.filter(p => !p.isBankrupt);
+   652→    if (activePlayers.length <= 1) {
+   653→      const winner = activePlayers[0]?.id || null;
+   654→      set({ phase: 'game_over', winner });
+   655→      return;
+   656→    }
+   657→
+   658→    // Next player
+   659→    let nextIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
+   660→    const nextPlayerId = state.turnOrder[nextIndex];
+   661→    let nextPlayer = state.players.find(p => p.id === nextPlayerId);
+   662→
+   663→    // Skip bankrupt players
+   664→    let safety = 0;
+   665→    while (nextPlayer?.isBankrupt && safety < 10) {
+   666→      nextIndex = (nextIndex + 1) % state.turnOrder.length;
+   667→      nextPlayerId;
+   668→      nextPlayerId = state.turnOrder[nextIndex];
+   669→      nextPlayer = state.players.find(p => p.id === nextPlayerId);
+   670→      safety++;
+   671→    }
+   672→
+   673→    const isNextTurn = nextIndex <= state.currentTurnIndex;
+   674→    const newTurnCount = isNextTurn ? state.turnCount + 1 : state.turnCount;
+   675→
+   676→    set({
+   677→      currentTurnIndex: nextIndex,
+   678→      turnCount: newTurnCount,
+   679→      diceValues: null,
+   680→      isDoubles: false,
+   681→      consecutiveDoubles: 0,
+   682→      phase: 'playing',
+   683→      selectedTileId: null,
+   684→    });
+   685→
+   686→    // If next player is AI, auto-play
+   687→    if (nextPlayer?.isAI) {
+   688→      get().setAIThinking(true);
+   689→      setTimeout(() => {
+   690→        get().aiTurn();
+   691→      }, 1000);
+   692→    }
+   693→  },
+   694→
+   695→  handleJailDecision: (pay: boolean) => {
+   696→    const state = get();
+   697→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   698→    const player = state.players.find(p => p.id === currentPlayerId);
+   699→    if (!player) return;
+   700→
+   701→    if (pay || player.hasGetOutOfJailFree) {
+   702→      const cost = pay ? 50 : 0;
+   703→      set(state => ({
+   704→        players: state.players.map(p =>
+   705→          p.id === currentPlayerId
+   706→            ? { ...p, money: p.money - cost, isInJail: false, jailTurns: 0, hasGetOutOfJailFree: pay ? p.hasGetOutOfJailFree : false }
+   707→            : p
+   708→        ),
+   709→        phase: 'playing',
+   710→      }));
+   711→      get().addLog({
+   712→        playerId: currentPlayerId,
+   713→        playerName: player.name,
+   714→        message: `🔓 ${player.name} ${pay ? `pays RM50 bail` : 'uses Get Out of Jail Free card'}!`,
+   715→        type: 'jail',
+   716→      });
+   717→    } else {
+   718→      // Try to roll doubles
+   719→      const d1 = Math.floor(Math.random() * 6) + 1;
+   720→      const d2 = Math.floor(Math.random() * 6) + 1;
+   721→      if (d1 === d2) {
+   722→        set(state => ({
+   723→          players: state.players.map(p =>
+   724→            p.id === currentPlayerId ? { ...p, isInJail: false, jailTurns: 0 } : p
+   725→          ),
+   726→          diceValues: [d1, d2],
+   727→          isDoubles: true,
+   728→          phase: 'rolling',
+   729→        }));
+   730→        get().addLog({
+   731→          playerId: currentPlayerId,
+   732→          playerName: player.name,
+   733→          message: `🎲 ${player.name} rolls doubles (${d1},${d2}) and escapes jail!`,
+   734→          type: 'jail',
+   735→        });
+   736→        setTimeout(() => get().movePlayer(), 1500);
+   737→      } else {
+   738→        const newJailTurns = player.jailTurns + 1;
+   739→        const forcedOut = newJailTurns >= 3;
+   740→        set(state => ({
+   741→          players: state.players.map(p =>
+   742→            p.id === currentPlayerId
+   743→              ? {
+   744→                  ...p,
+   745→                  jailTurns: newJailTurns,
+   746→                  isInJail: !forcedOut,
+   747→                  money: forcedOut ? p.money - 50 : p.money,
+   748→                }
+   749→              : p
+   750→          ),
+   751→          diceValues: [d1, d2],
+   752→          isDoubles: false,
+   753→          phase: forcedOut ? 'landed' : 'jail_decision',
+   754→        }));
+   755→        get().addLog({
+   756→          playerId: currentPlayerId,
+   757→          playerName: player.name,
+   758→          message: forcedOut
+   759→            ? `⏰ ${player.name} serves full sentence! Pays RM50 and is released.`
+   760→            : `Dice: ${d1},${d2} — No doubles. ${player.name} remains in Tahanan SPR. (Turn ${newJailTurns}/3)`,
+   761→          type: 'jail',
+   762→        });
+   763→      }
+   764→    }
+   765→  },
+   766→
+   767→  selectTile: (tileId: number | null) => {
+   768→    set({ selectedTileId: tileId });
+   769→  },
+   770→
+   771→  addLog: (entry) => {
+   772→    const state = get();
+   773→    set({
+   774→      gameLog: [
+   775→        ...state.gameLog,
+   776→        { ...entry, id: crypto.randomUUID(), turn: state.turnCount },
+   777→      ],
+   778→    });
+   779→  },
+   780→
+   781→  setAIThinking: (thinking) => {
+   782→    set({ aiThinking: thinking });
+   783→  },
+   784→
+   785→  aiTurn: async () => {
+   786→    const state = get();
+   787→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   788→    const player = state.players.find(p => p.id === currentPlayerId);
+   789→    if (!player || !player.isAI || player.isBankrupt) {
+   790→      get().endTurn();
+   791→      return;
+   792→    }
+   793→
+   794→    // Handle jail for AI
+   795→    if (player.isInJail) {
+   796→      get().handleJailDecision(Math.random() > 0.5);
+   797→      await new Promise(resolve => setTimeout(resolve, 1500));
+   798→    }
+   799→
+   800→    const currentState = get();
+   801→    if (currentState.phase === 'jail_decision') {
+   802→      // Still in jail, end turn
+   803→      get().endTurn();
+   804→      return;
+   805→    }
+   806→
+   807→    // Roll dice
+   808→    get().rollDice();
+   809→
+   810→    // Wait for move to complete
+   811→    await new Promise(resolve => setTimeout(resolve, 3000));
+   812→
+   813→    // Check if we need to pay rent or buy
+   814→    const afterMoveState = get();
+   815→    if (afterMoveState.phase === 'paying_rent') {
+   816→      get().payRent();
+   817→      await new Promise(resolve => setTimeout(resolve, 500));
+   818→    }
+   819→    if (afterMoveState.phase === 'card') {
+   820→      const card = afterMoveState.currentCard;
+   821→      if (card) {
+   822→        get().applyCard(card);
+   823→        await new Promise(resolve => setTimeout(resolve, 500));
+   824→      }
+   825→    }
+   826→
+   827→    get().setAIThinking(false);
+   828→    get().endTurn();
+   829→  },
+   830→
+   831→  getMarketState: () => get().marketState,
+   832→}));
