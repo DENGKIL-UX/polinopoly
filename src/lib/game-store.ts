@@ -884,7 +884,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // If next player is AI, auto-play
     if (nextPlayer?.isAI) {
       get().setAIThinking(true);
-      const aiDelay = Math.round(1000 / state.aiSpeed);
+      const aiDelay = Math.round(500 / state.aiSpeed);
       setTimeout(() => {
         get().aiTurn();
       }, aiDelay);
@@ -993,7 +993,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   aiTurn: async () => {
     const state = get();
     const speed = state.aiSpeed;
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.round(ms / speed)));
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.round(ms / (speed * 2))));
 
     const currentPlayerId = state.turnOrder[state.currentTurnIndex];
     const player = state.players.find(p => p.id === currentPlayerId);
@@ -1019,19 +1019,41 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().rollDice();
 
     // Wait for move to complete
-    await delay(3000);
+    await delay(1500);
 
-    // Check if we need to pay rent or buy
+    // Check if we need to buy, pay rent, or handle card
     const afterMoveState = get();
-    if (afterMoveState.phase === 'paying_rent') {
-      get().payRent();
-      await delay(500);
+
+    // AI: Buy property if affordable and strategic
+    if (afterMoveState.phase === 'buying') {
+      const aiPlayerNow = get().players.find(p => p.id === currentPlayerId);
+      const currentTile = get().tiles[aiPlayerNow?.position ?? 0];
+      if (aiPlayerNow && currentTile?.price && aiPlayerNow.money >= currentTile.price) {
+        // AI buying strategy: buy if we have enough cash (keep 300 RM buffer)
+        if (aiPlayerNow.money - currentTile.price >= 300) {
+          get().buyProperty();
+          await delay(300);
+        } else {
+          get().skipBuy();
+          await delay(300);
+        }
+      } else {
+        get().skipBuy();
+        await delay(300);
+      }
     }
-    if (afterMoveState.phase === 'card') {
-      const card = afterMoveState.currentCard;
+
+    // Re-check phase after buying
+    const postBuyState = get();
+    if (postBuyState.phase === 'paying_rent') {
+      get().payRent();
+      await delay(300);
+    }
+    if (postBuyState.phase === 'card') {
+      const card = postBuyState.currentCard;
       if (card) {
         get().applyCard(card);
-        await delay(500);
+        await delay(300);
       }
     }
 
