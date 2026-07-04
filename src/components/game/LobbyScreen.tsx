@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import {
   Sparkles,
   BookOpen,
   Info,
+  ChevronDown,
 } from 'lucide-react';
 
 const COALITION_LIST = Object.values(COALITIONS);
@@ -36,9 +37,110 @@ const COALITION_ADVANTAGES: Record<string, string[]> = {
   IND: ['None — pure rakyat power!', 'Higher difficulty = more glory', 'No coalition obligations'],
 };
 
+const CONFETTI_COLORS = ['#fbbf24', '#ef4444', '#3b82f6', '#10b981', '#f472b6', '#f59e0b'];
+
+/* ─── Confetti particle component ─── */
+function ConfettiParticle({ delay, x, color }: { delay: number; x: number; color: string }) {
+  return (
+    <motion.div
+      className="absolute w-1.5 h-1.5 rounded-full pointer-events-none"
+      style={{ left: '50%', top: '50%', backgroundColor: color }}
+      initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+      animate={{
+        x: [0, x * 40, x * 80],
+        y: [0, -30 - Math.abs(x) * 15, 20 + Math.abs(x) * 10],
+        opacity: [0, 1, 0],
+        scale: [0, 1, 0.5],
+        rotate: [0, 180 + Math.abs(x) * 50, 360],
+      }}
+      transition={{ duration: 1.2, delay, ease: 'easeOut' }}
+    />
+  );
+}
+
+/* ─── Tilted coalition card ─── */
+function TiltedCoalitionCard({ coalition, index, selected, onSelect }: {
+  coalition: typeof COALITION_LIST[number];
+  index: number;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(500px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg) scale(1.03)`;
+  }, []);
+  const handleMouseLeave = useCallback(() => {
+    if (ref.current) ref.current.style.transform = '';
+  }, []);
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.4 + index * 0.08 }}
+    >
+      <Card
+        ref={ref}
+        className={`cursor-pointer hover:shadow-lg border-2 ${
+          selected
+            ? 'border-yellow-400 shadow-yellow-400/20 shadow-lg'
+            : 'border-slate-700/50 hover:border-slate-600'
+        }`}
+        style={{
+          backgroundColor: selected
+            ? `${coalition.color}15`
+            : 'rgba(15, 23, 42, 0.8)',
+          transition: 'transform 0.15s ease-out, box-shadow 0.2s, border-color 0.2s, background-color 0.2s',
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={() => onSelect(coalition.id)}
+      >
+        <CardHeader className="p-3 pb-1 text-center">
+          <div
+            className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl shadow-inner"
+            style={{ backgroundColor: coalition.color }}
+          >
+            {coalition.emblem}
+          </div>
+          <CardTitle className="text-sm font-bold" style={{ color: coalition.color }}>
+            {coalition.name}
+          </CardTitle>
+          <CardDescription className="text-[10px] text-slate-400 leading-tight">
+            {coalition.fullName}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-3 pt-0">
+          {selected && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              className="overflow-hidden"
+            >
+              <p className="text-[10px] text-slate-400 mb-2">
+                {COALITION_DESCRIPTIONS[coalition.id]}
+              </p>
+              <Badge variant="outline" className="text-[9px] border-yellow-600/50 text-yellow-500">
+                <Sparkles className="h-2.5 w-2.5 mr-1" />
+                {coalition.slogan}
+              </Badge>
+            </motion.div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 export default function LobbyScreen() {
   const [selectedCoalition, setSelectedCoalition] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState<string | null>(null);
+  const [showRules, setShowRules] = useState(false);
+  const [confettiActive, setConfettiActive] = useState(false);
   const startGame = useGameStore(s => s.startGame);
 
   const handleStart = () => {
@@ -47,8 +149,20 @@ export default function LobbyScreen() {
     }
   };
 
+  const handleSelectCoalition = (id: string) => {
+    setSelectedCoalition(id);
+    setShowInfo(id);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-[#0a1628] to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div
+      className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-4"
+      style={{
+        background: 'linear-gradient(135deg, #020617 0%, #0a1628 25%, #0f2e1a 50%, #0a1628 75%, #020617 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'lobby-gradient 12s ease infinite',
+      }}
+    >
       {/* Background effects */}
       <div className="absolute inset-0 opacity-15" style={{
         backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)',
@@ -73,7 +187,7 @@ export default function LobbyScreen() {
         >
           <Crown className="h-10 w-10 text-yellow-400" />
           <h1 className="text-4xl md:text-6xl font-black tracking-tight">
-            <span className="bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+            <span className="animate-shimmer">
               DEWAN RAKYAT
             </span>
           </h1>
@@ -114,61 +228,13 @@ export default function LobbyScreen() {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {COALITION_LIST.map((coalition, index) => (
-            <motion.div
+            <TiltedCoalitionCard
               key={coalition.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 + index * 0.08 }}
-            >
-              <Card
-                className={`cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-lg border-2 ${
-                  selectedCoalition === coalition.id
-                    ? 'border-yellow-400 shadow-yellow-400/20 shadow-lg'
-                    : 'border-slate-700/50 hover:border-slate-600'
-                }`}
-                style={{
-                  backgroundColor: selectedCoalition === coalition.id
-                    ? `${coalition.color}15`
-                    : 'rgba(15, 23, 42, 0.8)',
-                }}
-                onClick={() => {
-                  setSelectedCoalition(coalition.id);
-                  setShowInfo(coalition.id);
-                }}
-              >
-                <CardHeader className="p-3 pb-1 text-center">
-                  <div
-                    className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl shadow-inner"
-                    style={{ backgroundColor: coalition.color }}
-                  >
-                    {coalition.emblem}
-                  </div>
-                  <CardTitle className="text-sm font-bold" style={{ color: coalition.color }}>
-                    {coalition.name}
-                  </CardTitle>
-                  <CardDescription className="text-[10px] text-slate-400 leading-tight">
-                    {coalition.fullName}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  {selectedCoalition === coalition.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      className="overflow-hidden"
-                    >
-                      <p className="text-[10px] text-slate-400 mb-2">
-                        {COALITION_DESCRIPTIONS[coalition.id]}
-                      </p>
-                      <Badge variant="outline" className="text-[9px] border-yellow-600/50 text-yellow-500">
-                        <Sparkles className="h-2.5 w-2.5 mr-1" />
-                        {coalition.slogan}
-                      </Badge>
-                    </motion.div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
+              coalition={coalition}
+              index={index}
+              selected={selectedCoalition === coalition.id}
+              onSelect={handleSelectCoalition}
+            />
           ))}
         </div>
 
@@ -214,23 +280,72 @@ export default function LobbyScreen() {
           )}
         </AnimatePresence>
 
-        {/* Start Button */}
+        {/* Start Button with confetti */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
           className="flex justify-center"
         >
-          <Button
-            size="lg"
-            disabled={!selectedCoalition}
-            onClick={handleStart}
-            className="px-12 py-6 text-lg font-bold bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black shadow-xl shadow-yellow-500/20 disabled:opacity-30 disabled:shadow-none transition-all duration-300"
+          <div className="relative" onPointerEnter={() => setConfettiActive(true)} onPointerLeave={() => setConfettiActive(false)}>
+            <AnimatePresence>
+              {confettiActive && CONFETTI_COLORS.map((color, i) => (
+                <ConfettiParticle key={i} delay={i * 0.04} x={(i - 2.5) * 0.8} color={color} />
+              ))}
+            </AnimatePresence>
+            <Button
+              size="lg"
+              disabled={!selectedCoalition}
+              onClick={handleStart}
+              className="px-12 py-6 text-lg font-bold bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black shadow-xl shadow-yellow-500/20 disabled:opacity-30 disabled:shadow-none transition-all duration-300"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              Mulakan Pilihan Raya!
+              <ChevronRight className="h-5 w-5 ml-2" />
+            </Button>
+          </div>
+        </motion.div>
+
+        {/* Rules expandable section */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0 }}
+          className="mt-6 mb-4 w-full max-w-2xl mx-auto"
+        >
+          <button
+            onClick={() => setShowRules(v => !v)}
+            className="flex items-center gap-2 mx-auto text-xs text-slate-400 hover:text-amber-400 transition-colors"
           >
-            <Crown className="h-5 w-5 mr-2" />
-            Mulakan Pilihan Raya!
-            <ChevronRight className="h-5 w-5 ml-2" />
-          </Button>
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Peraturan Permainan / Game Rules</span>
+            <motion.div animate={{ rotate: showRules ? 180 : 0 }}>
+              <ChevronDown className="h-3.5 w-3.5" />
+            </motion.div>
+          </button>
+          <AnimatePresence>
+            {showRules && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <Card className="mt-3 bg-slate-800/40 border-slate-700/30 backdrop-blur-sm">
+                  <CardContent className="p-4 text-[11px] text-slate-400 space-y-2 leading-relaxed">
+                    <p><b className="text-amber-300">Objektif:</b> Jadilah gabungan terakhir yang berdiri! Beli hartanah, kutip sewa, dan bankrapkan lawan anda.</p>
+                    <p><b className="text-amber-300">Objective:</b> Be the last coalition standing! Buy properties, collect rent, and bankrupt your opponents.</p>
+                    <p><b className="text-amber-300">Dadu:</b> Baling dua dadu untuk bergerak. Doubles = giliran lagi. 3 doubles berturut = Tahanan SPR!</p>
+                    <p><b className="text-amber-300">Dice:</b> Roll two dice to move. Doubles = extra turn. 3 doubles in a row = SPR Jail!</p>
+                    <p><b className="text-amber-300">Hartanah:</b> Miliki set warna penuh untuk bina rumah dan naikkan sewa.</p>
+                    <p><b className="text-amber-300">Properties:</b> Own a full color set to build houses and increase rent.</p>
+                    <p><b className="text-amber-300">Kad:</b> Kad Jawatan Menteri & Krisis Nasional boleh memberi wang, menggerak, atau masuk penjara.</p>
+                    <p><b className="text-amber-300">Cards:</b> Jawatan Menteri & Krisis Nasional cards can give money, move you, or send you to jail.</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Game rules hint */}
@@ -238,7 +353,7 @@ export default function LobbyScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
-          className="text-center mt-6"
+          className="text-center mt-2"
         >
           <p className="text-xs text-slate-500 flex items-center justify-center gap-1">
             <Info className="h-3 w-3" />

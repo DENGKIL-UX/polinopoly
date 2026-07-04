@@ -93,8 +93,8 @@ function TileView({ tile }: { tile: Tile }) {
 
   return (
     <div
-      className={`absolute border transition-all duration-200 ${
-        isCorner ? 'rounded-lg border-amber-700/50' : 'rounded-sm border-white/15'
+      className={`absolute border transition-all duration-200 group ${
+        isCorner ? 'rounded-lg border-amber-700/50 animate-pulse-glow' : 'rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer'
       } ${isSelected ? 'ring-2 ring-yellow-400 z-20 scale-105' : ''} ${isPlayerHere ? 'z-10' : ''}`}
       style={{
         ...getTileStyle(tile.id),
@@ -206,6 +206,18 @@ export default function GameBoard() {
         {/* Outer glow ring */}
         <div className="absolute -inset-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-transparent to-emerald-500/10 blur-sm" />
 
+        {/* Jalur Gemilang decorative border */}
+        <div className="absolute -inset-1 rounded-xl overflow-hidden pointer-events-none">
+          {['#CC0001','#FFFFFF','#002569','#FFFFFF','#CC0001','#FFFFFF','#002569','#FFFFFF','#CC0001','#FFFFFF','#002569','#FFFFFF','#CC0001','#FFFFFF'].map((c, i) => (
+            <div key={i} className="absolute h-full" style={{
+              left: `${(i / 14) * 100}%`,
+              width: `${100 / 14}%`,
+              backgroundColor: c,
+              opacity: 0.12,
+            }} />
+          ))}
+        </div>
+
         {/* Board base with wood-like gradient */}
         <div className="absolute inset-0 rounded-xl overflow-hidden"
           style={{
@@ -225,12 +237,27 @@ export default function GameBoard() {
         </div>
 
         {/* Center area */}
-        <div className="absolute rounded-lg bg-gradient-to-br from-[#0d2a18] to-[#153d22] border border-amber-700/20"
+        <div className="absolute rounded-lg bg-gradient-to-br from-[#0d2a18] to-[#153d22] border border-amber-700/20 overflow-hidden"
           style={{
             top: '12%', left: '12%', right: '12%', bottom: '12%',
             boxShadow: 'inset 0 0 25px rgba(0,0,0,0.4), 0 0 20px rgba(0,0,0,0.2)',
           }}
         >
+          {/* Rotating "Pilihan Raya" text along center border */}
+          <div className="absolute inset-0 pointer-events-none">
+            <svg className="w-full h-full" viewBox="0 0 100 100">
+              <defs>
+                <path id="centerTextPath" d="M 76,50 A 26,26 0 1,1 24,50 A 26,26 0 1,1 76,50" fill="none" />
+              </defs>
+              <text fill="rgba(245,158,11,0.15)" fontSize="4" fontWeight="900" letterSpacing="4">
+                <textPath href="#centerTextPath">
+                  <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="30s" repeatCount="indefinite" />
+                  PILIHAN RAYA &#xB7; DEWAN RAKYAT &#xB7; 2024 &#xB7;
+                </textPath>
+              </text>
+            </svg>
+          </div>
+
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
             className="w-full h-full flex flex-col items-center justify-center p-2">
             {/* Title with glow */}
@@ -305,6 +332,16 @@ export default function GameBoard() {
             </div>
           </motion.div>
         </div>
+
+        {/* Sparkle particles */}
+        {[{x:'18%',y:'22%',d:0},{x:'78%',y:'35%',d:1.2},{x:'30%',y:'75%',d:2.5},{x:'85%',y:'80%',d:0.8}].map((s, i) => (
+          <div key={i} className="absolute w-1 h-1 rounded-full bg-yellow-300 pointer-events-none"
+            style={{
+              left: s.x, top: s.y,
+              animation: `sparkle-float ${2.5 + s.d}s ease-in-out ${s.d}s infinite`,
+            }}
+          />
+        ))}
 
         {/* Tiles */}
         {BOARD_TILES.map(tile => <TileView key={tile.id} tile={tile} />)}

@@ -5,27 +5,88 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGameStore, type Player } from '@/lib/game-store';
-import { COALITIONS, BOARD_TILES, COLOR_GROUP_HEX, type GameCard } from '@/lib/game-data';
+import { useGameStore, type Player, type AuctionState } from '@/lib/game-store';
+import { COALITIONS, BOARD_TILES, COLOR_GROUP_HEX, COLOR_GROUP_COALITION, type GameCard } from '@/lib/game-data';
 import {
   Wallet, ArrowRight, Gavel, CreditCard,
   AlertTriangle, Trophy, MessageSquare, TrendingUp, TrendingDown,
   ChevronRight, SkipForward, DollarSign, Building2, Crown,
-  Briefcase, Hammer, Home, X, Landmark,
+  Briefcase, Hammer, Home, X, Landmark, HelpCircle, RotateCw,
+  Volume2, VolumeX,
 } from 'lucide-react';
+import { soundManager, useSoundEnabled } from '@/lib/sound-effects';
 
-const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚄', '⚅'];
+
+/* ─── Sound Toggle ─── */
+function SoundToggleButton() {
+  const [enabled, toggle] = useSoundEnabled();
+  return (
+    <button
+      onClick={toggle}
+      className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors backdrop-blur-sm"
+      title={enabled ? 'Mute sounds' : 'Enable sounds'}
+    >
+      {enabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+/* ─── How to Play ─── */
+function HowToPlayButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="pointer-events-auto w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-yellow-400 hover:border-yellow-500/40 transition-colors backdrop-blur-sm"
+      >
+        <HelpCircle className="h-4 w-4" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            className="absolute top-10 right-0 w-64 z-40 pointer-events-auto"
+          >
+            <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 backdrop-blur-sm">
+              <CardHeader className="p-3 pb-1.5">
+                <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                  <HelpCircle className="h-3.5 w-3.5" />Cara Bermain / How to Play
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 text-[9px] text-slate-300 space-y-1.5 leading-relaxed">
+                <p>🎲 <b className="text-slate-200">Baling Dadu</b> — Roll dice to move around the board.</p>
+                <p>🏛️ <b className="text-slate-200">Beli Hartanah</b> — Buy unowned properties to collect rent.</p>
+                <p>🏠 <b className="text-slate-200">Bina Rumah</b> — Own a full color set? Build houses for 2× rent!</p>
+                <p>⛓️ <b className="text-slate-200">Tahanan SPR</b> — Land on TAHANAN or roll 3 doubles = jail.</p>
+                <p>📜⚡ <b className="text-slate-200">Kad</b> — Jawatan Menteri & Krisis Nasional cards change your fate.</p>
+                <p>🏆 <b className="text-slate-200">Menang</b> — Last coalition standing wins Dewan Rakyat!</p>
+                <p className="text-slate-500 pt-1 border-t border-slate-700/30">AI controls 5 other coalitions automatically.</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 /* ─── Dice ─── */
 function DiceDisplay({ value, rolling }: { value: number | null; rolling: boolean }) {
   return (
-    <motion.div
-      animate={rolling ? { rotate: [0, 360, 720], scale: [1, 1.2, 0.9, 1] } : { scale: 1 }}
-      transition={rolling ? { duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}
-      className="w-11 h-11 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-white to-slate-100 shadow-xl shadow-black/20 flex items-center justify-center text-xl md:text-2xl border border-slate-200"
-    >
-      {value ? DICE_FACES[value] : '⚀'}
-    </motion.div>
+    <div className="relative">
+      <div className="absolute inset-0 rounded-xl bg-yellow-400/15 blur-md pointer-events-none" />
+      <motion.div
+        animate={rolling ? { rotate: [0, 360, 720], scale: [1, 1.2, 0.9, 1] } : { scale: 1 }}
+        transition={rolling ? { duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}
+        className="relative w-11 h-11 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-white to-slate-100 shadow-xl shadow-black/20 flex items-center justify-center text-xl md:text-2xl border border-slate-200"
+      >
+        {value ? DICE_FACES[value] : '⚀'}
+      </motion.div>
+    </div>
   );
 }
 
@@ -34,7 +95,7 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
   const coalition = COALITIONS[player.coalitionId];
   if (player.isBankrupt) return null;
   return (
-    <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm ${
+    <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
       isCurrentTurn
         ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
         : 'border-slate-700/30 bg-slate-800/30'
@@ -233,6 +294,168 @@ function TileDetail() {
   );
 }
 
+/* ─── Auction Panel ─── */
+function AuctionPanel() {
+  const auctionState = useGameStore(s => s.auctionState);
+  const players = useGameStore(s => s.players);
+  const tiles = useGameStore(s => s.tiles);
+  const placeBid = useGameStore(s => s.placeBid);
+  const passBid = useGameStore(s => s.passBid);
+  const [bidAmount, setBidAmount] = useState('');
+
+  if (!auctionState || !auctionState.isActive) return null;
+
+  const tile = tiles.find(t => t.id === auctionState.tileId);
+  if (!tile) return null;
+
+  const currentBidderId = auctionState.bidderOrder[auctionState.currentBidderIndex];
+  const currentBidder = players.find(p => p.id === currentBidderId);
+  const isHumanTurn = currentBidder?.id === 'player' && !currentBidder?.isAI;
+  const highestBidderPlayer = auctionState.highestBidder ? players.find(p => p.id === auctionState.highestBidder) : null;
+  const minBid = auctionState.highestBid + Math.max(10, Math.floor(auctionState.highestBid * 0.1));
+  const playerMoney = players.find(p => p.id === 'player')?.money || 0;
+
+  const handleBid = () => {
+    const amount = parseInt(bidAmount);
+    if (isNaN(amount) || amount < minBid || amount > playerMoney) return;
+    placeBid('player', amount);
+    setBidAmount('');
+  };
+
+  const handlePass = () => {
+    passBid('player');
+    setBidAmount('');
+  };
+
+  return (
+    <Card className="bg-slate-900/95 border-amber-500/30 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+      <CardHeader className="p-3 pb-2">
+        <CardTitle className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+          <Gavel className="h-3.5 w-3.5" />
+          LELANGAN — {tile.name}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-3 pt-1 space-y-2.5">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-xl shadow-inner"
+            style={{
+              backgroundColor: tile.colorGroup
+                ? `${COLOR_GROUP_HEX[tile.colorGroup]}25`
+                : 'rgba(100,116,139,0.2)',
+            }}
+          >
+            {tile.type === 'highway' ? '🚂' : tile.type === 'media' ? '📺' : '🏛️'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-slate-400">
+              Harga asal: <span className="text-slate-300 font-semibold">RM{tile.price}</span>
+            </p>
+            <p className="text-[10px] text-slate-400">
+              Sewa asas: <span className="text-emerald-400 font-semibold">RM{tile.rent?.[0] || 0}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/30">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-slate-400">Bida tertinggi</span>
+            <motion.span
+              key={auctionState.highestBid}
+              initial={{ scale: 1.3 }}
+              animate={{ scale: 1 }}
+              className="text-sm font-black text-amber-400"
+            >
+              RM{auctionState.highestBid}
+            </motion.span>
+          </div>
+          {highestBidderPlayer && (
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10"
+                style={{ backgroundColor: COALITIONS[highestBidderPlayer.coalitionId]?.color }}
+              >
+                {highestBidderPlayer.avatarEmoji}
+              </div>
+              <span
+                className="text-[10px] font-semibold"
+                style={{ color: COALITIONS[highestBidderPlayer.coalitionId]?.color }}
+              >
+                {highestBidderPlayer.name}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <span className="text-slate-500">Giliran:</span>
+          {currentBidder && (
+            <div className="flex items-center gap-1">
+              <div
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10"
+                style={{ backgroundColor: COALITIONS[currentBidder.coalitionId]?.color }}
+              >
+                {currentBidder.avatarEmoji}
+              </div>
+              <span
+                className="font-bold"
+                style={{ color: COALITIONS[currentBidder.coalitionId]?.color }}
+              >
+                {currentBidder.name}
+              </span>
+              {currentBidder.isAI && (
+                <motion.span
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.2 }}
+                  className="text-yellow-400"
+                >
+                  sedang berfikir...
+                </motion.span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {isHumanTurn && (
+          <div className="space-y-2 pt-1 border-t border-slate-700/30">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={bidAmount}
+                onChange={e => setBidAmount(e.target.value)}
+                placeholder={`Min RM${minBid}`}
+                min={minBid}
+                max={playerMoney}
+                className="flex-1 h-9 px-2.5 bg-slate-800/80 border border-slate-600/50 rounded-lg text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleBid}
+                disabled={!bidAmount || parseInt(bidAmount) < minBid || parseInt(bidAmount) > playerMoney}
+                className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold h-9 shadow-lg shadow-amber-600/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Gavel className="h-3.5 w-3.5 mr-1" />Bida
+              </Button>
+              <Button
+                onClick={handlePass}
+                variant="outline"
+                className="flex-1 border-slate-600 text-slate-300 text-xs h-9 hover:bg-slate-800"
+              >
+                <SkipForward className="h-3.5 w-3.5 mr-1" />Lalu
+              </Button>
+            </div>
+            <p className="text-[8px] text-slate-500 text-center">
+              Baki anda: RM{playerMoney.toLocaleString()} · Minimum: RM{minBid}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ─── Property Portfolio Panel ─── */
 function PropertyPortfolio() {
   const showPortfolio = useGameStore(s => s.showPortfolio);
@@ -331,7 +554,7 @@ function PropertyPortfolio() {
                               {canBuild && (
                                 <motion.button
                                   whileHover={{ scale: 1.1 }}
-                                  onClick={() => buildHouse(t.id)}
+                                  onClick={() => { soundManager.playBuildHouse(); buildHouse(t.id); }}
                                   className="w-6 h-6 rounded bg-green-600/20 border border-green-500/30 flex items-center justify-center text-green-400 hover:bg-green-600/40 transition-colors"
                                   title={`Build house (RM${t.housePrice})`}
                                 >
@@ -373,6 +596,8 @@ export default function GameDashboard() {
   const turnOrder = useGameStore(s => s.turnOrder);
   const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
   const diceValues = useGameStore(s => s.diceValues);
+  const turnCount = useGameStore(s => s.turnCount);
+  const gameLog = useGameStore(s => s.gameLog);
   const currentPlayerId = turnOrder[currentTurnIndex];
   const currentPlayer = players.find(p => p.id === currentPlayerId);
   const isPlayerTurn = currentPlayer?.id === 'player' && !currentPlayer?.isAI;
@@ -391,7 +616,32 @@ export default function GameDashboard() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-20 flex flex-col">
-      <MarketTicker />
+      <div className="relative">
+        <MarketTicker />
+        {/* Mobile player strip below ticker */}
+        <div className="md:hidden flex items-center gap-2 overflow-x-auto px-2 py-1.5 bg-slate-950/80 border-b border-slate-700/20 pointer-events-auto">
+          {players.map(p => <PlayerCard key={p.id} player={p} isCurrentTurn={p.id === currentPlayerId} />)}
+        </div>
+      </div>
+
+      {/* How to Play button top-right */}
+      <div className="absolute top-8 right-1.5 z-30 pointer-events-auto hidden md:flex items-center gap-1.5">
+        <SoundToggleButton />
+        <HowToPlayButton />
+      </div>
+      <div className="absolute top-[4.5rem] right-1.5 z-30 pointer-events-auto flex items-center gap-1.5 md:hidden">
+        <SoundToggleButton />
+        <HowToPlayButton />
+      </div>
+
+      {/* Turn / Round indicator badge */}
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+        <Badge className="bg-slate-800/80 border-slate-600/40 text-[9px] text-amber-300 backdrop-blur-sm pointer-events-auto">
+          <RotateCw className="h-2.5 w-2.5 mr-1" />
+          {'Round '}{Math.ceil(turnCount / Math.max(players.filter(p => !p.isBankrupt).length, 1))}{' · Turn '}{turnCount}
+        </Badge>
+      </div>
+
       <div className="flex-1" />
 
       {/* Bottom action area */}
@@ -416,7 +666,7 @@ export default function GameDashboard() {
                   </motion.div>
                 )}
               </div>
-              <Button onClick={rollDice} size="lg"
+              <Button onClick={() => { soundManager.playDiceRoll(); rollDice(); }} size="lg"
                 className="w-full max-w-xs mx-auto block px-8 py-4 text-sm font-extrabold bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-500 hover:from-yellow-400 hover:via-amber-400 hover:to-yellow-400 text-black shadow-xl shadow-yellow-500/25 border border-yellow-400/50 tracking-wide">
                 🎲 Baling Dadu!
               </Button>
@@ -460,10 +710,10 @@ export default function GameDashboard() {
                     )}
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <Button onClick={buyProperty} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold h-9 shadow-lg shadow-emerald-600/20">
+                    <Button onClick={() => { soundManager.playBuy(); buyProperty(); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold h-9 shadow-lg shadow-emerald-600/20">
                       <CreditCard className="h-3.5 w-3.5 mr-1" />Beli
                     </Button>
-                    <Button onClick={skipBuy} variant="outline" className="flex-1 border-slate-600 text-slate-300 text-xs h-9 hover:bg-slate-800">
+                    <Button onClick={() => { soundManager.playAuction(); skipBuy(); }} variant="outline" className="flex-1 border-slate-600 text-slate-300 text-xs h-9 hover:bg-slate-800">
                       <SkipForward className="h-3.5 w-3.5 mr-1" />Lewat
                     </Button>
                   </div>
@@ -480,7 +730,7 @@ export default function GameDashboard() {
                   <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: 2 }}><AlertTriangle className="h-6 w-6 text-red-400 mx-auto" /></motion.div>
                   <p className="text-xs font-bold text-red-300">Rent Perlu Dibayar!</p>
                   <p className="text-[10px] text-slate-300">Bayar <span className="font-black text-red-400 text-sm">RM{currentRentPayment.amount}</span> kepada {players.find(p => p.id === currentRentPayment.to)?.name}</p>
-                  <Button onClick={payRent} className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold h-9 shadow-lg shadow-red-600/20">
+                  <Button onClick={() => { soundManager.playRent(); payRent(); }} className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold h-9 shadow-lg shadow-red-600/20">
                     <DollarSign className="h-3.5 w-3.5 mr-1" />Bayar RM{currentRentPayment.amount}
                   </Button>
                 </CardContent>
@@ -506,7 +756,7 @@ export default function GameDashboard() {
                     {' '}{currentCard.title}
                   </p>
                   <p className="text-[10px] text-slate-300 leading-relaxed">{currentCard.description}</p>
-                  <Button onClick={() => applyCard(currentCard)} className="w-full bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold h-9">
+                  <Button onClick={() => { soundManager.playCardDraw(); applyCard(currentCard); }} className="w-full bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold h-9">
                     <ChevronRight className="h-3.5 w-3.5 mr-1" />Terima
                   </Button>
                 </CardContent>
@@ -522,10 +772,10 @@ export default function GameDashboard() {
                   <p className="text-xs font-bold text-orange-300">⛓️ Tahanan SPR</p>
                   <p className="text-[10px] text-slate-400">Turn {currentPlayer.jailTurns}/3 sebelum dibebaskan</p>
                   <div className="flex gap-2">
-                    <Button onClick={() => handleJailDecision(true)} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold h-9">
+                    <Button onClick={() => { soundManager.playEndTurn(); handleJailDecision(true); }} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold h-9">
                       <DollarSign className="h-3.5 w-3.5 mr-1" />Bayar RM50
                     </Button>
-                    <Button onClick={() => handleJailDecision(false)} variant="outline" className="flex-1 border-orange-600/50 text-orange-300 text-xs h-9 hover:bg-orange-900/30">
+                    <Button onClick={() => { soundManager.playJail(); handleJailDecision(false); }} variant="outline" className="flex-1 border-orange-600/50 text-orange-300 text-xs h-9 hover:bg-orange-900/30">
                       🎲 Baling Doubles
                     </Button>
                   </div>
@@ -534,17 +784,24 @@ export default function GameDashboard() {
             </motion.div>
           )}
 
+          {phase === 'auction' && (
+            <motion.div key="auction" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+              className="max-w-xs mx-auto w-full">
+              <AuctionPanel />
+            </motion.div>
+          )}
+
           {phase === 'landed' && isPlayerTurn && (
             <motion.div key="end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Button onClick={endTurn} variant="outline"
-                className="px-6 py-2.5 border-slate-600/50 text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-medium transition-colors">
+              <Button onClick={() => { soundManager.playEndTurn(); endTurn(); }} variant="outline"
+                className="px-6 py-2.5 border-yellow-500/40 text-yellow-300 hover:bg-yellow-900/30 hover:text-yellow-200 text-xs font-bold transition-colors animate-end-turn-pulse">
                 Akhir Giliran <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
             </motion.div>
           )}
 
           {phase === 'game_over' && (
-            <motion.div key="over" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="max-w-sm mx-auto">
+            <motion.div key="over" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto">
               <Card className="bg-gradient-to-br from-yellow-900/80 via-amber-900/60 to-yellow-900/80 border-yellow-500/50 shadow-2xl shadow-yellow-500/10 backdrop-blur-sm">
                 <CardContent className="p-5 text-center space-y-3">
                   <motion.div animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
@@ -562,7 +819,43 @@ export default function GameDashboard() {
                   <p className="text-[10px] text-slate-400">
                     {winner === 'player' ? '🎉 Tahniah YAB! Kerajaan terbentuk!' : '😞 Pembangkang menang. Tunggu GE16!'}
                   </p>
-                  <Button onClick={() => window.location.reload()} className="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
+
+                  {/* Game Statistics */}
+                  <div className="border-t border-yellow-500/20 pt-3 mt-2">
+                    <p className="text-[9px] text-amber-400/60 font-bold uppercase tracking-wider mb-2">Keputusan Pilihan Raya / Election Results</p>
+                    <div className="space-y-1.5">
+                      {players
+                        .filter(p => !p.isBankrupt)
+                        .sort((a, b) => {
+                          const aVal = a.money + a.properties.reduce((s, pid) => s + (BOARD_TILES[pid]?.price || 0), 0);
+                          const bVal = b.money + b.properties.reduce((s, pid) => s + (BOARD_TILES[pid]?.price || 0), 0);
+                          return bVal - aVal;
+                        })
+                        .map((p, idx) => {
+                          const totalValue = p.money + p.properties.reduce((s, pid) => s + (BOARD_TILES[pid]?.price || 0), 0);
+                          return (
+                            <div key={p.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10px] ${p.id === winner ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-slate-800/30'}`}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-400/60 font-mono font-bold w-4">#{idx + 1}</span>
+                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px]" style={{ backgroundColor: COALITIONS[p.coalitionId]?.color }}>
+                                  {p.avatarEmoji}
+                                </div>
+                                <span className="font-bold" style={{ color: COALITIONS[p.coalitionId]?.color }}>{p.name}</span>
+                                {p.isAI && <span className="text-slate-600 text-[8px]">AI</span>}
+                              </div>
+                              <div className="flex items-center gap-3 text-[9px]">
+                                <span className="text-slate-400"><span className="text-amber-400 font-bold">{p.properties.length}</span> seats</span>
+                                <span className="text-slate-400">RM<span className="font-bold text-slate-200">{totalValue.toLocaleString()}</span></span>
+                                {p.id === winner && <span className="text-yellow-400">👑</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    <p className="text-[8px] text-slate-600 mt-2">Total turns: {turnCount} · {gameLog.length} events logged</p>
+                  </div>
+
+                  <Button onClick={() => { soundManager.playGameOver(); window.location.reload(); }} className="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
                 </CardContent>
               </Card>
             </motion.div>

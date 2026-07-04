@@ -30,7 +30,16 @@ export interface Player {
   avatarEmoji: string;
 }
 
-export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'game_over';
+export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'auction' | 'game_over';
+
+export interface AuctionState {
+  tileId: number;
+  highestBid: number;
+  highestBidder: string | null;
+  currentBidderIndex: number;
+  bidderOrder: string[];
+  isActive: boolean;
+}
 
 export interface GameLogEntry {
   id: string;
@@ -38,7 +47,7 @@ export interface GameLogEntry {
   playerId: string;
   playerName: string;
   message: string;
-  type: 'move' | 'buy' | 'rent' | 'card' | 'jail' | 'bankrupt' | 'ai_quote' | 'system' | 'tax' | 'pass_go';
+  type: 'move' | 'buy' | 'rent' | 'card' | 'jail' | 'bankrupt' | 'ai_quote' | 'system' | 'tax' | 'pass_go' | 'auction';
 }
 
 export interface GameState {
@@ -69,6 +78,9 @@ export interface GameState {
   aiThinking: boolean;
   showPortfolio: boolean;
 
+  // Auction
+  auctionState: AuctionState | null;
+
   // Actions
   startGame: (coalitionId: string) => void;
   rollDice: () => void;
@@ -89,6 +101,11 @@ export interface GameState {
   buildHouse: (tileId: number) => void;
   sellProperty: (tileId: number) => void;
   togglePortfolio: () => void;
+  startAuction: (tileId: number) => void;
+  placeBid: (playerId: string, amount: number) => void;
+  passBid: (playerId: string) => void;
+  resolveAuction: () => void;
+  aiAuctionTurn: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -164,6 +181,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   winner: null,
   aiThinking: false,
   showPortfolio: false,
+  auctionState: null,
 
   startGame: (playerCoalitionId: string) => {
     const allCoalitionIds = Object.keys(COALITIONS);
@@ -501,11 +519,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().addLog({
       playerId: currentPlayerId,
       playerName: player.name,
-      message: `🚶 ${player.name} passes on ${tile.name}.`,
+      message: `🚶 ${player.name} passes on ${tile.name}. Lelangan bermula!`,
       type: 'move',
     });
 
-    set({ phase: 'landed', selectedTileId: null });
+    set({ selectedTileId: null });
+    get().startAuction(tile.id);
   },
 
   payRent: () => {
@@ -862,8 +881,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    // Wait for auction to complete if one was triggered
+    let auctionWaitCount = 0;
+    while (get().phase === 'auction' && auctionWaitCount < 30) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      auctionWaitCount++;
+    }
+
     get().setAIThinking(false);
-    get().endTurn();
+    // Only end turn if we're in a terminal sub-phase
+    const finalPhase = get().phase;
+    if (finalPhase === 'landed' || finalPhase === 'playing') {
+      get().endTurn();
+    }
   },
 
   getMarketState: () => get().marketState,
@@ -934,5 +964,280 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   togglePortfolio: () => {
     set(state => ({ showPortfolio: !state.showPortfolio }));
+  },
+
+  startAuction: (tileId: number) => {
+    const state = get();
+    const tile = state.tiles.find(t => t.id === tileId);
+    if (!tile || tile.owner) return;
+
+    const price = tile.price || 0;
+    const activePlayers = state.players.filter(
+      p => !p.isBankrupt && p.money >= Math.floor(price * 0.5)
+    );
+
+    if (activePlayers.length === 0) {
+      set({ phase: 'landed' });
+      get().addLog({
+        playerId: 'system',
+        playerName: 'System',
+        message: `🔨 Lelangan ${tile.name} dibatalkan — tiada pembida layak!`,
+        type: 'auction',
+      });
+      return;
+    }
+
+    const floorPrice = Math.floor(price * 0.5);
+    const passingPlayerId = state.turnOrder[state.currentTurnIndex];
+    const bidderOrder: string[] = [];
+    const startIdx = state.currentTurnIndex;
+    for (let i = 1; i <= state.turnOrder.length; i++) {
+      const idx = (startIdx + i) % state.turnOrder.length;
+      const pid = state.turnOrder[idx];
+      const p = state.players.find(pl => pl.id === pid);
+      if (p && !p.isBankrupt && pid !== passingPlayerId) {
+        bidderOrder.push(pid);
+      }
+    }
+
+    if (bidderOrder.length === 0) {
+      set({ phase: 'landed' });
+      return;
+    }
+
+    const auctionState: AuctionState = {
+      tileId,
+      highestBid: floorPrice,
+      highestBidder: null,
+      currentBidderIndex: 0,
+      bidderOrder,
+      isActive: true,
+    };
+
+    set({ auctionState, phase: 'auction' });
+    get().addLog({
+      playerId: 'system',
+      playerName: 'System',
+      message: `🔨 Lelangan ${tile.name} bermula! Harga mula: RM${floorPrice}`,
+      type: 'auction',
+    });
+
+    const firstBidder = state.players.find(p => p.id === bidderOrder[0]);
+    if (firstBidder?.isAI) {
+      get().setAIThinking(true);
+      setTimeout(() => get().aiAuctionTurn(), 2000);
+    }
+  },
+
+  placeBid: (playerId: string, amount: number) => {
+    const state = get();
+    const auction = state.auctionState;
+    if (!auction || !auction.isActive) return;
+
+    const player = state.players.find(p => p.id === playerId);
+    if (!player || player.money < amount) return;
+    if (amount <= auction.highestBid) return;
+
+    const newAuction: AuctionState = {
+      ...auction,
+      highestBid: amount,
+      highestBidder: playerId,
+    };
+
+    const nextBidderIndex = auction.currentBidderIndex + 1;
+    if (nextBidderIndex >= auction.bidderOrder.length) {
+      const hasOtherBidders = auction.bidderOrder.some(id => id !== playerId);
+      if (!hasOtherBidders || auction.bidderOrder.length === 1) {
+        set({ auctionState: { ...newAuction, currentBidderIndex: nextBidderIndex, isActive: false } });
+        get().resolveAuction();
+        return;
+      }
+      newAuction.currentBidderIndex = 0;
+    } else {
+      newAuction.currentBidderIndex = nextBidderIndex;
+    }
+
+    set({ auctionState: newAuction });
+    get().addLog({
+      playerId,
+      playerName: player.name,
+      message: `📢 ${player.name} bida RM${amount}!`,
+      type: 'auction',
+    });
+
+    const nextBidderId = newAuction.bidderOrder[newAuction.currentBidderIndex];
+    const nextBidder = state.players.find(p => p.id === nextBidderId);
+    if (nextBidder?.isAI) {
+      get().setAIThinking(true);
+      setTimeout(() => get().aiAuctionTurn(), 2000);
+    }
+  },
+
+  passBid: (playerId: string) => {
+    const state = get();
+    const auction = state.auctionState;
+    if (!auction || !auction.isActive) return;
+
+    const player = state.players.find(p => p.id === playerId);
+
+    const newBidderOrder = auction.bidderOrder.filter(id => id !== playerId);
+    const remainingBidders = newBidderOrder.filter(id => id !== auction.highestBidder);
+
+    if (remainingBidders.length === 0 && auction.highestBidder) {
+      set({ auctionState: { ...auction, bidderOrder: newBidderOrder, isActive: false } });
+      get().addLog({
+        playerId,
+        playerName: player?.name || playerId,
+        message: `🚫 ${player?.name || playerId} lalu (pass).`,
+        type: 'auction',
+      });
+      get().resolveAuction();
+      return;
+    }
+
+    if (!auction.highestBidder && newBidderOrder.length === 0) {
+      set({ auctionState: null, phase: 'landed' });
+      get().addLog({
+        playerId: 'system',
+        playerName: 'System',
+        message: `🔨 Lelangan dibatalkan — tiada pembida!`,
+        type: 'auction',
+      });
+      return;
+    }
+
+    let newBidderIndex = 0;
+    const currentBidderId = auction.bidderOrder[auction.currentBidderIndex];
+    if (playerId === currentBidderId) {
+      newBidderIndex = 0;
+    } else {
+      const idx = newBidderOrder.indexOf(currentBidderId);
+      newBidderIndex = idx >= 0 ? idx : 0;
+    }
+
+    const newAuction: AuctionState = {
+      ...auction,
+      bidderOrder: newBidderOrder,
+      currentBidderIndex: newBidderIndex,
+    };
+
+    set({ auctionState: newAuction });
+    get().addLog({
+      playerId,
+      playerName: player?.name || playerId,
+      message: `🚫 ${player?.name || playerId} lalu (pass).`,
+      type: 'auction',
+    });
+
+    const nextBidderId = newBidderOrder[newBidderIndex];
+    const nextBidder = state.players.find(p => p.id === nextBidderId);
+    if (nextBidder?.isAI) {
+      get().setAIThinking(true);
+      setTimeout(() => get().aiAuctionTurn(), 2000);
+    }
+  },
+
+  resolveAuction: () => {
+    const state = get();
+    const auction = state.auctionState;
+    if (!auction) return;
+
+    const tile = state.tiles.find(t => t.id === auction.tileId);
+    if (!tile) {
+      set({ auctionState: null, phase: 'landed' });
+      return;
+    }
+
+    if (auction.highestBidder) {
+      const winner = state.players.find(p => p.id === auction.highestBidder);
+      if (winner) {
+        set(state => ({
+          players: state.players.map(p =>
+            p.id === auction.highestBidder
+              ? { ...p, money: p.money - auction.highestBid, properties: [...p.properties, auction.tileId] }
+              : p
+          ),
+          tiles: state.tiles.map(t =>
+            t.id === auction.tileId ? { ...t, owner: auction.highestBidder } : t
+          ),
+          auctionState: null,
+          phase: 'landed',
+        }));
+        get().addLog({
+          playerId: auction.highestBidder,
+          playerName: winner.name,
+          message: `🔨 ${winner.name} menang lelangan ${tile.name} untuk RM${auction.highestBid}!`,
+          type: 'auction',
+        });
+        return;
+      }
+    }
+
+    set({ auctionState: null, phase: 'landed' });
+    get().addLog({
+      playerId: 'system',
+      playerName: 'System',
+      message: `🔨 Lelangan ${tile.name} tamat tanpa pembida.`,
+      type: 'auction',
+    });
+  },
+
+  aiAuctionTurn: () => {
+    const state = get();
+    const auction = state.auctionState;
+    if (!auction || !auction.isActive) {
+      get().setAIThinking(false);
+      return;
+    }
+
+    const currentBidderId = auction.bidderOrder[auction.currentBidderIndex];
+    const player = state.players.find(p => p.id === currentBidderId);
+    if (!player || !player.isAI) {
+      get().setAIThinking(false);
+      return;
+    }
+
+    const tile = state.tiles.find(t => t.id === auction.tileId);
+    if (!tile) {
+      get().setAIThinking(false);
+      return;
+    }
+
+    const baseRent = tile.rent?.[0] || 0;
+    const maxWillingToPay = Math.floor(baseRent * 15);
+    const minIncrement = Math.max(10, Math.floor(auction.highestBid * 0.1));
+    const proposedBid = auction.highestBid + minIncrement;
+
+    const quote = getRandomQuote(player.coalitionId);
+
+    if (proposedBid <= maxWillingToPay && proposedBid <= player.money && Math.random() > 0.3) {
+      get().placeBid(currentBidderId, proposedBid);
+      set(state => ({
+        players: state.players.map(p =>
+          p.id === currentBidderId ? { ...p, quote } : p
+        ),
+      }));
+      get().addLog({
+        playerId: currentBidderId,
+        playerName: player.name,
+        message: `🤖 ${player.name}: "${quote}"`,
+        type: 'ai_quote',
+      });
+    } else {
+      get().passBid(currentBidderId);
+      set(state => ({
+        players: state.players.map(p =>
+          p.id === currentBidderId ? { ...p, quote } : p
+        ),
+      }));
+      get().addLog({
+        playerId: currentBidderId,
+        playerName: player.name,
+        message: `🤖 ${player.name}: "${quote}"`,
+        type: 'ai_quote',
+      });
+    }
+
+    get().setAIThinking(false);
   },
 }));

@@ -1,0 +1,593 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useRef, useEffect, useState } from 'react';
+     4→     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→     5→import { Button } from '@/components/ui/button';
+     6→     6→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     7→     7→import { Badge } from '@/components/ui/badge';
+     8→     8→import { useGameStore, type Player } from '@/lib/game-store';
+     9→     9→import { COALITIONS, BOARD_TILES, COLOR_GROUP_HEX, type GameCard } from '@/lib/game-data';
+    10→    10→import {
+    11→    11→  Wallet, ArrowRight, Gavel, CreditCard,
+    12→    12→  AlertTriangle, Trophy, MessageSquare, TrendingUp, TrendingDown,
+    13→    13→  ChevronRight, SkipForward, DollarSign, Building2, Crown,
+    14→    14→  Briefcase, Hammer, Home, X, Landmark,
+    15→    15→} from 'lucide-react';
+    16→    16→
+    17→    17→const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    18→    18→
+    19→    19→/* ─── Dice ─── */
+    20→    20→function DiceDisplay({ value, rolling }: { value: number | null; rolling: boolean }) {
+    21→    21→  return (
+    22→    22→    <motion.div
+    23→    23→      animate={rolling ? { rotate: [0, 360, 720], scale: [1, 1.2, 0.9, 1] } : { scale: 1 }}
+    24→    24→      transition={rolling ? { duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}
+    25→    25→      className="w-11 h-11 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-white to-slate-100 shadow-xl shadow-black/20 flex items-center justify-center text-xl md:text-2xl border border-slate-200"
+    26→    26→    >
+    27→    27→      {value ? DICE_FACES[value] : '⚀'}
+    28→    28→    </motion.div>
+    29→    29→  );
+    30→    30→}
+    31→    31→
+    32→    32→/* ─── Player Card ─── */
+    33→    33→function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: boolean }) {
+    34→    34→  const coalition = COALITIONS[player.coalitionId];
+    35→    35→  if (player.isBankrupt) return null;
+    36→    36→  return (
+    37→    37→    <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm ${
+    38→    38→      isCurrentTurn
+    39→    39→        ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
+    40→    40→        : 'border-slate-700/30 bg-slate-800/30'
+    41→    41→    }`}>
+    42→    42→      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md border border-white/10"
+    43→    43→        style={{ backgroundColor: coalition.color, boxShadow: `0 0 8px ${coalition.color}30` }}>
+    44→    44→        {player.avatarEmoji}
+    45→    45→      </div>
+    46→    46→      <div className="flex-1 min-w-0">
+    47→    47→        <div className="flex items-center gap-1.5">
+    48→    48→          <span className="text-[11px] font-bold truncate" style={{ color: coalition.color }}>{player.name}</span>
+    49→    49→          {player.isAI && <Badge variant="outline" className="text-[7px] px-1 py-0 h-3.5 border-slate-600 text-slate-500">AI</Badge>}
+    50→    50→          {player.isInJail && <Badge className="text-[7px] px-1 py-0 h-3.5 bg-red-600">JAIL</Badge>}
+    51→    51→        </div>
+    52→    52→        <div className="flex items-center gap-2.5 text-[9px] text-slate-400 mt-0.5">
+    53→    53→          <span className="flex items-center gap-0.5"><Wallet className="h-2.5 w-2.5" /><span className="font-semibold text-slate-300">RM{player.money.toLocaleString()}</span></span>
+    54→    54→          <span className="flex items-center gap-0.5"><Building2 className="h-2.5 w-2.5" />{player.properties.length}</span>
+    55→    55→        </div>
+    56→    56→      </div>
+    57→    57→      {isCurrentTurn && (
+    58→    58→        <motion.div animate={{ x: [0, 4, 0], opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 1.2 }}>
+    59→    59→          <ArrowRight className="h-3.5 w-3.5 text-yellow-400" />
+    60→    60→        </motion.div>
+    61→    61→      )}
+    62→    62→    </div>
+    63→    63→  );
+    64→    64→}
+    65→    65→
+    66→    66→/* ─── Market Ticker ─── */
+    67→    67→function MarketTicker() {
+    68→    68→  const [ticks, setTicks] = useState({ klci: 1587.3, klciChange: -0.8, cpoPrice: 3950, cpoChange: 2.3, ringgitUsd: 4.47, ringgitChange: -0.2, inflation: 1.0 });
+    69→    69→  useEffect(() => {
+    70→    70→    const iv = setInterval(() => {
+    71→    71→      setTicks(p => ({
+    72→    72→        klci: +(p.klci + (Math.random() - 0.48) * 3).toFixed(1),
+    73→    73→        klciChange: +((Math.random() - 0.45) * 2.5).toFixed(1),
+    74→    74→        cpoPrice: Math.round(p.cpoPrice + (Math.random() - 0.45) * 50),
+    75→    75→        cpoChange: +((Math.random() - 0.4) * 3).toFixed(1),
+    76→    76→        ringgitUsd: +(p.ringgitUsd + (Math.random() - 0.52) * 0.02).toFixed(2),
+    77→    77→        ringgitChange: +((Math.random() - 0.5) * 0.3).toFixed(2),
+    78→    78→        inflation: +(0.85 + Math.random() * 0.3).toFixed(2),
+    79→    79→      }));
+    80→    80→    }, 5000);
+    81→    81→    return () => clearInterval(iv);
+    82→    82→  }, []);
+    83→    83→  return (
+    84→    84→    <div className="flex items-center gap-3 md:gap-4 overflow-x-auto px-3 py-1.5 bg-slate-950/90 border-b border-slate-700/30 text-[10px] backdrop-blur-sm">
+    85→    85→      <span className="font-bold text-yellow-500 flex items-center gap-1 flex-shrink-0">
+    86→    86→        <TrendingUp className="h-3 w-3" /><span className="hidden sm:inline">BURSA</span><span className="sm:hidden">📈</span>
+    87→    87→      </span>
+    88→    88→      {[
+    89→    89→        { l: 'KLCI', v: ticks.klci.toFixed(1), c: ticks.klciChange },
+    90→    90→        { l: 'CPO', v: `RM${ticks.cpoPrice}`, c: ticks.cpoChange },
+    91→    91→        { l: 'MYR', v: ticks.ringgitUsd.toFixed(2), c: ticks.ringgitChange * 10 },
+    92→    92→        { l: 'INF', v: `×${ticks.inflation}`, c: (ticks.inflation - 1) * 50 },
+    93→    93→      ].map((item, i) => (
+    94→    94→        <span key={i} className="flex items-center gap-1 flex-shrink-0">
+    95→    95→          <span className="text-slate-500 font-medium">{item.l}</span>
+    96→    96→          <span className="font-bold text-slate-200">{item.v}</span>
+    97→    97→          <span className={item.c >= 0 ? 'text-emerald-400' : 'text-red-400'} style={{ minWidth: 38 }}>
+    98→    98→            {item.c >= 0 ? '▲' : '▼'}{Math.abs(item.c).toFixed(1)}%
+    99→    99→          </span>
+   100→   100→        </span>
+   101→   101→      ))}
+   102→   102→    </div>
+   103→   103→  );
+   104→   104→}
+   105→   105→
+   106→   106→/* ─── Game Log ─── */
+   107→   107→function GameLogPanel() {
+   108→   108→  const gameLog = useGameStore(s => s.gameLog);
+   109→   109→  const ref = useRef<HTMLDivElement>(null);
+   110→   110→  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [gameLog.length]);
+   111→   111→  return (
+   112→   112→    <Card className="bg-slate-950/90 border-slate-700/30 backdrop-blur-sm">
+   113→   113→      <CardHeader className="p-2.5 pb-1.5">
+   114→   114→        <CardTitle className="text-[10px] font-bold text-amber-400/80 flex items-center gap-1.5 tracking-wide uppercase">
+   115→   115→          <Landmark className="h-3 w-3" />Hansard Log
+   116→   116→        </CardTitle>
+   117→   117→      </CardHeader>
+   118→   118→      <CardContent className="p-1.5 pt-0">
+   119→   119→        <div ref={ref} className="h-40 overflow-y-auto space-y-1 pr-1">
+   120→   120→          {gameLog.slice(-30).reverse().map(e => (
+   121→   121→            <div key={e.id} className="text-[9px] leading-relaxed text-slate-400 border-l-2 pl-2 py-0.5"
+   122→   122→              style={{ borderColor: e.type === 'ai_quote' ? 'rgba(234,179,8,0.3)' : e.type === 'buy' ? 'rgba(74,222,128,0.3)' : e.type === 'rent' ? 'rgba(248,113,113,0.3)' : 'rgba(100,116,139,0.2)' }}>
+   123→   123→              <span className="text-slate-600 mr-1 font-mono">T{e.turn}</span>{e.message}
+   124→   124→            </div>
+   125→   125→          ))}
+   126→   126→        </div>
+   127→   127→      </CardContent>
+   128→   128→    </Card>
+   129→   129→  );
+   130→   130→}
+   131→   131→
+   132→   132→/* ─── AI Quote Bubble ─── */
+   133→   133→function AIQuoteBubble() {
+   134→   134→  const players = useGameStore(s => s.players);
+   135→   135→  const aiThinking = useGameStore(s => s.aiThinking);
+   136→   136→  const aiWithQuotes = players.filter(p => p.isAI && p.quote && !p.isBankrupt);
+   137→   137→  const latest = aiWithQuotes[aiWithQuotes.length - 1];
+   138→   138→  if (!latest && !aiThinking) return null;
+   139→   139→  return (
+   140→   140→    <AnimatePresence>
+   141→   141→      <motion.div
+   142→   142→        initial={{ opacity: 0, y: 10, x: 20 }}
+   143→   143→        animate={{ opacity: 1, y: 0, x: 0 }}
+   144→   144→        exit={{ opacity: 0, x: -20 }}
+   145→   145→        className="absolute bottom-20 left-2 right-2 md:left-auto md:right-2 md:w-72 z-30"
+   146→   146→      >
+   147→   147→        <Card className="bg-slate-900/95 border-yellow-500/20 shadow-xl shadow-black/20 backdrop-blur-sm">
+   148→   148→          <CardContent className="p-3">
+   149→   149→            {aiThinking && !latest ? (
+   150→   150→              <div className="flex items-center gap-2">
+   151→   151→                <div className="w-4 h-4 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+   152→   152→                <span className="text-[10px] text-yellow-400 font-medium">AI sedang berfikir...</span>
+   153→   153→              </div>
+   154→   154→            ) : latest ? (
+   155→   155→              <div className="flex items-start gap-2.5">
+   156→   156→                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 shadow-md border border-white/10"
+   157→   157→                  style={{ backgroundColor: COALITIONS[latest.coalitionId]?.color }}>
+   158→   158→                  {latest.avatarEmoji}
+   159→   159→                </div>
+   160→   160→                <div>
+   161→   161→                  <p className="text-[10px] font-bold mb-0.5" style={{ color: COALITIONS[latest.coalitionId]?.color }}>{latest.name}</p>
+   162→   162→                  <p className="text-[11px] text-slate-300 italic leading-relaxed">&ldquo;{latest.quote}&rdquo;</p>
+   163→   163→                </div>
+   164→   164→              </div>
+   165→   165→            ) : null}
+   166→   166→          </CardContent>
+   167→   167→        </Card>
+   168→   168→      </motion.div>
+   169→   169→    </AnimatePresence>
+   170→   170→  );
+   171→   171→}
+   172→   172→
+   173→   173→/* ─── Tile Detail Popup ─── */
+   174→   174→function TileDetail() {
+   175→   175→  const selectedTileId = useGameStore(s => s.selectedTileId);
+   176→   176→  const tiles = useGameStore(s => s.tiles);
+   177→   177→  const selectTile = useGameStore(s => s.selectTile);
+   178→   178→  if (selectedTileId === null) return null;
+   179→   179→  const tile = tiles.find(t => t.id === selectedTileId);
+   180→   180→  if (!tile) return null;
+   181→   181→  const ownerPlayer = tile.owner ? COALITIONS[tile.owner] : null;
+   182→   182→  return (
+   183→   183→    <AnimatePresence>
+   184→   184→      <motion.div
+   185→   185→        initial={{ opacity: 0, scale: 0.9, y: -10 }}
+   186→   186→        animate={{ opacity: 1, scale: 1, y: 0 }}
+   187→   187→        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+   188→   188→        className="absolute top-28 left-1/2 -translate-x-1/2 z-30"
+   189→   189→      >
+   190→   190→        <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 min-w-56 backdrop-blur-sm">
+   191→   191→          <CardContent className="p-3.5">
+   192→   192→            <div className="flex items-center justify-between mb-2">
+   193→   193→              <div className="flex items-center gap-2">
+   194→   194→                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
+   195→   195→                  style={{ backgroundColor: tile.colorGroup ? `${COLOR_GROUP_HEX[tile.colorGroup]}30` : 'rgba(100,116,139,0.2)' }}>
+   196→   196→                  {tile.type === 'highway' ? '🚂' : tile.type === 'media' ? '📺' : tile.type === 'tax' ? '💰' : '🏛️'}
+   197→   197→                </div>
+   198→   198→                <div>
+   199→   199→                  <span className="text-xs font-bold text-slate-100">{tile.name}</span>
+   200→   200→                  {tile.colorGroup && (
+   201→   201→                    <p className="text-[8px] text-slate-500">{COALITIONS[COLOR_GROUP_COALITION[tile.colorGroup]]?.fullName}</p>
+   202→   202→                  )}
+   203→   203→                </div>
+   204→   204→              </div>
+   205→   205→              <button onClick={() => selectTile(null)} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
+   206→   206→            </div>
+   207→   207→            <p className="text-[9px] text-slate-400 mb-2 leading-relaxed">{tile.description}</p>
+   208→   208→            <div className="space-y-1 text-[10px]">
+   209→   209→              {tile.price && <div className="flex justify-between"><span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{tile.price}</span></div>}
+   210→   210→              {tile.rent && <div className="flex justify-between"><span className="text-slate-500">Base Rent</span><span className="text-emerald-400 font-semibold">RM{tile.rent[0]}</span></div>}
+   211→   211→              {tile.housePrice && <div className="flex justify-between"><span className="text-slate-500">House Cost</span><span className="text-blue-400">RM{tile.housePrice}</span></div>}
+   212→   212→              {tile.houses !== undefined && tile.houses > 0 && (
+   213→   213→                <div className="flex justify-between"><span className="text-slate-500">Houses</span>
+   214→   214→                  <span className="text-green-400 font-semibold">{tile.houses >= 5 ? '🏨 Hotel' : `🏠 ×${tile.houses}`}</span>
+   215→   215→                </div>
+   216→   216→              )}
+   217→   217→              {tile.rent && tile.houses && tile.houses > 0 && (
+   218→   218→                <div className="flex justify-between"><span className="text-slate-500">Current Rent</span>
+   219→   219→                  <span className="text-yellow-400 font-bold">RM{tile.rent[Math.min(tile.houses, 5)]}</span>
+   220→   220→                </div>
+   221→   221→              )}
+   222→   222→            </div>
+   223→   223→            {ownerPlayer && (
+   224→   224→              <div className="mt-2 pt-2 border-t border-slate-700/30 flex items-center justify-between">
+   225→   225→                <span className="text-[9px] text-slate-500">Owner</span>
+   226→   226→                <span className="text-[10px] font-bold" style={{ color: ownerPlayer.color }}>{ownerPlayer.name}</span>
+   227→   227→              </div>
+   228→   228→            )}
+   229→   229→          </CardContent>
+   230→   230→        </Card>
+   231→   231→      </motion.div>
+   232→   232→    </AnimatePresence>
+   233→   233→  );
+   234→   234→}
+   235→   235→
+   236→   236→/* ─── Property Portfolio Panel ─── */
+   237→   237→function PropertyPortfolio() {
+   238→   238→  const showPortfolio = useGameStore(s => s.showPortfolio);
+   239→   239→  const togglePortfolio = useGameStore(s => s.togglePortfolio);
+   240→   240→  const players = useGameStore(s => s.players);
+   241→   241→  const tiles = useGameStore(s => s.tiles);
+   242→   242→  const buildHouse = useGameStore(s => s.buildHouse);
+   243→   243→  const sellProperty = useGameStore(s => s.sellProperty);
+   244→   244→  const phase = useGameStore(s => s.phase);
+   245→   245→  const turnOrder = useGameStore(s => s.turnOrder);
+   246→   246→  const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
+   247→   247→  const currentPlayerId = turnOrder[currentTurnIndex];
+   248→   248→  const isPlayerTurn = currentPlayerId === 'player';
+   249→   249→
+   250→   250→  const player = players.find(p => p.id === 'player');
+   251→   251→  if (!player) return null;
+   252→   252→
+   253→   253→  const ownedTiles = player.properties.map(pid => tiles.find(t => t.id === pid)).filter(Boolean) as typeof BOARD_TILES;
+   254→   254→
+   255→   255→  // Group by color group
+   256→   256→  const groups: Record<string, typeof BOARD_TILES> = {};
+   257→   257→  ownedTiles.forEach(t => {
+   258→   258→    const g = t.colorGroup || 'other';
+   259→   259→    if (!groups[g]) groups[g] = [];
+   260→   260→    groups[g].push(t);
+   261→   261→  });
+   262→   262→
+   263→   263→  const canBuildAny = ownedTiles.some(t => {
+   264→   264→    if (t.type !== 'property' || !t.colorGroup || !t.housePrice || (t.houses || 0) >= 5) return false;
+   265→   265→    const groupTiles = BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup);
+   266→   266→    return groupTiles.every(gt => gt.owner === 'player');
+   267→   267→  });
+   268→   268→
+   269→   269→  return (
+   270→   270→    <>
+   271→   271→      <motion.button
+   272→   272→        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+   273→   273→        onClick={togglePortfolio}
+   274→   274→        className="absolute top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors pointer-events-auto"
+   275→   275→      >
+   276→   276→        <Briefcase className="h-3.5 w-3.5" />
+   277→   277→        <span>Portfolio</span>
+   278→   278→        <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 border-amber-600/50 text-amber-400">{ownedTiles.length}</Badge>
+   279→   279→        {canBuildAny && isPlayerTurn && (
+   280→   280→          <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
+   281→   281→            className="w-1.5 h-1.5 rounded-full bg-green-400" />
+   282→   282→        )}
+   283→   283→      </motion.button>
+   284→   284→
+   285→   285→      <AnimatePresence>
+   286→   286→        {showPortfolio && (
+   287→   287→          <motion.div
+   288→   288→            initial={{ opacity: 0, x: -300 }}
+   289→   289→            animate={{ opacity: 1, x: 0 }}
+   290→   290→            exit={{ opacity: 0, x: -300 }}
+   291→   291→            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+   292→   292→            className="absolute top-16 left-1 z-30 w-64 max-h-[65vh] pointer-events-auto"
+   293→   293→          >
+   294→   294→            <Card className="bg-slate-900/95 border-slate-600/30 shadow-2xl shadow-black/30 backdrop-blur-sm">
+   295→   295→              <CardHeader className="p-3 pb-2 flex-row items-center justify-between space-y-0">
+   296→   296→                <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+   297→   297→                  <Crown className="h-3.5 w-3.5" />Your Properties
+   298→   298→                </CardTitle>
+   299→   299→                <button onClick={togglePortfolio} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
+   300→   300→              </CardHeader>
+   301→   301→              <CardContent className="p-2 pt-0">
+   302→   302→                <div className="h-[50vh] overflow-y-auto space-y-2 pr-1">
+   303→   303→                  {ownedTiles.length === 0 && (
+   304→   304→                    <p className="text-[10px] text-slate-500 text-center py-4">No properties yet. Buy some!</p>
+   305→   305→                  )}
+   306→   306→                  {Object.entries(groups).map(([group, gTiles]) => (
+   307→   307→                    <div key={group}>
+   308→   308→                      <div className="flex items-center gap-1.5 mb-1">
+   309→   309→                        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLOR_GROUP_HEX[group as keyof typeof COLOR_GROUP_HEX] || '#6b7280' }} />
+   310→   310→                        <span className="text-[8px] text-slate-500 uppercase font-bold tracking-wider">{group}</span>
+   311→   311→                      </div>
+   312→   312→                      {gTiles.map(t => {
+   313→   313→                        const ownsGroup = t.colorGroup && BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup).every(gt => gt.owner === 'player');
+   314→   314→                        const canBuild = ownsGroup && t.type === 'property' && !!t.housePrice && (t.houses || 0) < 5 && player.money >= (t.housePrice || 0) && isPlayerTurn && phase !== 'rolling' && phase !== 'moving';
+   315→   315→                        return (
+   316→   316→                          <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-800/40 border border-slate-700/20 mb-1">
+   317→   317→                            <div className="w-5 h-5 rounded flex items-center justify-center text-[8px] flex-shrink-0"
+   318→   318→                              style={{ backgroundColor: `${COLOR_GROUP_HEX[t.colorGroup!] || '#6b7280'}40` }}>
+   319→   319→                              🏛️
+   320→   320→                            </div>
+   321→   321→                            <div className="flex-1 min-w-0">
+   322→   322→                              <p className="text-[9px] font-bold text-slate-200 truncate">{t.name}</p>
+   323→   323→                              <div className="flex items-center gap-2 text-[8px] text-slate-400">
+   324→   324→                                <span>Rent: RM{t.rent?.[(t.houses || 0)] || t.rent?.[0]}</span>
+   325→   325→                                {(t.houses || 0) > 0 && (
+   326→   326→                                  <span className="text-green-400">{t.houses >= 5 ? '🏨' : `🏠×${t.houses}`}</span>
+   327→   327→                                )}
+   328→   328→                              </div>
+   329→   329→                            </div>
+   330→   330→                            <div className="flex gap-1 flex-shrink-0">
+   331→   331→                              {canBuild && (
+   332→   332→                                <motion.button
+   333→   333→                                  whileHover={{ scale: 1.1 }}
+   334→   334→                                  onClick={() => buildHouse(t.id)}
+   335→   335→                                  className="w-6 h-6 rounded bg-green-600/20 border border-green-500/30 flex items-center justify-center text-green-400 hover:bg-green-600/40 transition-colors"
+   336→   336→                                  title={`Build house (RM${t.housePrice})`}
+   337→   337→                                >
+   338→   338→                                  <Home className="h-3 w-3" />
+   339→   339→                                </motion.button>
+   340→   340→                              )}
+   341→   341→                              <button
+   342→   342→                                onClick={() => sellProperty(t.id)}
+   343→   343→                                className="w-6 h-6 rounded bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-400/60 hover:bg-red-600/30 hover:text-red-400 transition-colors"
+   344→   344→                                title="Sell property"
+   345→   345→                              >
+   346→   346→                                <DollarSign className="h-3 w-3" />
+   347→   347→                              </button>
+   348→   348→                            </div>
+   349→   349→                          </div>
+   350→   350→                        );
+   351→   351→                      })}
+   352→   352→                    </div>
+   353→   353→                  ))}
+   354→   354→                </div>
+   355→   355→                {canBuildAny && isPlayerTurn && (
+   356→   356→                  <div className="mt-2 pt-2 border-t border-slate-700/30 text-center">
+   357→   357→                    <p className="text-[8px] text-green-400/70">✨ Full set owned — build houses to increase rent!</p>
+   358→   358→                  </div>
+   359→   359→                )}
+   360→   360→              </CardContent>
+   361→   361→            </Card>
+   362→   362→          </motion.div>
+   363→   363→        )}
+   364→   364→      </AnimatePresence>
+   365→   365→    </>
+   366→   366→  );
+   367→   367→}
+   368→   368→
+   369→   369→/* ─── Main Dashboard ─── */
+   370→   370→export default function GameDashboard() {
+   371→   371→  const phase = useGameStore(s => s.phase);
+   372→   372→  const players = useGameStore(s => s.players);
+   373→   373→  const turnOrder = useGameStore(s => s.turnOrder);
+   374→   374→  const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
+   375→   375→  const diceValues = useGameStore(s => s.diceValues);
+   376→   376→  const currentPlayerId = turnOrder[currentTurnIndex];
+   377→   377→  const currentPlayer = players.find(p => p.id === currentPlayerId);
+   378→   378→  const isPlayerTurn = currentPlayer?.id === 'player' && !currentPlayer?.isAI;
+   379→   379→  const rollDice = useGameStore(s => s.rollDice);
+   380→   380→  const buyProperty = useGameStore(s => s.buyProperty);
+   381→   381→  const skipBuy = useGameStore(s => s.skipBuy);
+   382→   382→  const payRent = useGameStore(s => s.payRent);
+   383→   383→  const applyCard = useGameStore(s => s.applyCard);
+   384→   384→  const endTurn = useGameStore(s => s.endTurn);
+   385→   385→  const handleJailDecision = useGameStore(s => s.handleJailDecision);
+   386→   386→  const currentCard = useGameStore(s => s.currentCard);
+   387→   387→  const currentRentPayment = useGameStore(s => s.currentRentPayment);
+   388→   388→  const winner = useGameStore(s => s.winner);
+   389→   389→  const selectedTileId = useGameStore(s => s.selectedTileId);
+   390→   390→  const selectedTile = selectedTileId !== null ? BOARD_TILES[selectedTileId] : null;
+   391→   391→
+   392→   392→  return (
+   393→   393→    <div className="absolute inset-0 pointer-events-none z-20 flex flex-col">
+   394→   394→      <MarketTicker />
+   395→   395→      <div className="flex-1" />
+   396→   396→
+   397→   397→      {/* Bottom action area */}
+   398→   398→      <div className="pointer-events-auto pb-2 px-2 flex justify-center">
+   399→   399→        <AnimatePresence mode="wait">
+   400→   400→          {phase === 'playing' && isPlayerTurn && (
+   401→   401→            <motion.div key="roll" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+   402→   402→              <div className="flex items-center gap-3 mb-3 justify-center">
+   403→   403→                <DiceDisplay value={diceValues?.[0] ?? null} rolling={phase === 'rolling'} />
+   404→   404→                <DiceDisplay value={diceValues?.[1] ?? null} rolling={phase === 'rolling'} />
+   405→   405→                {diceValues && (
+   406→   406→                  <motion.div initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+   407→   407→                    className="text-xl font-black text-yellow-400 min-w-[2rem] text-center"
+   408→   408→                    style={{ textShadow: '0 0 10px rgba(250,204,21,0.4)' }}>
+   409→   409→                    {diceValues[0] + diceValues[1]}
+   410→   410→                  </motion.div>
+   411→   411→                )}
+   412→   412→                {diceValues && diceValues[0] === diceValues[1] && (
+   413→   413→                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+   414→   414→                    className="px-2 py-0.5 rounded-full bg-yellow-500 text-black text-[9px] font-black shadow-lg shadow-yellow-500/30">
+   415→   415→                    DOUBLES!
+   416→   416→                  </motion.div>
+   417→   417→                )}
+   418→   418→              </div>
+   419→   419→              <Button onClick={rollDice} size="lg"
+   420→   420→                className="w-full max-w-xs mx-auto block px-8 py-4 text-sm font-extrabold bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-500 hover:from-yellow-400 hover:via-amber-400 hover:to-yellow-400 text-black shadow-xl shadow-yellow-500/25 border border-yellow-400/50 tracking-wide">
+   421→   421→                🎲 Baling Dadu!
+   422→   422→              </Button>
+   423→   423→            </motion.div>
+   424→   424→          )}
+   425→   425→
+   426→   426→          {phase === 'buying' && selectedTile && (
+   427→   427→            <motion.div key="buy" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+   428→   428→              className="max-w-xs mx-auto w-full">
+   429→   429→              <Card className="bg-slate-900/95 border-emerald-500/20 shadow-2xl shadow-black/20 backdrop-blur-sm">
+   430→   430→                <CardContent className="p-3.5 space-y-2.5">
+   431→   431→                  <div className="flex items-center gap-2.5">
+   432→   432→                    <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xl shadow-inner"
+   433→   433→                      style={{ backgroundColor: selectedTile.colorGroup ? `${COLOR_GROUP_HEX[selectedTile.colorGroup]}25` : 'rgba(100,116,139,0.2)' }}>
+   434→   434→                      {selectedTile.type === 'highway' ? '🚂' : selectedTile.type === 'media' ? '📺' : '🏛️'}
+   435→   435→                    </div>
+   436→   436→                    <div className="flex-1 min-w-0">
+   437→   437→                      <p className="text-xs font-bold text-slate-100">{selectedTile.name}</p>
+   438→   438→                      <p className="text-[9px] text-slate-400 truncate">{selectedTile.description}</p>
+   439→   439→                    </div>
+   440→   440→                  </div>
+   441→   441→                  <div className="grid grid-cols-2 gap-1.5">
+   442→   442→                    <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
+   443→   443→                      <span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{selectedTile.price}</span>
+   444→   444→                    </div>
+   445→   445→                    {selectedTile.rent && (
+   446→   446→                      <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
+   447→   447→                        <span className="text-slate-500">Rent</span><span className="font-bold text-emerald-400">RM{selectedTile.rent[0]}</span>
+   448→   448→                      </div>
+   449→   449→                    )}
+   450→   450→                    {selectedTile.housePrice && (
+   451→   451→                      <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
+   452→   452→                        <span className="text-slate-500">Hotel</span><span className="text-blue-400">RM{selectedTile.rent[5]}</span>
+   453→   453→                      </div>
+   454→   454→                    )}
+   455→   455→                    {selectedTile.colorGroup && (
+   456→   456→                      <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
+   457→   457→                        <span className="text-slate-500">Group</span>
+   458→   458→                        <span className="font-semibold" style={{ color: COLOR_GROUP_HEX[selectedTile.colorGroup] }}>{selectedTile.colorGroup}</span>
+   459→   459→                      </div>
+   460→   460→                    )}
+   461→   461→                  </div>
+   462→   462→                  <div className="flex gap-2 pt-1">
+   463→   463→                    <Button onClick={buyProperty} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold h-9 shadow-lg shadow-emerald-600/20">
+   464→   464→                      <CreditCard className="h-3.5 w-3.5 mr-1" />Beli
+   465→   465→                    </Button>
+   466→   466→                    <Button onClick={skipBuy} variant="outline" className="flex-1 border-slate-600 text-slate-300 text-xs h-9 hover:bg-slate-800">
+   467→   467→                      <SkipForward className="h-3.5 w-3.5 mr-1" />Lewat
+   468→   468→                    </Button>
+   469→   469→                  </div>
+   470→   470→                </CardContent>
+   471→   471→              </Card>
+   472→   472→            </motion.div>
+   473→   473→          )}
+   474→   474→
+   475→   475→          {phase === 'paying_rent' && currentRentPayment && (
+   476→   476→            <motion.div key="rent" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20 }}
+   477→   477→              className="max-w-xs mx-auto">
+   478→   478→              <Card className="bg-red-950/80 border-red-500/30 shadow-2xl shadow-red-500/10 backdrop-blur-sm">
+   479→   479→                <CardContent className="p-3.5 text-center space-y-2.5">
+   480→   480→                  <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: 2 }}><AlertTriangle className="h-6 w-6 text-red-400 mx-auto" /></motion.div>
+   481→   481→                  <p className="text-xs font-bold text-red-300">Rent Perlu Dibayar!</p>
+   482→   482→                  <p className="text-[10px] text-slate-300">Bayar <span className="font-black text-red-400 text-sm">RM{currentRentPayment.amount}</span> kepada {players.find(p => p.id === currentRentPayment.to)?.name}</p>
+   483→   483→                  <Button onClick={payRent} className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold h-9 shadow-lg shadow-red-600/20">
+   484→   484→                    <DollarSign className="h-3.5 w-3.5 mr-1" />Bayar RM{currentRentPayment.amount}
+   485→   485→                  </Button>
+   486→   486→                </CardContent>
+   487→   487→              </Card>
+   488→   488→            </motion.div>
+   489→   489→          )}
+   490→   490→
+   491→   491→          {phase === 'card' && currentCard && (
+   492→   492→            <motion.div key="card" initial={{ opacity: 0, y: 20, rotateY: 60, scale: 0.9 }} animate={{ opacity: 1, y: 0, rotateY: 0, scale: 1 }} exit={{ opacity: 0, y: 20, rotateY: -60, scale: 0.9 }}
+   493→   493→              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+   494→   494→              className="max-w-xs mx-auto">
+   495→   495→              <Card className={`shadow-2xl backdrop-blur-sm ${currentCard.effect.value > 0 ? 'bg-emerald-950/80 border-emerald-500/30' : 'bg-red-950/80 border-red-500/30'}`}>
+   496→   496→                <CardContent className="p-3.5 space-y-2 text-center">
+   497→   497→                  <p className={`text-sm font-black ${currentCard.effect.value > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+   498→   498→                    {currentCard.effect.type === 'money' && currentCard.effect.value > 0 && '💰'}
+   499→   499→                    {currentCard.effect.type === 'money' && currentCard.effect.value < 0 && '💸'}
+   500→   500→                    {currentCard.effect.type === 'move' && currentCard.effect.value > 0 && '➡️'}
+   501→   501→                    {currentCard.effect.type === 'move' && currentCard.effect.value < 0 && '⬅️'}
+   502→   502→                    {currentCard.effect.type === 'jail' && '⛓️'}
+   503→   503→                    {currentCard.effect.type === 'go_to' && '🏁'}
+   504→   504→                    {currentCard.effect.type === 'collect_all' && '🤲'}
+   505→   505→                    {currentCard.effect.type === 'pay_all' && '😰'}
+   506→   506→                    {' '}{currentCard.title}
+   507→   507→                  </p>
+   508→   508→                  <p className="text-[10px] text-slate-300 leading-relaxed">{currentCard.description}</p>
+   509→   509→                  <Button onClick={() => applyCard(currentCard)} className="w-full bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold h-9">
+   510→   510→                    <ChevronRight className="h-3.5 w-3.5 mr-1" />Terima
+   511→   511→                  </Button>
+   512→   512→                </CardContent>
+   513→   513→              </Card>
+   514→   514→            </motion.div>
+   515→   515→          )}
+   516→   516→
+   517→   517→          {phase === 'jail_decision' && isPlayerTurn && currentPlayer?.isInJail && (
+   518→   518→            <motion.div key="jail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+   519→   519→              className="max-w-xs mx-auto">
+   520→   520→              <Card className="bg-orange-950/80 border-orange-500/30 shadow-2xl backdrop-blur-sm">
+   521→   521→                <CardContent className="p-3.5 space-y-2.5 text-center">
+   522→   522→                  <p className="text-xs font-bold text-orange-300">⛓️ Tahanan SPR</p>
+   523→   523→                  <p className="text-[10px] text-slate-400">Turn {currentPlayer.jailTurns}/3 sebelum dibebaskan</p>
+   524→   524→                  <div className="flex gap-2">
+   525→   525→                    <Button onClick={() => handleJailDecision(true)} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold h-9">
+   526→   526→                      <DollarSign className="h-3.5 w-3.5 mr-1" />Bayar RM50
+   527→   527→                    </Button>
+   528→   528→                    <Button onClick={() => handleJailDecision(false)} variant="outline" className="flex-1 border-orange-600/50 text-orange-300 text-xs h-9 hover:bg-orange-900/30">
+   529→   529→                      🎲 Baling Doubles
+   530→   530→                    </Button>
+   531→   531→                  </div>
+   532→   532→                </CardContent>
+   533→   533→              </Card>
+   534→   534→            </motion.div>
+   535→   535→          )}
+   536→   536→
+   537→   537→          {phase === 'landed' && isPlayerTurn && (
+   538→   538→            <motion.div key="end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+   539→   539→              <Button onClick={endTurn} variant="outline"
+   540→   540→                className="px-6 py-2.5 border-slate-600/50 text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-medium transition-colors">
+   541→   541→                Akhir Giliran <ChevronRight className="h-3 w-3 ml-1" />
+   542→   542→              </Button>
+   543→   543→            </motion.div>
+   544→   544→          )}
+   545→   545→
+   546→   546→          {phase === 'game_over' && (
+   547→   547→            <motion.div key="over" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="max-w-sm mx-auto">
+   548→   548→              <Card className="bg-gradient-to-br from-yellow-900/80 via-amber-900/60 to-yellow-900/80 border-yellow-500/50 shadow-2xl shadow-yellow-500/10 backdrop-blur-sm">
+   549→   549→                <CardContent className="p-5 text-center space-y-3">
+   550→   550→                  <motion.div animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+   551→   551→                    <Trophy className="h-12 w-12 text-yellow-400 mx-auto drop-shadow-lg" />
+   552→   552→                  </motion.div>
+   553→   553→                  <h2 className="text-xl font-black text-yellow-400 tracking-tight">PILIHAN RAYA TAMAT!</h2>
+   554→   554→                  {winner && (
+   555→   555→                    <p className="text-sm text-slate-200">
+   556→   556→                      <span className="font-black text-base" style={{ color: COALITIONS[players.find(p => p.id === winner)?.coalitionId || 'PH']?.color }}>
+   557→   557→                        {players.find(p => p.id === winner)?.name}
+   558→   558→                      </span>
+   559→   559→                      <br /><span className="text-slate-400 text-xs">memenangi pilihan raya!</span>
+   560→   560→                    </p>
+   561→   561→                  )}
+   562→   562→                  <p className="text-[10px] text-slate-400">
+   563→   563→                    {winner === 'player' ? '🎉 Tahniah YAB! Kerajaan terbentuk!' : '😞 Pembangkang menang. Tunggu GE16!'}
+   564→   564→                  </p>
+   565→   565→                  <Button onClick={() => window.location.reload()} className="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
+   566→   566→                </CardContent>
+   567→   567→              </Card>
+   568→   568→            </motion.div>
+   569→   569→          )}
+   570→   570→        </AnimatePresence>
+   571→   571→      </div>
+   572→   572→
+   573→   573→      {/* Left sidebar */}
+   574→   574→      <div className="absolute top-8 left-1.5 w-48 space-y-1 pointer-events-auto max-h-[55vh] overflow-y-auto hidden md:block">
+   575→   575→        {players.map(p => <PlayerCard key={p.id} player={p} isCurrentTurn={p.id === currentPlayerId} />)}
+   576→   576→      </div>
+   577→   577→
+   578→   578→      {/* Right sidebar */}
+   579→   579→      <div className="absolute top-8 right-1.5 w-56 pointer-events-auto hidden md:block">
+   580→   580→        <GameLogPanel />
+   581→   581→      </div>
+   582→   582→
+   583→   583→      {/* Mobile log */}
+   584→   584→      <div className="md:hidden pointer-events-auto px-2 pb-16">
+   585→   585→        <GameLogPanel />
+   586→   586→      </div>
+   587→   587→
+   588→   588→      <AIQuoteBubble />
+   589→   589→      <TileDetail />
+   590→   590→      <PropertyPortfolio />
+   591→   591→    </div>
+   592→   592→  );
+   593→   593→}
