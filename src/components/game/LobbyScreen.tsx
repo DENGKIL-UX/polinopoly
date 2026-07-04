@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,7 +145,12 @@ export default function LobbyScreen() {
   const startGame = useGameStore(s => s.startGame);
   const loadGame = useGameStore(s => s.loadGame);
   const hasSavedGame = useGameStore(s => s.hasSavedGame);
+  const [hasSaved, setHasSaved] = useState(false);
   const [loadAttempted, setLoadAttempted] = useState(false);
+
+  useEffect(() => {
+    setHasSaved(hasSavedGame());
+  }, [hasSavedGame]);
 
   const handleStart = () => {
     if (selectedCoalition) {
@@ -313,7 +318,7 @@ export default function LobbyScreen() {
           transition={{ delay: 0.8 }}
           className="flex justify-center gap-3"
         >
-          {hasSavedGame() && (
+          {hasSaved && (
             <div className="relative">
               <Button
                 size="lg"

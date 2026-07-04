@@ -535,3 +535,59 @@ Work Log:
 
 ### Priority Recommendations for Next Phase
 - (Same as prior recommendations)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix hydration mismatch, VLM board verification, styling improvements, new features
+
+Work Log:
+- **Fixed hydration mismatch error**: `hasSavedGame()` was called directly in render on LobbyScreen, accessing `localStorage` which returns different values on server vs client. Root cause: `Crown` icon rendered server-side, `FolderOpen` icon rendered client-side when a saved game exists. Fix: moved `hasSavedGame()` call into `useEffect`, using `hasSaved` state variable.
+- **VLM visual testing**: Used agent-browser + z-ai VLM (Vision Language Model) to take screenshots and analyze the game:
+  - Lobby screen: 8/10 quality, minor IND icon inconsistency noted
+  - Game board: Confirmed all 40 tiles present in DOM via accessibility snapshot
+  - VLM struggles with very small tile text (6-8px) but board structure verified correct
+- **Board layout improvements**:
+  - Changed board sizing from `min(84vw,84vh)` to `min(78vh,70vw)` on desktop to prevent dashboard overlap
+  - Fixed vertical centering: changed `-translate-y-[45%]` to proper `top-[46%]` + `-translate-y-1/2`
+  - Increased grid corner ratio from `1.5fr` to `1.6fr` for better corner tile visibility
+  - Added `inset-1` padding to grid for visual breathing room
+- **Dashboard improvements**:
+  - Made GameLogPanel more compact: reduced width from w-56 to w-52, log height from h-40 to h-36
+  - Increased transparency: bg-slate-950/90 → bg-slate-950/80 with backdrop-blur-md
+  - Reduced left sidebar width from w-48 to w-44, max-height from 55vh to 50vh
+  - Reduced bottom action area padding for more board space
+- **Tile readability improvements**:
+  - Increased font sizes across all tile types (icons, names, prices)
+  - Bottom/Top tiles: icon 8px→9px, name 6px→7px, price 5px→6px (with sm: breakpoints)
+  - Left/Right tiles: icon 8px→9px, name 6px→7px, price 5px→6px
+  - Corner tiles: icon base→lg, name 7px→8px, description 4px→5px
+
+Stage Summary:
+- **Hydration fix**: Moved localStorage-dependent rendering into useEffect — server and client now render identical initial HTML
+- **Board verification**: All 40 tiles confirmed in DOM. CSS Grid 11×11 layout mathematically correct.
+- **New feature: Color Group Legend** — Real-time ownership visualization in board center showing all 8 color groups with per-tile owner indicators
+- **New feature: Tile Group Highlight** — When selecting a tile, all tiles in the same color group get a subtle yellow ring
+- **Enhanced TileDetail popup** — Now shows color group ownership bar with building indicators, monopoly badge, owner avatar, and improved icon selection per tile type
+
+### Files Modified
+- `src/components/game/LobbyScreen.tsx` — Hydration fix (useEffect for hasSavedGame)
+- `src/components/game/GameBoard.tsx` — Board sizing, tile fonts, ColorGroupLegend, group highlight
+- `src/components/game/GameDashboard.tsx` — Compact sidebars, transparent log, enhanced TileDetail
+
+### Current Project Status
+- Board renders correctly with all 40 tiles on 11×11 CSS Grid
+- Dashboard no longer overlaps board significantly
+- Color group legend provides at-a-glance ownership overview
+- Hydration error fully resolved
+
+### Unresolved Issues or Risks
+- VLM model (glm-4.6v) struggles to detect small tiles in screenshots — not a code issue, but makes automated visual QA harder
+- Board size on very short viewports (577px height in agent-browser) is constrained by vh units
+- The `GameScene.tsx` (Three.js 3D board) has `useIsMobile()` that could cause hydration issues if ever used in SSR
+
+### Priority Recommendations for Next Phase
+- Add property building UI (click to build houses when monopoly achieved)
+- Improve mobile layout (hide sidebars, use sheet/drawer for log and players)
+- Add trade negotiation UI improvements
+- Consider adding a mini-map for zoomed-in board views

@@ -79,6 +79,9 @@ function TileView({ tile }: { tile: Tile }) {
   const playersOnTile = players.filter(p => p.position === tile.id && !p.isBankrupt);
   const isPlayerHere = playersOnTile.some(p => p.id === 'player');
   const isSelected = useGameStore(s => s.selectedTileId === tile.id);
+  const selectedTileId = useGameStore(s => s.selectedTileId);
+  const selectedTile = selectedTileId !== null ? BOARD_TILES.find(t => t.id === selectedTileId) : null;
+  const isInSameGroup = selectedTile?.colorGroup && tile.colorGroup === selectedTile.colorGroup;
   const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
   const isMortgaged = mortgagedTiles.includes(tile.id);
 
@@ -101,7 +104,7 @@ function TileView({ tile }: { tile: Tile }) {
       className={`relative w-full h-full border transition-all duration-200 group overflow-hidden ${
         isCorner
           ? 'rounded-lg border-amber-700/50 animate-corner-glow'
-          : `border-white/15 hover:brightness-125 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
+          : `border-white/15 hover:brightness-125 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''} ${isInSameGroup && !isSelected ? 'ring-1 ring-yellow-400/40 z-10' : ''}`
       } ${isSelected ? 'ring-2 ring-yellow-400 z-20' : ''} ${isPlayerHere ? 'z-10' : ''}`}
       style={{
         background: bg,
@@ -133,17 +136,17 @@ function TileView({ tile }: { tile: Tile }) {
       {/* Bottom/Top tiles: horizontal layout */}
       {!isSideTile && (
         <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 px-[2px] ${hasColorStrip ? 'mt-[25%] h-[75%]' : ''}`}>
-          <span className={isCorner ? 'text-base sm:text-lg leading-none drop-shadow' : 'text-[8px] sm:text-[10px] leading-none'}>{icon}</span>
+          <span className={isCorner ? 'text-lg sm:text-xl leading-none drop-shadow' : 'text-[9px] sm:text-xs leading-none'}>{icon}</span>
           <span className={`font-extrabold text-center leading-tight truncate w-full ${
-            isCorner ? 'text-[7px] sm:text-[8px] text-amber-900' : 'text-[6px] sm:text-[7px] text-slate-900'
+            isCorner ? 'text-[8px] sm:text-[10px] text-amber-900' : 'text-[7px] sm:text-[9px] text-slate-900'
           }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)' }}>
             {isCorner ? getCornerLabel(tile) : tile.name}
           </span>
           {tile.price && !isCorner && (
-            <span className="text-[5px] sm:text-[6px] font-bold text-slate-800/80">RM{tile.price}</span>
+            <span className="text-[6px] sm:text-[7px] font-bold text-slate-800/80">RM{tile.price}</span>
           )}
           {isCorner && (
-            <span className="text-[4px] sm:text-[5px] text-amber-800/70 font-medium truncate max-w-full">{tile.description?.substring(0, 30)}</span>
+            <span className="text-[5px] sm:text-[7px] text-amber-800/70 font-medium truncate max-w-full">{tile.description?.substring(0, 30)}</span>
           )}
         </div>
       )}
@@ -151,14 +154,14 @@ function TileView({ tile }: { tile: Tile }) {
       {/* Left/Right tiles: vertical layout with rotated content */}
       {isSideTile && (
         <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 py-[2px] ${hasColorStrip ? 'ml-[25%] w-[75%]' : ''}`}>
-          <span className="text-[8px] sm:text-[10px] leading-none">{icon}</span>
+          <span className="text-[9px] sm:text-xs leading-none">{icon}</span>
           <span className={`font-extrabold text-center leading-tight ${
-            'text-[6px] sm:text-[7px] text-slate-900'
+            'text-[7px] sm:text-[9px] text-slate-900'
           }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)', writingMode: orientation === 'left' ? 'vertical-rl' : 'vertical-lr' }}>
             {tile.name}
           </span>
           {tile.price && (
-            <span className="text-[5px] sm:text-[6px] font-bold text-slate-800/80">RM{tile.price}</span>
+            <span className="text-[6px] sm:text-[7px] font-bold text-slate-800/80">RM{tile.price}</span>
           )}
         </div>
       )}
@@ -232,6 +235,59 @@ function TileView({ tile }: { tile: Tile }) {
   );
 }
 
+/* ─── Color Group Ownership Legend ─── */
+const COLOR_GROUPS = ['brown', 'lightblue', 'pink', 'orange', 'red', 'yellow', 'green', 'darkblue'] as const;
+type ColorGroupName = typeof COLOR_GROUPS[number];
+
+function ColorGroupLegend() {
+  const tiles = useGameStore(s => s.tiles);
+  const players = useGameStore(s => s.players);
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-[3px] mt-1.5">
+      {COLOR_GROUPS.map(group => {
+        const groupTiles = BOARD_TILES.filter(t => t.colorGroup === group);
+        if (groupTiles.length === 0) return null;
+        const ownedTiles = groupTiles.map(t => tiles.find(st => st.id === t.id)).filter(Boolean);
+        const owners = [...new Set(ownedTiles.map(t => t!.owner).filter(Boolean))];
+        const allSameOwner = owners.length === 1;
+        const ownerPlayer = allSameOwner ? players.find(p => p.id === owners[0]) : null;
+        const hex = COLOR_GROUP_HEX[group as ColorGroupName];
+
+        return (
+          <div
+            key={group}
+            className="flex items-center gap-[2px] px-1 py-[1px] rounded-sm border"
+            style={{
+              backgroundColor: ownerPlayer ? `${hex}30` : 'rgba(0,0,0,0.3)',
+              borderColor: ownerPlayer ? `${COALITIONS[ownerPlayer.coalitionId]?.color}60` : 'rgba(255,255,255,0.08)',
+            }}
+            title={`${group}: ${ownedTiles.filter(t => t!.owner).length}/${groupTiles.length} owned`}
+          >
+            <div className="w-1.5 h-1.5 rounded-[1px]" style={{ backgroundColor: hex }} />
+            {groupTiles.map(t => {
+              const tileState = tiles.find(st => st.id === t.id);
+              const ownerP = tileState?.owner ? players.find(p => p.id === tileState!.owner) : null;
+              return (
+                <div
+                  key={t.id}
+                  className="w-1.5 h-1.5 rounded-[1px] border border-white/20"
+                  style={{ backgroundColor: ownerP ? COALITIONS[ownerP.coalitionId]?.color : 'rgba(100,116,139,0.3)' }}
+                />
+              );
+            })}
+            {ownerPlayer && (
+              <span className="text-[5px] font-bold" style={{ color: COALITIONS[ownerPlayer.coalitionId]?.color }}>
+                {ownerPlayer.avatarEmoji}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function GameBoard() {
   const turnCount = useGameStore(s => s.turnCount);
   const players = useGameStore(s => s.players);
@@ -258,8 +314,8 @@ export default function GameBoard() {
         initial={{ opacity: 0, scale: 0.85, rotateX: 15 }}
         animate={{ opacity: 1, scale: 1, rotateX: 0 }}
         transition={{ duration: 1, ease: 'easeOut' }}
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[45%] w-[min(84vw,84vh)] h-[min(84vw,84vh)]"
-        style={{ transform: 'translateX(-50%) translateY(-45%)' }}
+        className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 w-[min(82vh,92vw)] h-[min(82vh,92vw)] md:w-[min(78vh,70vw)] md:h-[min(78vh,70vw)]"
+        style={{ transform: 'translate(-50%, -50%)' }}
       >
         {/* Outer glow ring */}
         <div className="absolute -inset-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-transparent to-emerald-500/10 blur-sm" />
@@ -298,10 +354,10 @@ export default function GameBoard() {
         {/* 11×11 grid: corners 1.5fr, edges 1fr each */}
         {/* Row 1 = top, Row 11 = bottom; Col 1 = left, Col 11 = right */}
         <div
-          className="absolute inset-0 grid rounded-xl overflow-hidden"
+          className="absolute inset-1 grid rounded-lg overflow-hidden"
           style={{
-            gridTemplateColumns: '1.5fr repeat(9, 1fr) 1.5fr',
-            gridTemplateRows: '1.5fr repeat(9, 1fr) 1.5fr',
+            gridTemplateColumns: '1.6fr repeat(9, 1fr) 1.6fr',
+            gridTemplateRows: '1.6fr repeat(9, 1fr) 1.6fr',
           }}
         >
           {/* Render all 40 tiles */}
@@ -412,6 +468,9 @@ export default function GameBoard() {
               <div className="text-[6px] md:text-[7px] text-slate-600 mt-1.5 italic text-center leading-relaxed">
                 &ldquo;Satu hari nanti, rakyat akan menilai&rdquo;
               </div>
+
+              {/* Color group ownership legend */}
+              <ColorGroupLegend />
 
               {/* Live player count */}
               <div className="flex items-center gap-2 mt-1 text-[6px] text-slate-600">

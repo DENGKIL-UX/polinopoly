@@ -208,14 +208,14 @@ function GameLogPanel() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [gameLog.length]);
   return (
-    <Card className="bg-slate-950/90 border-slate-700/30 backdrop-blur-sm">
-      <CardHeader className="p-2.5 pb-1.5">
-        <CardTitle className="text-[10px] font-bold text-amber-400/80 flex items-center gap-1.5 tracking-wide uppercase">
-          <Landmark className="h-3 w-3" />Hansard Log
+    <Card className="bg-slate-950/80 border-slate-700/20 backdrop-blur-md">
+      <CardHeader className="p-2 pb-1">
+        <CardTitle className="text-[9px] font-bold text-amber-400/70 flex items-center gap-1 tracking-wide uppercase">
+          <Landmark className="h-2.5 w-2.5" />Hansard Log
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-1.5 pt-0">
-        <div ref={ref} className="h-40 overflow-y-auto space-y-1 pr-1">
+      <CardContent className="p-1 pt-0">
+        <div ref={ref} className="h-36 overflow-y-auto space-y-0.5 pr-1">
           {gameLog.slice(-30).reverse().map(e => (
             <div key={e.id} className="text-[9px] leading-relaxed text-slate-400 border-l-2 pl-2 py-0.5"
               style={{ borderColor: e.type === 'ai_quote' ? 'rgba(234,179,8,0.3)' : e.type === 'buy' ? 'rgba(74,222,128,0.3)' : e.type === 'rent' ? 'rgba(248,113,113,0.3)' : 'rgba(100,116,139,0.2)' }}>
@@ -273,13 +273,27 @@ function AIQuoteBubble() {
 function TileDetail() {
   const selectedTileId = useGameStore(s => s.selectedTileId);
   const tiles = useGameStore(s => s.tiles);
+  const players = useGameStore(s => s.players);
   const selectTile = useGameStore(s => s.selectTile);
   const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
   if (selectedTileId === null) return null;
   const tile = tiles.find(t => t.id === selectedTileId);
-  if (!tile) return null;
+  const tileData = BOARD_TILES.find(t => t.id === selectedTileId);
+  if (!tile || !tileData) return null;
   const ownerPlayer = tile.owner ? COALITIONS[tile.owner] : null;
+  const ownerRealPlayer = tile.owner ? players.find(p => p.id === tile.owner) : null;
   const isMortgaged = mortgagedTiles.includes(tile.id);
+
+  // Color group info
+  const groupInfo = tileData.colorGroup ? (() => {
+    const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tileData.colorGroup);
+    const groupStates = groupTiles.map(t => tiles.find(st => st.id === t.id)).filter(Boolean);
+    const owned = groupStates.filter(t => t!.owner);
+    const owners = [...new Set(owned.map(t => t!.owner!))];
+    const monopoly = owners.length === 1 && owned.length === groupTiles.length;
+    return { groupTiles, groupStates, owned, owners, monopoly, hex: COLOR_GROUP_HEX[tileData.colorGroup!] };
+  })() : null;
+
   return (
     <AnimatePresence>
       <motion.div
@@ -288,45 +302,87 @@ function TileDetail() {
         exit={{ opacity: 0, scale: 0.9, y: -10 }}
         className="absolute top-28 left-1/2 -translate-x-1/2 z-30"
       >
-        <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 min-w-56 backdrop-blur-sm">
+        <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 min-w-60 backdrop-blur-sm">
           <CardContent className="p-3.5">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
-                  style={{ backgroundColor: tile.colorGroup ? `${COLOR_GROUP_HEX[tile.colorGroup]}30` : 'rgba(100,116,139,0.2)' }}>
-                  {tile.type === 'highway' ? '🚂' : tile.type === 'media' ? '📺' : tile.type === 'tax' ? '💰' : '🏛️'}
+                  style={{ backgroundColor: tileData.colorGroup ? `${COLOR_GROUP_HEX[tileData.colorGroup]}30` : 'rgba(100,116,139,0.2)' }}>
+                  {tileData.type === 'highway' ? '🚂' : tileData.type === 'media' ? '📺' : tileData.type === 'tax' ? '💰' : tileData.type === 'chest' ? '📜' : tileData.type === 'chance' ? '⚡' : tileData.type === 'corner' ? '👑' : '🏛️'}
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-slate-100">{tile.name}</span>
-                  {tile.colorGroup && (
-                    <p className="text-[8px] text-slate-500">{COALITIONS[COLOR_GROUP_COALITION[tile.colorGroup]]?.fullName}</p>
+                  <span className="text-xs font-bold text-slate-100">{tileData.name}</span>
+                  {tileData.colorGroup && (
+                    <p className="text-[8px] text-slate-500 capitalize">{tileData.colorGroup} — {COALITIONS[COLOR_GROUP_COALITION[tileData.colorGroup]]?.name}</p>
                   )}
                 </div>
               </div>
               <button onClick={() => selectTile(null)} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-[9px] text-slate-400 mb-2 leading-relaxed">{tile.description}</p>
+            <p className="text-[9px] text-slate-400 mb-2 leading-relaxed">{tileData.description}</p>
+
+            {/* Color group ownership bar */}
+            {groupInfo && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[8px] text-slate-500 capitalize">{tileData.colorGroup} Group</span>
+                  {groupInfo.monopoly && (
+                    <Badge className="text-[7px] px-1.5 py-0 h-3.5 bg-yellow-600 text-yellow-100">MONOPOLY</Badge>
+                  )}
+                </div>
+                <div className="flex gap-[2px]">
+                  {groupInfo.groupTiles.map(t => {
+                    const st = tiles.find(x => x.id === t.id);
+                    const op = st?.owner ? players.find(p => p.id === st!.owner) : null;
+                    return (
+                      <div key={t.id} className="flex-1 h-3 rounded-sm border border-white/10" title={t.name}
+                        style={{ backgroundColor: op ? `${COALITIONS[op.coalitionId]?.color}90` : `${groupInfo.hex}20` }}>
+                        {st?.houses && st.houses > 0 && (
+                          <div className="flex gap-px items-center justify-center h-full">
+                            {Array.from({ length: Math.min(st.houses, 4) }).map((_, i) => (
+                              <div key={i} className="w-1 h-1.5 bg-green-400 rounded-[1px]" />
+                            ))}
+                            {st.houses >= 5 && <div className="w-1 h-1.5 bg-red-500 rounded-[1px]" />}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-[2px] mt-0.5">
+                  {groupInfo.groupTiles.map(t => (
+                    <div key={t.id} className="flex-1 text-center text-[6px] text-slate-600 truncate">{t.name}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1 text-[10px]">
-              {tile.price && <div className="flex justify-between"><span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{tile.price}</span></div>}
-              {tile.rent && <div className="flex justify-between"><span className="text-slate-500">Base Rent</span><span className="text-emerald-400 font-semibold">RM{tile.rent[0]}</span></div>}
-              {tile.housePrice && <div className="flex justify-between"><span className="text-slate-500">House Cost</span><span className="text-blue-400">RM{tile.housePrice}</span></div>}
-              {tile.mortgageValue && <div className="flex justify-between"><span className="text-slate-500">Mortgage Value</span><span className="text-orange-400">RM{tile.mortgageValue}</span></div>}
+              {tileData.price && <div className="flex justify-between"><span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{tileData.price}</span></div>}
+              {tileData.rent && <div className="flex justify-between"><span className="text-slate-500">Base Rent</span><span className="text-emerald-400 font-semibold">RM{tileData.rent[0]}</span></div>}
+              {tileData.housePrice && <div className="flex justify-between"><span className="text-slate-500">House Cost</span><span className="text-blue-400">RM{tileData.housePrice}</span></div>}
+              {tileData.mortgageValue && <div className="flex justify-between"><span className="text-slate-500">Mortgage</span><span className="text-orange-400">RM{tileData.mortgageValue}</span></div>}
               {isMortgaged && <div className="flex justify-between"><span className="text-orange-400 font-bold">Status</span><span className="text-orange-300 font-bold">🏦 MORTGAGED</span></div>}
               {tile.houses !== undefined && tile.houses > 0 && (
-                <div className="flex justify-between"><span className="text-slate-500">Houses</span>
+                <div className="flex justify-between"><span className="text-slate-500">Buildings</span>
                   <span className="text-green-400 font-semibold">{tile.houses >= 5 ? '🏨 Hotel' : `🏠 ×${tile.houses}`}</span>
                 </div>
               )}
-              {tile.rent && tile.houses && tile.houses > 0 && (
+              {tileData.rent && tile.houses && tile.houses > 0 && (
                 <div className="flex justify-between"><span className="text-slate-500">Current Rent</span>
-                  <span className="text-yellow-400 font-bold">RM{tile.rent[Math.min(tile.houses, 5)]}</span>
+                  <span className="text-yellow-400 font-bold">RM{tileData.rent[Math.min(tile.houses, 5)]}</span>
                 </div>
               )}
             </div>
-            {ownerPlayer && (
+            {ownerRealPlayer && (
               <div className="mt-2 pt-2 border-t border-slate-700/30 flex items-center justify-between">
-                <span className="text-[9px] text-slate-500">Owner</span>
-                <span className="text-[10px] font-bold" style={{ color: ownerPlayer.color }}>{ownerPlayer.name}</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center text-[8px]" style={{ backgroundColor: COALITIONS[ownerRealPlayer.coalitionId]?.color }}>
+                    {ownerRealPlayer.avatarEmoji}
+                  </div>
+                  <span className="text-[10px] font-bold" style={{ color: COALITIONS[ownerRealPlayer.coalitionId]?.color }}>{ownerRealPlayer.name}</span>
+                </div>
+                {ownerRealPlayer.isAI && <span className="text-[7px] text-slate-600">AI</span>}
               </div>
             )}
           </CardContent>
@@ -1290,7 +1346,7 @@ export default function GameDashboard() {
       <div className="flex-1" />
 
       {/* Bottom action area */}
-      <div className="pointer-events-auto pb-2 px-2 flex justify-center">
+      <div className="pointer-events-auto pb-1.5 px-2 flex justify-center">
         <AnimatePresence mode="wait">
           {phase === 'playing' && isPlayerTurn && (
             <motion.div key="roll" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
@@ -1532,12 +1588,12 @@ export default function GameDashboard() {
       </div>
 
       {/* Left sidebar */}
-      <div className="absolute top-8 left-1.5 w-48 space-y-1 pointer-events-auto max-h-[55vh] overflow-y-auto hidden md:block">
+      <div className="absolute top-8 left-1 w-44 space-y-1 pointer-events-auto max-h-[50vh] overflow-y-auto hidden md:block">
         {players.map(p => <PlayerCard key={p.id} player={p} isCurrentTurn={p.id === currentPlayerId} />)}
       </div>
 
       {/* Right sidebar */}
-      <div className="absolute top-8 right-1.5 w-56 pointer-events-auto hidden md:block">
+      <div className="absolute top-8 right-1 w-52 pointer-events-auto hidden md:block">
         <GameLogPanel />
       </div>
 
