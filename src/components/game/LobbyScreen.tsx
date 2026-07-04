@@ -48,13 +48,15 @@ export default function LobbyScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.1) 35px, rgba(255,255,255,0.1) 36px)`,
-        }} />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-[#0a1628] to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 opacity-15" style={{
+        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)',
+        backgroundSize: '40px 40px',
+      }} />
+      <div className="absolute top-[20%] left-[15%] w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-[10%] right-[10%] w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl" />
+      <div className="absolute top-[60%] left-[60%] w-48 h-48 bg-blue-500/5 rounded-full blur-3xl" />
 
       {/* Header */}
       <motion.div

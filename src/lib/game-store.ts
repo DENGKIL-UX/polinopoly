@@ -67,6 +67,7 @@ export interface GameState {
   gameLog: GameLogEntry[];
   winner: string | null;
   aiThinking: boolean;
+  showPortfolio: boolean;
 
   // Actions
   startGame: (coalitionId: string) => void;
@@ -85,6 +86,9 @@ export interface GameState {
   setAIThinking: (thinking: boolean) => void;
   aiTurn: () => Promise<void>;
   getMarketState: () => MarketState;
+  buildHouse: (tileId: number) => void;
+  sellProperty: (tileId: number) => void;
+  togglePortfolio: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -159,6 +163,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameLog: [],
   winner: null,
   aiThinking: false,
+  showPortfolio: false,
 
   startGame: (playerCoalitionId: string) => {
     const allCoalitionIds = Object.keys(COALITIONS);
@@ -862,4 +867,72 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   getMarketState: () => get().marketState,
+
+  buildHouse: (tileId: number) => {
+    const state = get();
+    const tile = state.tiles.find(t => t.id === tileId);
+    const player = state.players.find(p => p.id === 'player');
+    if (!tile || !player || tile.owner !== 'player') return;
+    if (tile.type !== 'property' || !tile.housePrice) return;
+    if ((tile.houses || 0) >= 5) return;
+
+    const cost = tile.housePrice;
+    if (player.money < cost) return;
+
+    // Must own full color group to build
+    if (tile.colorGroup) {
+      const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+      const ownsAll = groupTiles.every(t => t.owner === 'player');
+      if (!ownsAll) return;
+    }
+
+    const newHouses = (tile.houses || 0) + 1;
+    set(state => ({
+      players: state.players.map(p =>
+        p.id === 'player' ? { ...p, money: p.money - cost } : p
+      ),
+      tiles: state.tiles.map(t =>
+        t.id === tileId ? { ...t, houses: newHouses } : t
+      ),
+    }));
+    get().addLog({
+      playerId: 'player',
+      playerName: player.name,
+      message: newHouses === 5
+        ? `🏨 Built a HOTEL on ${tile.name}! (RM${cost})`
+        : `🏠 Built house ${newHouses}/4 on ${tile.name} (RM${cost})`,
+      type: 'buy',
+    });
+  },
+
+  sellProperty: (tileId: number) => {
+    const state = get();
+    const tile = state.tiles.find(t => t.id === tileId);
+    const player = state.players.find(p => p.id === 'player');
+    if (!tile || !player || tile.owner !== 'player') return;
+
+    const sellPrice = Math.round((tile.mortgageValue || tile.price || 0) * 0.8);
+    const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);
+
+    set(state => ({
+      players: state.players.map(p =>
+        p.id === 'player'
+          ? { ...p, money: p.money + sellPrice + houseRefund, properties: p.properties.filter(pid => pid !== tileId) }
+          : p
+      ),
+      tiles: state.tiles.map(t =>
+        t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t
+      ),
+    }));
+    get().addLog({
+      playerId: 'player',
+      playerName: player.name,
+      message: `📉 Sold ${tile.name} for RM${sellPrice + houseRefund}`,
+      type: 'buy',
+    });
+  },
+
+  togglePortfolio: () => {
+    set(state => ({ showPortfolio: !state.showPortfolio }));
+  },
 }));
