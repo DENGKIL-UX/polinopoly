@@ -464,3 +464,74 @@ Game is production-ready with all core Monopoly mechanics, 6 major new features 
 6. Game statistics dashboard (win rate, avg turns, favorite coalition)
 7. Multi-language support (full BM/EN toggle beyond cards)
 8. Animated dice rolling 3D effect
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: VLM testing and board layout verification/fix
+
+Work Log:
+- Read worklog to understand project state (6 prior task rounds completed)
+- Verified tile data correctness: all 40 tiles, correct types, correct color groups, correct pricing progression
+- Used agent-browser to navigate to lobby, start game, and take screenshots
+- Ran VLM (Vision Language Model) analysis via z-ai CLI on game board screenshots
+- Performed mathematical analysis of tile positioning formulas
+
+**VLM Test Results (Before Fix):**
+- Rating: 7/10
+- All 40 tiles visible and correctly ordered
+- Color coding correct for all 8 groups
+- ISSUES FOUND:
+  1. Tiles 2x too wide for edge space (8.5% vs 4.28% needed)
+  2. Bottom/right tiles extended 4.65% into corner areas
+  3. Top/left tiles had 4.65% gaps after corners
+  4. Top/left last tiles extended 7.65% into opposite corners
+  5. Asymmetric positioning between the 4 sides
+  6. Buy/Pass buttons could overlap board during property purchase
+
+**Root Cause:**
+- Absolute positioning formula used `t * (half - CORNER_SIZE)` which distributed tile LEFT edges across the full half-width (0-50%) instead of just the edge space between corners
+- EDGE_TILE_W (8.5%) × 9 tiles = 76.5% >> 38.5% edge space
+
+**Fix: Converted to CSS Grid Layout**
+- Replaced absolute positioning with CSS Grid (11×11 grid)
+- Grid template: `1.5fr repeat(9, 1fr) 1.5fr` for both rows and columns
+- Each tile mapped to exact grid cell via `getGridPosition(tileId)` function
+- Center area spans inner 9×9 cells (grid-row: 2/11, grid-column: 2/11)
+- Removed old `getTileStyle()`, `CORNER_SIZE`, `EDGE_TILE_W`, `EDGE_TILE_D` constants
+- Added `getTileOrientation()` for side-tile specific styling (vertical text, color strip on left edge)
+- Maintained all visual effects (hover, glow, owner indicators, houses, player tokens)
+
+**VLM Test Results (After Fix):**
+- Rating: 9/10
+- All 40 tiles visible with no gaps, overlaps, or misalignments
+- Corner tiles correctly larger than edge tiles
+- Tile order verified correct clockwise from GO
+- Center area clean with DEWAN RAKYAT title
+- Seamless tile-to-tile alignment
+
+**Tile Data Verification:**
+- 40 tiles total: 4 corners, 22 properties, 4 highways, 2 media, 2 taxes, 3 chest, 3 chance
+- All 8 color groups correct (brown:2, lightblue:3, pink:3, orange:3, red:3, yellow:3, green:3, darkblue:2)
+- Tile order matches standard Monopoly layout exactly
+- Price progression correct within each color group
+
+### Files Modified
+- `src/components/game/GameBoard.tsx` — Complete rewrite from absolute positioning to CSS Grid
+
+### Verification
+- `bun run lint`: 0 errors, 0 warnings
+- VLM analysis at 1080p: 9/10, all tiles correct
+- Dev server running clean, no runtime errors
+
+### Current Project Status
+- Board layout is production-quality with CSS Grid
+- All 40 tiles correctly placed with no overlap
+- VLM vision AI confirms correct layout
+
+### Unresolved Issues
+- Buy/Pass popup can temporarily obscure board (by design, dismissed with action)
+- Side tile text uses `writing-mode: vertical-rl/lr` which may need testing on all browsers
+
+### Priority Recommendations for Next Phase
+- (Same as prior recommendations)

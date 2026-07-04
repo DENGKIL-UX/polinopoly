@@ -1,49 +1,38 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/lib/game-store';
-import { BOARD_TILES, COLOR_GROUP_HEX, COALITIONS, COLOR_GROUP_COALITION, type Tile, type ColorGroup } from '@/lib/game-data';
+import { BOARD_TILES, COLOR_GROUP_HEX, COALITIONS, type Tile, type ColorGroup } from '@/lib/game-data';
 
-const CORNER_SIZE = 11.5;
-const EDGE_TILE_W = 8.5;
-const EDGE_TILE_D = 6.2;
-
-function getTileStyle(tileId: number): React.CSSProperties {
-  const isCorner = tileId % 10 === 0;
-  const half = 50;
-  let x: number, y: number, w: number, h: number;
-  if (isCorner) {
-    if (tileId === 0) { x = half - CORNER_SIZE; y = half - CORNER_SIZE; }
-    else if (tileId === 10) { x = 0; y = half - CORNER_SIZE; }
-    else if (tileId === 20) { x = 0; y = 0; }
-    else { x = half - CORNER_SIZE; y = 0; }
-    w = CORNER_SIZE; h = CORNER_SIZE;
-  } else if (tileId >= 1 && tileId <= 9) {
-    const t = tileId / 10;
-    x = half - CORNER_SIZE - t * (half - CORNER_SIZE); y = half - EDGE_TILE_D; w = EDGE_TILE_W; h = EDGE_TILE_D;
-  } else if (tileId >= 11 && tileId <= 19) {
-    const t = (tileId - 10) / 10;
-    x = half - EDGE_TILE_D; y = half - CORNER_SIZE - t * (half - CORNER_SIZE); w = EDGE_TILE_D; h = EDGE_TILE_W;
-  } else if (tileId >= 21 && tileId <= 29) {
-    const t = (tileId - 20) / 10;
-    x = CORNER_SIZE + (t * (half - CORNER_SIZE)) - EDGE_TILE_W; y = 0; w = EDGE_TILE_W; h = EDGE_TILE_D;
-  } else {
-    const t = (tileId - 30) / 10;
-    x = 0; y = CORNER_SIZE + (t * (half - CORNER_SIZE)) - EDGE_TILE_W; w = EDGE_TILE_D; h = EDGE_TILE_W;
-  }
-  return { position: 'absolute', left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` };
+// --- CSS Grid position mapping ---
+// 11×11 grid: corners at (1,1), (1,11), (11,1), (11,11)
+// Clockwise from GO (bottom-right):
+//   Bottom row: GO at (11,11), tiles 1-9 at (11, 10→2), Jail at (11,1)
+//   Left col:  tiles 11-19 at (10→2, 1), Free Parking at (1,1)
+//   Top row:   tiles 21-29 at (1, 2→10), Go to Jail at (1,11)
+//   Right col: tiles 31-39 at (2→10, 11)
+function getGridPosition(tileId: number): { row: number; col: number } {
+  if (tileId === 0) return { row: 11, col: 11 };
+  if (tileId >= 1 && tileId <= 9) return { row: 11, col: 11 - tileId };
+  if (tileId === 10) return { row: 11, col: 1 };
+  if (tileId >= 11 && tileId <= 19) return { row: 11 - (tileId - 10), col: 1 };
+  if (tileId === 20) return { row: 1, col: 1 };
+  if (tileId >= 21 && tileId <= 29) return { row: 1, col: tileId - 19 };
+  if (tileId === 30) return { row: 1, col: 11 };
+  if (tileId >= 31 && tileId <= 39) return { row: tileId - 29, col: 11 };
+  return { row: 1, col: 1 };
 }
 
-function getTileBg(tile: Tile, colorGroup: ColorGroup | undefined): string {
+function getTileBg(tile: Tile): string {
   if (tile.type === 'corner') return 'linear-gradient(135deg, #f5e6c8 0%, #e8d5a8 100%)';
   if (tile.type === 'highway') return 'linear-gradient(180deg, #e5e7eb 0%, #d1d5db 100%)';
   if (tile.type === 'media') return 'linear-gradient(180deg, #f0abfc 0%, #d946ef 100%)';
   if (tile.type === 'tax') return 'linear-gradient(180deg, #fca5a5 0%, #ef4444 100%)';
   if (tile.type === 'chest') return 'linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%)';
   if (tile.type === 'chance') return 'linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%)';
-  if (colorGroup) {
-    const base = COLOR_GROUP_HEX[colorGroup];
+  if (tile.colorGroup) {
+    const base = COLOR_GROUP_HEX[tile.colorGroup];
     return `linear-gradient(180deg, ${base} 0%, ${base}dd 100%)`;
   }
   return '#4b5563';
@@ -66,13 +55,22 @@ function getCornerLabel(tile: Tile): string {
   return 'SPR';
 }
 
+// Determine tile orientation based on which side it's on
+function getTileOrientation(tileId: number): 'bottom' | 'left' | 'top' | 'right' {
+  if (tileId >= 0 && tileId <= 10) return 'bottom';
+  if (tileId >= 11 && tileId <= 20) return 'left';
+  if (tileId >= 21 && tileId <= 30) return 'top';
+  return 'right';
+}
+
 function TileView({ tile }: { tile: Tile }) {
   const tiles = useGameStore(s => s.tiles);
   const players = useGameStore(s => s.players);
   const selectTile = useGameStore(s => s.selectTile);
   const isCorner = tile.type === 'corner';
-  const bg = getTileBg(tile, tile.colorGroup);
+  const bg = getTileBg(tile);
   const icon = getTileIcon(tile);
+  const orientation = getTileOrientation(tile.id);
   const currentTile = tiles.find(t => t.id === tile.id);
   const owner = currentTile?.owner;
   const ownerPlayer = owner ? players.find(p => p.id === owner) : null;
@@ -84,7 +82,6 @@ function TileView({ tile }: { tile: Tile }) {
   const mortgagedTiles = useGameStore(s => s.mortgagedTiles);
   const isMortgaged = mortgagedTiles.includes(tile.id);
 
-  // Check if player owns this and can build (full color set, houses < 5)
   const canBuild = useMemo(() => {
     const ct = tiles.find(t => t.id === tile.id);
     if (!ct || ct.owner !== 'player' || tile.type !== 'property' || !tile.colorGroup || !tile.housePrice) return false;
@@ -96,13 +93,17 @@ function TileView({ tile }: { tile: Tile }) {
     });
   }, [tile, tiles]);
 
+  // Side tiles (left/right) need rotated text for readability
+  const isSideTile = orientation === 'left' || orientation === 'right';
+
   return (
     <div
-      className={`absolute border transition-all duration-200 group ${
-        isCorner ? 'rounded-lg border-amber-700/50 animate-corner-glow' : `rounded-sm border-white/15 hover:scale-110 hover:brightness-110 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
-      } ${isSelected ? 'ring-2 ring-yellow-400 z-20 scale-105' : ''} ${isPlayerHere ? 'z-10' : ''}`}
+      className={`relative w-full h-full border transition-all duration-200 group overflow-hidden ${
+        isCorner
+          ? 'rounded-lg border-amber-700/50 animate-corner-glow'
+          : `border-white/15 hover:brightness-125 hover:z-30 cursor-pointer ${isMortgaged ? 'opacity-60' : ''}`
+      } ${isSelected ? 'ring-2 ring-yellow-400 z-20' : ''} ${isPlayerHere ? 'z-10' : ''}`}
       style={{
-        ...getTileStyle(tile.id),
         background: bg,
         boxShadow: isCorner
           ? 'inset 0 0 20px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,230,200,0.15)'
@@ -112,58 +113,105 @@ function TileView({ tile }: { tile: Tile }) {
       }}
       onClick={() => selectTile(tile.id === useGameStore.getState().selectedTileId ? null : tile.id)}
     >
-      {hasColorStrip && (
-        <div className="absolute top-0 left-0 right-0 h-[22%] rounded-t-sm"
+      {hasColorStrip && !isSideTile && (
+        <div className="absolute top-0 left-0 right-0 h-[25%] rounded-t-sm"
           style={{
             background: `linear-gradient(180deg, ${COLOR_GROUP_HEX[tile.colorGroup!]} 0%, ${COLOR_GROUP_HEX[tile.colorGroup!]}cc 100%)`,
             boxShadow: `0 1px 4px ${COLOR_GROUP_HEX[tile.colorGroup!]}40`,
           }}
         />
       )}
-      <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 ${hasColorStrip ? 'mt-[22%] h-[78%]' : ''}`}>
-        <span className={isCorner ? 'text-sm leading-none drop-shadow' : 'text-[9px] leading-none'}>{icon}</span>
-        <span className={`font-extrabold text-center leading-tight ${
-          isCorner ? 'text-[6.5px] text-amber-900' : 'text-[5.5px] text-slate-900'
-        }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)' }}>
-          {isCorner ? getCornerLabel(tile) : tile.name}
-        </span>
-        {tile.price && !isCorner && (
-          <span className="text-[5px] font-bold text-slate-800/80">RM{tile.price}</span>
-        )}
-        {isCorner && (
-          <span className="text-[4.5px] text-amber-800/70 font-medium">{tile.description?.substring(0, 25)}</span>
-        )}
-        {houses > 0 && (
-          <div className="flex gap-[1.5px] mt-px">
-            {Array.from({ length: Math.min(houses, 4) }).map((_, i) => (
-              <motion.div key={i}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="w-1.5 h-1.5 bg-green-400 rounded-[1px] border border-green-600 shadow-sm"
-              />
-            ))}
-            {houses >= 5 && (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-                className="w-1.5 h-1.5 bg-red-500 rounded-[1px] border border-red-700 shadow-sm" />
-            )}
-          </div>
-        )}
-        {ownerPlayer && (
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full border border-white/50 shadow-sm"
-            style={{ backgroundColor: COALITIONS[ownerPlayer.coalitionId]?.color }}
-          />
-        )}
-      </div>
+      {hasColorStrip && isSideTile && (
+        <div className="absolute top-0 left-0 bottom-0 w-[25%] rounded-l-sm"
+          style={{
+            background: `linear-gradient(90deg, ${COLOR_GROUP_HEX[tile.colorGroup!]} 0%, ${COLOR_GROUP_HEX[tile.colorGroup!]}cc 100%)`,
+            boxShadow: `0 1px 4px ${COLOR_GROUP_HEX[tile.colorGroup!]}40`,
+          }}
+        />
+      )}
+
+      {/* Bottom/Top tiles: horizontal layout */}
+      {!isSideTile && (
+        <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 px-[2px] ${hasColorStrip ? 'mt-[25%] h-[75%]' : ''}`}>
+          <span className={isCorner ? 'text-base sm:text-lg leading-none drop-shadow' : 'text-[8px] sm:text-[10px] leading-none'}>{icon}</span>
+          <span className={`font-extrabold text-center leading-tight truncate w-full ${
+            isCorner ? 'text-[7px] sm:text-[8px] text-amber-900' : 'text-[6px] sm:text-[7px] text-slate-900'
+          }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)' }}>
+            {isCorner ? getCornerLabel(tile) : tile.name}
+          </span>
+          {tile.price && !isCorner && (
+            <span className="text-[5px] sm:text-[6px] font-bold text-slate-800/80">RM{tile.price}</span>
+          )}
+          {isCorner && (
+            <span className="text-[4px] sm:text-[5px] text-amber-800/70 font-medium truncate max-w-full">{tile.description?.substring(0, 30)}</span>
+          )}
+        </div>
+      )}
+
+      {/* Left/Right tiles: vertical layout with rotated content */}
+      {isSideTile && (
+        <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 py-[2px] ${hasColorStrip ? 'ml-[25%] w-[75%]' : ''}`}>
+          <span className="text-[8px] sm:text-[10px] leading-none">{icon}</span>
+          <span className={`font-extrabold text-center leading-tight ${
+            'text-[6px] sm:text-[7px] text-slate-900'
+          }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)', writingMode: orientation === 'left' ? 'vertical-rl' : 'vertical-lr' }}>
+            {tile.name}
+          </span>
+          {tile.price && (
+            <span className="text-[5px] sm:text-[6px] font-bold text-slate-800/80">RM{tile.price}</span>
+          )}
+        </div>
+      )}
+
+      {/* Houses */}
+      {houses > 0 && !isCorner && (
+        <div className={`absolute flex gap-[1px] ${isSideTile ? 'bottom-1 left-1/2 -translate-x-1/2 flex-col' : 'bottom-0.5 left-1/2 -translate-x-1/2 flex-row'}`}>
+          {Array.from({ length: Math.min(houses, 4) }).map((_, i) => (
+            <motion.div key={i}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="w-1.5 h-1.5 bg-green-400 rounded-[1px] border border-green-600 shadow-sm"
+            />
+          ))}
+          {houses >= 5 && (
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+              className="w-1.5 h-1.5 bg-red-500 rounded-[1px] border border-red-700 shadow-sm" />
+          )}
+        </div>
+      )}
+
+      {/* Owner indicator */}
+      {ownerPlayer && (
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className={`absolute w-2 h-2 rounded-full border border-white/50 shadow-sm ${
+            isSideTile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5'
+          }`}
+          style={{ backgroundColor: COALITIONS[ownerPlayer.coalitionId]?.color }}
+        />
+      )}
+
+      {/* Mortgage overlay */}
       {isMortgaged && (
-          <div className="absolute inset-0 bg-orange-900/30 rounded-[inherit] flex items-center justify-center pointer-events-none z-10">
-            <span className="text-[6px] md:text-[7px] font-black text-orange-400/80 bg-orange-900/60 px-1 rounded">MORTGAGE</span>
-          </div>
-        )}
-        {playersOnTile.length > 0 && (
-        <div className="absolute -top-2 -right-0.5 flex flex-col gap-[2px]">
+        <div className="absolute inset-0 bg-orange-900/30 rounded-[inherit] flex items-center justify-center pointer-events-none z-10">
+          <span className="text-[5px] sm:text-[6px] font-black text-orange-400/80 bg-orange-900/60 px-1 rounded">MORTGAGE</span>
+        </div>
+      )}
+
+      {/* Player tokens */}
+      {playersOnTile.length > 0 && (
+        <div className={`absolute flex gap-[1px] z-20 ${
+          isCorner
+            ? '-top-1 -right-1 flex-col'
+            : orientation === 'bottom'
+              ? '-top-2 -right-0.5 flex-col'
+              : orientation === 'top'
+                ? '-bottom-2 -right-0.5 flex-col'
+                : orientation === 'left'
+                  ? '-right-2 -top-0.5 flex-row'
+                  : '-left-2 -top-0.5 flex-row'
+        }`}>
           {playersOnTile.map((p, idx) => (
             <motion.div
               key={p.id}
@@ -246,124 +294,149 @@ export default function GameBoard() {
           <div className="absolute inset-0 rounded-xl border-2 border-amber-600/40" />
         </div>
 
-        {/* Center area */}
-        <div className="absolute rounded-lg bg-gradient-to-br from-[#0d2a18] to-[#153d22] border border-amber-700/20 overflow-hidden"
+        {/* ===== CSS Grid Board Layout ===== */}
+        {/* 11×11 grid: corners 1.5fr, edges 1fr each */}
+        {/* Row 1 = top, Row 11 = bottom; Col 1 = left, Col 11 = right */}
+        <div
+          className="absolute inset-0 grid rounded-xl overflow-hidden"
           style={{
-            top: '12%', left: '12%', right: '12%', bottom: '12%',
-            boxShadow: 'inset 0 0 25px rgba(0,0,0,0.4), 0 0 20px rgba(0,0,0,0.2)',
+            gridTemplateColumns: '1.5fr repeat(9, 1fr) 1.5fr',
+            gridTemplateRows: '1.5fr repeat(9, 1fr) 1.5fr',
           }}
         >
-          {/* Rotating "Pilihan Raya" text along center border */}
-          <div className="absolute inset-0 pointer-events-none">
-            <svg className="w-full h-full" viewBox="0 0 100 100">
-              <defs>
-                <path id="centerTextPath" d="M 76,50 A 26,26 0 1,1 24,50 A 26,26 0 1,1 76,50" fill="none" />
-              </defs>
-              <text fill="rgba(245,158,11,0.15)" fontSize="4" fontWeight="900" letterSpacing="4">
-                <textPath href="#centerTextPath">
-                  <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="30s" repeatCount="indefinite" />
-                  PILIHAN RAYA &#xB7; DEWAN RAKYAT &#xB7; 2024 &#xB7;
-                </textPath>
-              </text>
-            </svg>
-          </div>
-
-          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
-            className="w-full h-full flex flex-col items-center justify-center p-2">
-            {/* Title with glow */}
-            <div className="relative">
-              <div className="absolute inset-0 blur-md bg-amber-400/20" />
-              <div className="relative text-xl md:text-3xl font-black tracking-tighter">
-                <span className="bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-200 bg-clip-text text-transparent drop-shadow-lg"
-                  style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>
-                  DEWAN RAKYAT
-                </span>
+          {/* Render all 40 tiles */}
+          {BOARD_TILES.map(tile => {
+            const pos = getGridPosition(tile.id);
+            return (
+              <div key={tile.id} style={{
+                gridRow: pos.row,
+                gridColumn: pos.col,
+                position: 'relative',
+                zIndex: tile.type === 'corner' ? 1 : 2,
+              }}>
+                <TileView tile={tile} />
               </div>
-            </div>
-            <div className="text-[7px] md:text-[9px] text-amber-300/40 tracking-[0.3em] uppercase mt-0.5 font-light">
-              Pilihan Raya Edition
+            );
+          })}
+
+          {/* Center area spans inner 9×9 */}
+          <div
+            className="rounded-lg bg-gradient-to-br from-[#0d2a18] to-[#153d22] border border-amber-700/20 overflow-hidden relative"
+            style={{
+              gridRow: '2 / 11',
+              gridColumn: '2 / 11',
+              boxShadow: 'inset 0 0 25px rgba(0,0,0,0.4), 0 0 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            {/* Rotating "Pilihan Raya" text along center border */}
+            <div className="absolute inset-0 pointer-events-none">
+              <svg className="w-full h-full" viewBox="0 0 100 100">
+                <defs>
+                  <path id="centerTextPath" d="M 76,50 A 26,26 0 1,1 24,50 A 26,26 0 1,1 76,50" fill="none" />
+                </defs>
+                <text fill="rgba(245,158,11,0.15)" fontSize="4" fontWeight="900" letterSpacing="4">
+                  <textPath href="#centerTextPath">
+                    <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="30s" repeatCount="indefinite" />
+                    PILIHAN RAYA &#xB7; DEWAN RAKYAT &#xB7; 2024 &#xB7;
+                  </textPath>
+                </text>
+              </svg>
             </div>
 
-            {/* Decorative line */}
-            <div className="w-16 md:w-24 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent my-1.5" />
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
+              className="w-full h-full flex flex-col items-center justify-center p-2">
+              {/* Title with glow */}
+              <div className="relative">
+                <div className="absolute inset-0 blur-md bg-amber-400/20" />
+                <div className="relative text-xl md:text-3xl font-black tracking-tighter">
+                  <span className="bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-200 bg-clip-text text-transparent drop-shadow-lg"
+                    style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>
+                    DEWAN RAKYAT
+                  </span>
+                </div>
+              </div>
+              <div className="text-[7px] md:text-[9px] text-amber-300/40 tracking-[0.3em] uppercase mt-0.5 font-light">
+                Pilihan Raya Edition
+              </div>
 
-            {/* Coalition emblems */}
-            <div className="flex items-center justify-center gap-1.5 md:gap-2">
-              {Object.values(COALITIONS).map((c, i) => (
-                <motion.div key={c.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 + i * 0.1 }}
-                  className="w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[7px] md:text-[9px] shadow-md border border-white/10"
-                  style={{
-                    backgroundColor: `${c.color}90`,
-                    boxShadow: `0 0 8px ${c.color}30`,
-                  }}
-                >
-                  {c.emblem}
+              {/* Decorative line */}
+              <div className="w-16 md:w-24 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent my-1.5" />
+
+              {/* Coalition emblems */}
+              <div className="flex items-center justify-center gap-1.5 md:gap-2">
+                {Object.values(COALITIONS).map((c, i) => (
+                  <motion.div key={c.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 + i * 0.1 }}
+                    className="w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[7px] md:text-[9px] shadow-md border border-white/10"
+                    style={{
+                      backgroundColor: `${c.color}90`,
+                      boxShadow: `0 0 8px ${c.color}30`,
+                    }}
+                  >
+                    {c.emblem}
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Round badge */}
+              <div className="mt-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                <span className="text-[7px] md:text-[8px] font-black tracking-wider text-amber-400/70">R{turnCount}</span>
+              </div>
+
+              {/* Current turn indicator */}
+              {currentPlayer && (
+                <motion.div key={currentPlayer.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                  className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 border border-white/5">
+                  <div className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: COALITIONS[currentPlayer.coalitionId]?.color, boxShadow: `0 0 6px ${COALITIONS[currentPlayer.coalitionId]?.color}` }} />
+                  <span className="text-[8px] md:text-[10px] font-bold" style={{ color: COALITIONS[currentPlayer.coalitionId]?.color }}>
+                    {currentPlayer.name}
+                  </span>
                 </motion.div>
-              ))}
-            </div>
+              )}
 
-            {/* Round badge */}
-            <div className="mt-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-              <span className="text-[7px] md:text-[8px] font-black tracking-wider text-amber-400/70">R{turnCount}</span>
-            </div>
+              {/* Dice display in center */}
+              {diceValues && (phase === 'rolling' || phase === 'moving') && (
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-1.5 flex items-center gap-1.5">
+                  <motion.span animate={phase === 'rolling' ? { rotate: [0, 180, 360] } : {}} transition={{ duration: 0.3 }}
+                    className="text-base md:text-lg">{'⚀⚁⚂⚃⚄⚅'[diceValues[0] - 1]}</motion.span>
+                  <span className="text-[8px] text-slate-500">+</span>
+                  <motion.span animate={phase === 'rolling' ? { rotate: [0, -180, -360] } : {}} transition={{ duration: 0.3 }}
+                    className="text-base md:text-lg">{'⚀⚁⚂⚃⚄⚅'[diceValues[1] - 1]}</motion.span>
+                  <span className="text-[9px] font-black text-amber-400">={diceValues[0] + diceValues[1]}</span>
+                </motion.div>
+              )}
 
-            {/* Current turn indicator */}
-            {currentPlayer && (
-              <motion.div key={currentPlayer.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 border border-white/5">
-                <div className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: COALITIONS[currentPlayer.coalitionId]?.color, boxShadow: `0 0 6px ${COALITIONS[currentPlayer.coalitionId]?.color}` }} />
-                <span className="text-[8px] md:text-[10px] font-bold" style={{ color: COALITIONS[currentPlayer.coalitionId]?.color }}>
-                  {currentPlayer.name}
-                </span>
-              </motion.div>
-            )}
+              <div className="text-[6px] md:text-[7px] text-slate-600 mt-1.5 italic text-center leading-relaxed">
+                &ldquo;Satu hari nanti, rakyat akan menilai&rdquo;
+              </div>
 
-            {/* Dice display in center */}
-            {diceValues && (phase === 'rolling' || phase === 'moving') && (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-1.5 flex items-center gap-1.5">
-                <motion.span animate={phase === 'rolling' ? { rotate: [0, 180, 360] } : {}} transition={{ duration: 0.3 }}
-                  className="text-base md:text-lg">{'⚀⚁⚂⚃⚄⚅'[diceValues[0] - 1]}</motion.span>
-                <span className="text-[8px] text-slate-500">+</span>
-                <motion.span animate={phase === 'rolling' ? { rotate: [0, -180, -360] } : {}} transition={{ duration: 0.3 }}
-                  className="text-base md:text-lg">{'⚀⚁⚂⚃⚄⚅'[diceValues[1] - 1]}</motion.span>
-                <span className="text-[9px] font-black text-amber-400">={diceValues[0] + diceValues[1]}</span>
-              </motion.div>
-            )}
-
-            <div className="text-[6px] md:text-[7px] text-slate-600 mt-1.5 italic text-center leading-relaxed">
-              &ldquo;Satu hari nanti, rakyat akan menilai&rdquo;
-            </div>
-
-            {/* Live player count */}
-            <div className="flex items-center gap-2 mt-1 text-[6px] text-slate-600">
-              <span>🗳️ {players.filter(p => !p.isBankrupt).length} Active</span>
-              <span>•</span>
-              <span>💰 {(players.reduce((s, p) => s + p.money, 0) / 1000).toFixed(1)}K Total</span>
-            </div>
-          </motion.div>
+              {/* Live player count */}
+              <div className="flex items-center gap-2 mt-1 text-[6px] text-slate-600">
+                <span>🗳️ {players.filter(p => !p.isBankrupt).length} Active</span>
+                <span>•</span>
+                <span>💰 {(players.reduce((s, p) => s + p.money, 0) / 1000).toFixed(1)}K Total</span>
+              </div>
+            </motion.div>
+          </div>
         </div>
 
         {/* Sparkle particles */}
         {[
-          {x:'15%',y:'20%',d:0},{x:'82%',y:'18%',d:0.5},
-          {x:'10%',y:'78%',d:1.2},{x:'85%',y:'82%',d:0.8},
-          {x:'50%',y:'10%',d:2.0},{x:'48%',y:'88%',d:1.5},
-          {x:'92%',y:'50%',d:2.5},{x:'5%',y:'50%',d:1.8},
+          {x:'8%',y:'8%',d:0},{x:'92%',y:'8%',d:0.5},
+          {x:'8%',y:'92%',d:1.2},{x:'92%',y:'92%',d:0.8},
+          {x:'50%',y:'5%',d:2.0},{x:'50%',y:'95%',d:1.5},
+          {x:'95%',y:'50%',d:2.5},{x:'5%',y:'50%',d:1.8},
         ].map((s, i) => (
-          <div key={i} className="absolute w-1 h-1 rounded-full bg-yellow-300 pointer-events-none"
+          <div key={i} className="absolute w-1 h-1 rounded-full bg-yellow-300 pointer-events-none z-30"
             style={{
               left: s.x, top: s.y,
               animation: `sparkle-float ${2.5 + s.d}s ease-in-out ${s.d}s infinite`,
             }}
           />
         ))}
-
-        {/* Tiles */}
-        {BOARD_TILES.map(tile => <TileView key={tile.id} tile={tile} />)}
       </motion.div>
     </div>
   );
