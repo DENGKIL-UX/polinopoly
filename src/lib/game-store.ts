@@ -12,6 +12,14 @@ import {
   type MarketState,
   type ColorGroup,
 } from './game-data';
+import {
+  decideBuy,
+  decideBuild,
+  decideJail,
+  decideAuctionBid,
+  getCoalitionPersonality,
+  type AIContext,
+} from './ai-engine';
 
 // --- Types ---
 export interface Player {
@@ -225,6 +233,53 @@ const INITIAL_ACHIEVEMENTS: Achievement[] = [
 const AI_COALITION_EMOJIS: Record<string, string> = {
   PH: '🏛️', PN: '🕌', BN: '⭐', GPS: '🦅', GRS: '🏝️', IND: '👤',
 };
+
+/**
+ * Build the AIContext object from current game state, for the AI engine
+ * to make buy/build/jail/auction decisions.
+ */
+function buildAIContext(state: GameState, playerId: string): AIContext {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) {
+    return {
+      player: {
+        id: playerId, coalitionId: 'IND', name: '', money: 0, properties: [],
+        isInJail: false, jailTurns: 0, hasGetOutOfJailFree: false, isBankrupt: true,
+      },
+      tiles: state.tiles,
+      mortgagedTiles: state.mortgagedTiles,
+      opponents: [],
+      marketInflation: state.marketState.inflationMultiplier,
+      turnCount: state.turnCount,
+    };
+  }
+  return {
+    player: {
+      id: player.id,
+      coalitionId: player.coalitionId,
+      name: player.name,
+      money: player.money,
+      properties: player.properties,
+      isInJail: player.isInJail,
+      jailTurns: player.jailTurns,
+      hasGetOutOfJailFree: player.hasGetOutOfJailFree,
+      isBankrupt: player.isBankrupt,
+    },
+    tiles: state.tiles,
+    mortgagedTiles: state.mortgagedTiles,
+    opponents: state.players
+      .filter((p) => p.id !== playerId && !p.isBankrupt)
+      .map((p) => ({
+        id: p.id,
+        coalitionId: p.coalitionId,
+        money: p.money,
+        properties: p.properties,
+        position: p.position,
+      })),
+    marketInflation: state.marketState.inflationMultiplier,
+    turnCount: state.turnCount,
+  };
+}
 
 export const useGameStore = create<GameState>((set, get) => ({
   phase: 'lobby',
@@ -444,69 +499,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       // Unowned
       if (!tile.owner) {
         if (player.money >= (tile.price || 0)) {
-          if (player.isAI) {
-            // AI decides — try LLM API, fallback to random
-            set({ aiThinking: true });
-            const aiDecide = async () => {
-              try {
-                const res = await fetch('/api/ai-decision', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    coalitionId: player.coalitionId,
-                    coalitionName: COALITIONS[player.coalitionId]?.fullName || player.name,
-                    property: { name: tile.name, id: tile.id, price: tile.price, rent: tile.rent },
-                    money: player.money,
-                    ownedProperties: player.properties.map(pid => BOARD_TILES[pid]?.name || `Tile ${pid}`),
-                    marketData: get().marketState,
-                  }),
-                });
-                const data = await res.json();
-                const quote = data.quote || getRandomQuote(player.coalitionId);
-                if (data.action === 'BUY' && player.money >= (tile.price || 0)) {
-                  get().buyProperty();
-                } else {
-                  get().skipBuy();
-                }
-                set(state => ({
-                  players: state.players.map(p =>
-                    p.id === currentPlayerId ? { ...p, quote } : p
-                  ),
-                  aiThinking: false,
-                }));
-                get().addLog({
-                  playerId: currentPlayerId,
-                  playerName: player.name,
-                  message: `🤖 ${player.name}: "${quote}"`,
-                  type: 'ai_quote',
-                });
-              } catch {
-                // Fallback to random decision
-                const shouldBuy = Math.random() > 0.2;
-                const quote = getRandomQuote(player.coalitionId);
-                if (shouldBuy && player.money >= (tile.price || 0)) {
-                  get().buyProperty();
-                } else {
-                  get().skipBuy();
-                }
-                set(state => ({
-                  players: state.players.map(p =>
-                    p.id === currentPlayerId ? { ...p, quote } : p
-                  ),
-                  aiThinking: false,
-                }));
-                get().addLog({
-                  playerId: currentPlayerId,
-                  playerName: player.name,
-                  message: `🤖 ${player.name}: "${quote}"`,
-                  type: 'ai_quote',
-                });
-              }
-            };
-            setTimeout(aiDecide, 800);
-          } else {
-            set({ phase: 'buying', selectedTileId: tile.id });
-          }
+          // Both human and AI land in 'buying' phase.
+          // aiTurn (for AI players) uses the expert-system engine in ai-engine.ts
+          // to decide buy-vs-skip. The human player clicks Buy/Pass in the UI.
+          set({ phase: 'buying', selectedTileId: tile.id });
         } else {
           get().addLog({
             playerId: currentPlayerId,
@@ -995,124 +991,187 @@ export const useGameStore = create<GameState>((set, get) => ({
     const speed = state.aiSpeed;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.round(ms / (speed * 2))));
 
+    /**
+     * Phase-polling wait: blocks until the game phase matches one of the
+     * target phases, polling every `intervalMs`. Returns the matched phase
+     * or null if `timeoutMs` elapses. This replaces fragile fixed delays
+     * that desync from the token-hop animation duration.
+     */
+    const waitForPhase = async (
+      targetPhases: string[],
+      timeoutMs = 5000,
+      intervalMs = 150,
+    ): Promise<string | null> => {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const ph = get().phase;
+        if (targetPhases.includes(ph)) return ph;
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+      return null;
+    };
+
     const currentPlayerId = state.turnOrder[state.currentTurnIndex];
     const player = state.players.find(p => p.id === currentPlayerId);
     if (!player || !player.isAI || player.isBankrupt) {
+      get().setAIThinking(false);
       get().endTurn();
       return;
     }
 
-    // Handle jail for AI
+    get().setAIThinking(true);
+    const personality = getCoalitionPersonality(player.coalitionId);
+
+    // ── 1. JAIL DECISION (expert system) ──
     if (player.isInJail) {
-      get().handleJailDecision(Math.random() > 0.5);
-      await delay(1500);
+      const ctx = buildAIContext(get(), currentPlayerId);
+      const { payBail, reason } = decideJail(ctx);
+      get().addLog({
+        playerId: currentPlayerId,
+        playerName: player.name,
+        message: `⛓️ ${player.name}: ${reason}`,
+        type: 'jail',
+      });
+      get().handleJailDecision(payBail);
+      await delay(800);
+
+      // If still in jail_decision, end turn
+      if (get().phase === 'jail_decision') {
+        get().setAIThinking(false);
+        get().endTurn();
+        return;
+      }
+      // If we got out via bail, still need to roll & move this turn
     }
 
-    const currentState = get();
-    if (currentState.phase === 'jail_decision') {
-      // Still in jail, end turn
-      get().endTurn();
-      return;
-    }
-
-    // Roll dice
+    // ── 2. ROLL DICE ──
     get().rollDice();
 
-    // Wait for move to complete
-    await delay(1500);
+    // Wait for the move pipeline to reach a decision phase or terminal.
+    // rollDice → (800ms) → movePlayer → (1500ms) → handleLanding → buying/rent/card/landed
+    await waitForPhase(
+      ['buying', 'paying_rent', 'card', 'landed', 'jail_decision', 'game_over', 'auction'],
+      6000,
+    );
+    await delay(200); // small breathe for UI
 
-    // Check if we need to buy, pay rent, or handle card
-    const afterMoveState = get();
+    let phase = get().phase;
 
-    // AI: Buy property if affordable and strategic
-    if (afterMoveState.phase === 'buying') {
-      const aiPlayerNow = get().players.find(p => p.id === currentPlayerId);
-      const currentTile = get().tiles[aiPlayerNow?.position ?? 0];
-      if (aiPlayerNow && currentTile?.price && aiPlayerNow.money >= currentTile.price) {
-        // AI buying strategy: buy if we have enough cash (keep 300 RM buffer)
-        if (aiPlayerNow.money - currentTile.price >= 300) {
-          get().buyProperty();
-          await delay(300);
-        } else {
-          get().skipBuy();
-          await delay(300);
-        }
+    // ── 3. BUY DECISION (expert system) ──
+    if (phase === 'buying') {
+      const ctx = buildAIContext(get(), currentPlayerId);
+      const tile = get().tiles[get().players.find(p => p.id === currentPlayerId)?.position ?? 0];
+      const decision = decideBuy(ctx, tile);
+      const quote = getRandomQuote(player.coalitionId);
+
+      get().addLog({
+        playerId: currentPlayerId,
+        playerName: player.name,
+        message: `🤖 ${player.name}: ${decision.reason} — "${quote}"`,
+        type: 'ai_quote',
+      });
+
+      if (decision.shouldBuy) {
+        get().buyProperty();
       } else {
         get().skipBuy();
-        await delay(300);
       }
+      await delay(400);
+
+      // After buy/skip, wait for resulting phase (skipBuy → auction)
+      await waitForPhase(
+        ['auction', 'landed', 'playing', 'paying_rent', 'game_over'],
+        5000,
+      );
+      phase = get().phase;
     }
 
-    // Re-check phase after buying
-    const postBuyState = get();
-    if (postBuyState.phase === 'paying_rent') {
+    // ── 4. PAY RENT ──
+    if (phase === 'paying_rent') {
       get().payRent();
-      await delay(300);
+      await delay(400);
+      await waitForPhase(['landed', 'playing', 'game_over', 'auction'], 4000);
+      phase = get().phase;
     }
-    if (postBuyState.phase === 'card') {
-      const card = postBuyState.currentCard;
+
+    // ── 5. DRAW CARD ──
+    if (phase === 'card') {
+      const card = get().currentCard;
       if (card) {
         get().applyCard(card);
-        await delay(300);
-      }
-    }
-
-    // Wait for auction to complete if one was triggered
-    let auctionWaitCount = 0;
-    while (get().phase === 'auction' && auctionWaitCount < 30) {
-      await delay(1000);
-      auctionWaitCount++;
-    }
-
-    // AI: Build houses on full color sets
-    const aiState = get();
-    const aiPlayer = aiState.players.find(p => p.id === currentPlayerId);
-    if (aiPlayer && aiPlayer.money > 300) {
-      const aiColorGroups = new Set<string>();
-      for (const tileId of aiPlayer.properties) {
-        const t = aiState.tiles.find(tile => tile.id === tileId);
-        if (t?.colorGroup && t?.type === 'property' && t.housePrice) {
-          aiColorGroups.add(t.colorGroup);
+        await delay(400);
+        await waitForPhase(['landed', 'playing', 'game_over', 'jail_decision', 'buying', 'paying_rent'], 4000);
+        phase = get().phase;
+        // Card may send us to a buy/rent situation — handle recursively-lite
+        if (phase === 'buying') {
+          const ctx = buildAIContext(get(), currentPlayerId);
+          const tile = get().tiles[get().players.find(p => p.id === currentPlayerId)?.position ?? 0];
+          const decision = decideBuy(ctx, tile);
+          if (decision.shouldBuy) get().buyProperty();
+          else get().skipBuy();
+          await delay(400);
+          await waitForPhase(['landed', 'playing', 'game_over', 'auction'], 4000);
+          phase = get().phase;
         }
-      }
-      for (const cg of aiColorGroups) {
-        const groupTiles = aiState.tiles.filter(t => t.colorGroup === cg && t.type === 'property');
-        const ownsAll = groupTiles.every(t => t.owner === currentPlayerId);
-        if (!ownsAll) continue;
-        // Build houses on the cheapest properties first
-        const buildable = groupTiles
-          .filter(t => (t.houses || 0) < 5 && !aiState.mortgagedTiles.includes(t.id))
-          .sort((a, b) => (a.housePrice || 0) - (b.housePrice || 0));
-        for (const bt of buildable) {
-          const currentAI = get().players.find(p => p.id === currentPlayerId);
-          if (!currentAI || currentAI.money < (bt.housePrice || 0)) break;
-          // Only build if we have enough cash buffer (keep 200 RM minimum)
-          if (currentAI.money - (bt.housePrice || 0) < 200) break;
-          const newHouses = (bt.houses || 0) + 1;
-          set(state => ({
-            players: state.players.map(p =>
-              p.id === currentPlayerId ? { ...p, money: p.money - (bt.housePrice || 0) } : p
-            ),
-            tiles: state.tiles.map(t =>
-              t.id === bt.id ? { ...t, houses: newHouses } : t
-            ),
-          }));
-          get().addLog({
-            playerId: currentPlayerId,
-            playerName: currentAI.name,
-            message: newHouses === 5
-              ? `🏨 ${currentAI.name} builds HOTEL on ${bt.name}!`
-              : `🏠 ${currentAI.name} builds house on ${bt.name} (${newHouses}/4)`,
-            type: 'buy',
-          });
+        if (phase === 'paying_rent') {
+          get().payRent();
+          await delay(400);
+          await waitForPhase(['landed', 'playing', 'game_over'], 4000);
+          phase = get().phase;
         }
       }
     }
 
+    // ── 6. AUCTION — let aiAuctionTurn handle it; wait for completion ──
+    if (phase === 'auction') {
+      // aiAuctionTurn is auto-triggered by skipBuy/startAuction. Poll until done.
+      let auctionWait = 0;
+      while (get().phase === 'auction' && auctionWait < 40) {
+        await delay(800);
+        auctionWait++;
+      }
+      phase = get().phase;
+    }
+
+    // ── 7. BUILD HOUSES (expert system: greedy ROI on monopolies) ──
+    if (phase === 'landed' || phase === 'playing') {
+      const ctx = buildAIContext(get(), currentPlayerId);
+      const buildTiles = decideBuild(ctx);
+      for (const tileId of buildTiles) {
+        const tile = BOARD_TILES[tileId];
+        const liveTile = get().tiles[tileId];
+        const currentAI = get().players.find(p => p.id === currentPlayerId);
+        if (!currentAI || !tile.housePrice) break;
+        if (currentAI.money - tile.housePrice < 200) break;
+        const newHouses = (liveTile?.houses ?? 0) + 1;
+        set(s => ({
+          players: s.players.map(p =>
+            p.id === currentPlayerId ? { ...p, money: p.money - (tile.housePrice ?? 0) } : p,
+          ),
+          tiles: s.tiles.map(t =>
+            t.id === tileId ? { ...t, houses: newHouses } : t,
+          ),
+        }));
+        get().addLog({
+          playerId: currentPlayerId,
+          playerName: currentAI.name,
+          message: newHouses === 5
+            ? `🏨 ${currentAI.name} builds HOTEL on ${tile.name}! (${personality.description})`
+            : `🏠 ${currentAI.name} builds house on ${tile.name} (${newHouses}/4)`,
+          type: 'buy',
+        });
+        await delay(250);
+      }
+    }
+
+    // ── 8. END TURN ──
     get().setAIThinking(false);
-    // Only end turn if we're in a terminal sub-phase
     const finalPhase = get().phase;
-    if (finalPhase === 'landed' || finalPhase === 'playing') {
+    if (finalPhase === 'landed' || finalPhase === 'playing' || finalPhase === 'jail_decision') {
+      get().endTurn();
+    } else if (finalPhase !== 'game_over') {
+      // Safety net: if we somehow ended in a non-terminal phase, end the turn
+      // rather than stalling the whole game.
       get().endTurn();
     }
   },
@@ -1447,37 +1506,36 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const baseRent = tile.rent?.[0] || 0;
-    const maxWillingToPay = Math.floor(baseRent * 15);
+    // Expert-system auction bid (ai-engine.ts)
     const minIncrement = Math.max(10, Math.floor(auction.highestBid * 0.1));
-    const proposedBid = auction.highestBid + minIncrement;
-
+    const ctx = buildAIContext(state, currentBidderId);
+    const { bid, reason } = decideAuctionBid(ctx, tile, auction.highestBid, minIncrement);
     const quote = getRandomQuote(player.coalitionId);
 
-    if (proposedBid <= maxWillingToPay && proposedBid <= player.money && Math.random() > 0.3) {
-      get().placeBid(currentBidderId, proposedBid);
-      set(state => ({
-        players: state.players.map(p =>
-          p.id === currentBidderId ? { ...p, quote } : p
+    if (bid > 0 && bid <= player.money) {
+      get().placeBid(currentBidderId, bid);
+      set(s => ({
+        players: s.players.map(p =>
+          p.id === currentBidderId ? { ...p, quote } : p,
         ),
       }));
       get().addLog({
         playerId: currentBidderId,
         playerName: player.name,
-        message: `🤖 ${player.name}: "${quote}"`,
+        message: `🤖 ${player.name}: ${reason} — "${quote}"`,
         type: 'ai_quote',
       });
     } else {
       get().passBid(currentBidderId);
-      set(state => ({
-        players: state.players.map(p =>
-          p.id === currentBidderId ? { ...p, quote } : p
+      set(s => ({
+        players: s.players.map(p =>
+          p.id === currentBidderId ? { ...p, quote } : p,
         ),
       }));
       get().addLog({
         playerId: currentBidderId,
         playerName: player.name,
-        message: `🤖 ${player.name}: "${quote}"`,
+        message: `🤖 ${player.name}: Pass (${reason}) — "${quote}"`,
         type: 'ai_quote',
       });
     }

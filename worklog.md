@@ -124,3 +124,47 @@ Stage Summary:
 - Board enlarged with felt margin so all tiles/tokens sit on the playing surface.
 - Auto-rotate disabled; static top-down readable camera.
 - Tile text (names, prices, sub-labels) now readable via bigger fonts + outlines + top-down angle.
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix AI turns stalling; add chess-like expert-system AI decision engine with surprising elements
+
+Work Log:
+- Analyzed stuck-game screenshot with VLM: PH was active but no "AI thinking" indicator — AI turns weren't firing after the human's turn.
+- Root-caused the stall: aiTurn used FIXED `await delay(1500)` after rollDice, but the rollDice→movePlayer→handleLanding pipeline takes 800+1500=2300ms. The AI checked `phase==='buying'` at 1500ms while phase was still 'moving' (handleLanding hadn't fired), so it skipped the buy branch, and the final `if (phase==='landed'||'playing')` was false → endTurn() never called → game frozen.
+- SECOND bug: handleLanding had DUPLICATE AI-buy logic (lines 447-506) that called /api/ai-decision (which 404s) and fell back to random, racing with aiTurn's own buy logic. The AI branch never set phase='buying' (only the human branch did), so aiTurn's buying check never matched for AI players.
+- Researched GitHub Monopoly AI (intrepidcoder, itaylayzer, AniketSanghi): cash-multiple buy heuristic, greedy-ROI house building, expert-system rules, simple positional eval function.
+
+Fixes implemented:
+
+1. NEW MODULE: src/lib/ai-engine.ts — chess-like expert-system AI:
+   - evaluatePosition(): positional score = cash (diminishing) + property equity + monopoly bonus + jail penalty − opponent-threat. Lets the AI compare decision branches.
+   - decideBuy(): 8-rule expert system — cash buffer, cash-multiple affordability, color-group completion (+80), block-opponent-monopoly (+35), ROI ratio, highway/media count-scaling, dark-blue federal-power bonus, inflation hedge, coalition-personality aggression + random variance. Returns shouldBuy + human-readable reason.
+   - decideBuild(): greedy ROI on completed monopolies, even-build rule enforced, dark-blue/green prioritised, aggressive coalitions build more.
+   - decideJail(): use Get-Out-Of-Jail card if held; early game with few props = wait; late game with monopolies = pay bail; affordability check.
+   - decideAuctionBid(): max-bid = price × (0.8 + personality), 50% premium to complete a monopoly, surprise over-bid 20% of the time.
+   - getCoalitionPersonality(): 6 coalition profiles (PH cautious, PN aggressive, BN steady, GPS opportunistic, GRS unpredictable, IND chaotic) with aggressionBonus, buildAggression, variance — creates surprising, non-deterministic, flavourful plays.
+
+2. game-store.ts — rewrote aiTurn with PHASE-POLLING waits:
+   - Replaced fragile fixed delays with waitForPhase(targets, timeout, interval=150ms) that polls until the phase matches. No more desync with the 2.3s move pipeline or the token-hop animation.
+   - Structured 8-step flow: jail decision → roll → wait-for-landing → buy (expert) → pay rent → draw card (with recursive buy/rent handling) → auction wait → build houses (expert) → end turn.
+   - Safety net: if final phase isn't terminal, endTurn() is called anyway so the game can never stall.
+   - Removed duplicate AI-buy logic from handleLanding — AI players now land in 'buying' phase just like humans, and aiTurn's expert system decides buy-vs-skip. This eliminated the /api/ai-decision 404 path entirely.
+   - aiAuctionTurn upgraded to use decideAuctionBid() expert function.
+   - buildAIContext() helper assembles the AIContext (player + tiles + opponents + market + turn) for the engine.
+
+Verification (Agent Browser + VLM):
+- Started game as GRS (user's scenario). Rolled dice, bought property, ended turn. ✓
+- Turn advanced to PH → "AI sedang berfikir..." indicator showed. ✓
+- Waited 40s: turn progressed PH → PN → BN → GPS → IND (all 5 AI players completed turns). ✓
+- Waited 20s more: turn cycled back to GRS (human), "Baling Dadu!" button reappeared. ✓
+- VLM read Hansard log: "T1 IND: Buy (affordable, high-roi, first-in-type, score 56)" — the expert system's reasoning is logged with rule factors + score. ✓
+- IND: RM1500→RM1300, 1 property (bought); GRS: bought Amanah RM100. ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- AI turn-stall bug fixed (root cause: fixed delays desynced from move pipeline + duplicate AI-buy logic in handleLanding).
+- Chess-like expert-system AI engine added: 8-rule buy decisions, greedy-ROI house building, positional evaluation, jail strategy, auction bidding — all with coalition personalities for surprising plays.
+- AI decisions are explainable: each move logs the rule factors and a score (e.g. "Buy (completes-monopoly, high-roi, score 92)").
+- Game now plays continuously: human rolls → all 5 AI players auto-take turns → returns to human. No stalls.
