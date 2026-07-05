@@ -1,0 +1,10 @@
+{
+  "compatibility_date": "2025-01-01",
+  "main": ".open-next/worker.js",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "name": "polinopoly",
+  "compatibility_flags": ["nodejs_compat"]
+}
