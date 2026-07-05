@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/lib/game-store';
 import LobbyScreen from '@/components/game/LobbyScreen';
 import { NarrationPopup } from '@/components/game/NarrationPopup';
+import { MusicPlayer } from '@/components/game/MusicPlayer';
 import { Boxes, Grid3x3 } from 'lucide-react';
 
 // Dynamic imports to keep the initial bundle lean and avoid SSR issues with WebGL
@@ -126,6 +127,9 @@ export default function Home() {
         {/* Political soap opera narration pop-ups during AI turns */}
         <NarrationPopupWrapper />
       </div>
+
+      {/* Game music player (loop + toggle, default On) */}
+      <MusicPlayer />
     </div>
   );
 }
