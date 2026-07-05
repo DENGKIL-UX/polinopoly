@@ -5,7 +5,7 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "name": "polinopoly",
+  "name": "pru",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true
