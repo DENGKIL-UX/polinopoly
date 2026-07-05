@@ -44,7 +44,7 @@ function SceneLoader() {
 /* Floating view-toggle (3D ↔ 2D) — only visible during play */
 function ViewToggle({ view, setView }: { view: '3d' | '2d'; setView: (v: '3d' | '2d') => void }) {
   return (
-    <div className="absolute top-3 right-3 z-40 flex items-center gap-1 p-1 rounded-xl bg-slate-900/80 border border-slate-600/40 backdrop-blur-md shadow-lg">
+    <div className="absolute bottom-14 right-3 z-40 flex items-center gap-1 p-1 rounded-xl bg-slate-900/80 border border-slate-600/40 backdrop-blur-md shadow-lg">
       <button
         onClick={() => setView('3d')}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${

@@ -1069,20 +1069,36 @@ function PropertyPortfolio() {
 
   return (
     <>
-      <motion.button
-        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-        onClick={togglePortfolio}
-        className="absolute top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors pointer-events-auto"
-      >
-        <Briefcase className="h-3.5 w-3.5" />
-        <span>Portfolio</span>
-        <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 border-amber-600/50 text-amber-400">{ownedTiles.length}</Badge>
-        {mortgagedCount > 0 && <Badge className="text-[7px] px-1 py-0 h-3.5 bg-orange-600/80">{mortgagedCount} mortgaged</Badge>}
-        {canBuildAny && isPlayerTurn && (
-          <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
-            className="w-1.5 h-1.5 rounded-full bg-green-400" />
-        )}
-      </motion.button>
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 pointer-events-auto">
+        <motion.button
+          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+          onClick={togglePortfolio}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+        >
+          <Briefcase className="h-3.5 w-3.5" />
+          <span>Portfolio</span>
+          <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 border-amber-600/50 text-amber-400">{ownedTiles.length}</Badge>
+          {mortgagedCount > 0 && <Badge className="text-[7px] px-1 py-0 h-3.5 bg-orange-600/80">{mortgagedCount} mortgaged</Badge>}
+          {canBuildAny && isPlayerTurn && (
+            <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
+              className="w-1.5 h-1.5 rounded-full bg-green-400" />
+          )}
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            if (confirm('Return to hero page? Your game will be saved.')) {
+              useGameStore.getState().saveGame();
+              useGameStore.setState({ phase: 'lobby' });
+            }
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-amber-600/40 text-[10px] text-amber-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+          title="Back to hero page"
+        >
+          <Home className="h-3.5 w-3.5" />
+          <span>Hero</span>
+        </motion.button>
+      </div>
 
       <AnimatePresence>
         {showPortfolio && (
