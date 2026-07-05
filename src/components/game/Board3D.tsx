@@ -384,32 +384,65 @@ function EdgeTile({ tile }: { tile: Tile }) {
         <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.85} depthWrite={false} />
       </mesh>
 
-      {/* ── Owner flag pole (rises when owned) ── */}
+      {/* ── Party HQ building + coalition flag (appears when owned) ── */}
       {hasOwner && ownerColor && (
         <group
           position={[
-            -outX * (EDGE_D / 2 - 0.15),
-            0.02,
-            -outZ * (EDGE_D / 2 - 0.15),
+            -outX * (EDGE_D / 2 - 0.25),
+            CARD_THICKNESS + 0.01,
+            -outZ * (EDGE_D / 2 - 0.25),
           ]}
         >
-          <mesh position={[0, 0.18, 0]} castShadow>
-            <cylinderGeometry args={[0.015, 0.015, 0.36, 8]} />
+          {/* Building base */}
+          <mesh position={[0, 0.08, 0]} castShadow>
+            <boxGeometry args={[0.28, 0.16, 0.22]} />
+            <meshStandardMaterial
+              color={ownerColor}
+              roughness={0.5}
+              metalness={0.2}
+              emissive={ownerColor}
+              emissiveIntensity={0.08}
+            />
+          </mesh>
+          {/* Roof (darker shade) */}
+          <mesh position={[0, 0.2, 0]} castShadow rotation={[0, Math.PI / 4, 0]}>
+            <coneGeometry args={[0.22, 0.1, 4]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.3} />
+          </mesh>
+          {/* Flag pole on top of building */}
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <cylinderGeometry args={[0.012, 0.012, 0.3, 8]} />
             <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.7} />
           </mesh>
-          <mesh position={[0.06, 0.28, 0]} castShadow>
-            <planeGeometry args={[0.12, 0.08]} />
+          {/* Coalition flag (waving) */}
+          <mesh position={[0.08, 0.42, 0]} castShadow>
+            <planeGeometry args={[0.14, 0.09]} />
             <meshStandardMaterial
               color={ownerColor}
               emissive={ownerColor}
-              emissiveIntensity={0.15}
+              emissiveIntensity={0.25}
               roughness={0.4}
               side={THREE.DoubleSide}
             />
           </mesh>
-          <mesh position={[0, 0.37, 0]}>
-            <sphereGeometry args={[0.025, 12, 12]} />
+          {/* Gold finial on pole top */}
+          <mesh position={[0, 0.51, 0]}>
+            <sphereGeometry args={[0.022, 12, 12]} />
             <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.15} />
+          </mesh>
+          {/* Door (dark opening) */}
+          <mesh position={[0, 0.04, 0.112]}>
+            <planeGeometry args={[0.08, 0.1]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.8} />
+          </mesh>
+          {/* Windows (glowing) */}
+          <mesh position={[-0.07, 0.1, 0.112]}>
+            <planeGeometry args={[0.05, 0.05]} />
+            <meshStandardMaterial color={ownerColor} emissive={ownerColor} emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0.07, 0.1, 0.112]}>
+            <planeGeometry args={[0.05, 0.05]} />
+            <meshStandardMaterial color={ownerColor} emissive={ownerColor} emissiveIntensity={0.4} />
           </mesh>
         </group>
       )}
