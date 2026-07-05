@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useThree, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Stars, ContactShadows, Float } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
+import { RotateCw } from 'lucide-react';
 import Board3D from './Board3D';
 import Token3D from './Token3D';
 import Dice3D from './Dice3D';
@@ -193,6 +194,7 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
    ─────────────────────────────────────────────────────────────────── */
 export default function GameScene() {
   const controlsRef = useRef<any>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
 
   const isMobile = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -239,12 +241,23 @@ export default function GameScene() {
           maxPolarAngle={Math.PI / 2.4}
           minDistance={16}
           maxDistance={48}
-          autoRotate={false}
+          autoRotate={autoRotate}
+          autoRotateSpeed={0.5}
           enableDamping
           dampingFactor={0.08}
           makeDefault
         />
       </Canvas>
+
+      {/* Auto-rotate toggle button (default Off) */}
+      <button
+        onClick={() => setAutoRotate((v) => !v)}
+        className="absolute bottom-3 right-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/80 border border-slate-600/40 backdrop-blur-md text-xs font-medium text-slate-300 hover:text-amber-400 hover:border-amber-500/40 transition-colors shadow-lg"
+        title={autoRotate ? 'Stop auto-rotate' : 'Start auto-rotate'}
+      >
+        <RotateCw className={`h-3.5 w-3.5 ${autoRotate ? 'animate-spin text-amber-400' : ''}`} style={autoRotate ? { animationDuration: '2s' } : {}} />
+        <span className="hidden sm:inline">{autoRotate ? 'Rotate On' : 'Rotate Off'}</span>
+      </button>
     </div>
   );
 }
