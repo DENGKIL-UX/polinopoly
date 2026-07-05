@@ -218,6 +218,10 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 16;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = true;
+  texture.needsUpdate = true;
+  // Force the texture to upload on next render
+  texture.source.data = canvas;
   return texture;
 }
 
@@ -268,34 +272,20 @@ export function generateCardBackTexture(): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 16;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = true;
+  texture.needsUpdate = true;
+  // Force the texture to upload on next render
+  texture.source.data = canvas;
   return texture;
 }
 
 // ───────────────────────────────────────────────────────────────────
-// CARD GEOMETRY FACTORY — rounded-rect ExtrudeGeometry (not BoxGeometry)
+// CARD GEOMETRY FACTORY — BoxGeometry with 6 face materials
+// (BoxGeometry material order: [+X, -X, +Y, -Y, +Z, -Z])
+// We use a box so the face texture maps cleanly to the top face and
+// the back texture to the bottom face — reliable, no group-index issues.
 // ───────────────────────────────────────────────────────────────────
 
-export function createCardGeometry(length: number, width: number, thickness: number): THREE.ExtrudeGeometry {
-  const radius = 0.02;
-  const shape = new THREE.Shape();
-  const x = -length / 2;
-  const y = -width / 2;
-  shape.moveTo(x, y + radius);
-  shape.lineTo(x, y + width - radius);
-  shape.quadraticCurveTo(x, y + width, x + radius, y + width);
-  shape.lineTo(x + length - radius, y + width);
-  shape.quadraticCurveTo(x + length, y + width, x + length, y + width - radius);
-  shape.lineTo(x + length, y + radius);
-  shape.quadraticCurveTo(x + length, y, x + length - radius, y);
-  shape.lineTo(x + radius, y);
-  shape.quadraticCurveTo(x, y, x, y + radius);
-
-  return new THREE.ExtrudeGeometry(shape, {
-    depth: thickness,
-    bevelEnabled: true,
-    bevelThickness: 0.008,
-    bevelSize: 0.008,
-    bevelSegments: 4,
-    curveSegments: 12,
-  });
+export function createCardGeometry(length: number, width: number, thickness: number): THREE.BoxGeometry {
+  return new THREE.BoxGeometry(length, thickness, width);
 }

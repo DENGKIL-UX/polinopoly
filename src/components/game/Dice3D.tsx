@@ -11,8 +11,8 @@ import { useGameStore } from '@/lib/game-store';
 // Research source: elena-pan/Unity-Monopoly (3D dice in browser)
 // ───────────────────────────────────────────────────────────────────
 
-const DICE_SIZE = 0.85;
-const PIP_RADIUS = 0.07;
+const DICE_SIZE = 1.4;
+const PIP_RADIUS = 0.12;
 
 // Pip layout on a 3×3 grid (offsets from face centre)
 const PIP_GRID: Record<number, [number, number][]> = {
@@ -154,19 +154,19 @@ export default function Dice3D() {
   const v2 = diceValues?.[1] ?? 1;
 
   return (
-    <group position={[0, 2.6, 0]}>
-      <Die value={v1} rolling={rolling} position={[-0.7, 0, 0]} spinSeed={1.7} />
-      <Die value={v2} rolling={rolling} position={[0.7, 0, 0]} spinSeed={4.2} />
+    <group position={[0, 1.8, 0]}>
+      <Die value={v1} rolling={rolling} position={[-1.1, 0, 0]} spinSeed={1.7} />
+      <Die value={v2} rolling={rolling} position={[1.1, 0, 0]} spinSeed={4.2} />
 
       {/* Soft glow disc beneath the dice */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
-        <circleGeometry args={[2.4, 48]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.8, 0]}>
+        <circleGeometry args={[3.2, 48]} />
         <meshStandardMaterial
           color="#facc15"
           transparent
-          opacity={rolling ? 0.18 : 0.08}
+          opacity={rolling ? 0.22 : 0.1}
           emissive="#facc15"
-          emissiveIntensity={rolling ? 0.4 : 0.12}
+          emissiveIntensity={rolling ? 0.5 : 0.15}
           depthWrite={false}
         />
       </mesh>

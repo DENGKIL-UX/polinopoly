@@ -187,8 +187,9 @@ function CornerTile({ tile }: { tile: Tile }) {
       }),
     [backTexture],
   );
+  // BoxGeometry material order: [+X, -X, +Y (top), -Y (bottom), +Z, -Z]
   const cardMaterials = useMemo(
-    () => [edgeMaterial, edgeMaterial, edgeMaterial, edgeMaterial, faceMaterial, backMaterial],
+    () => [edgeMaterial, edgeMaterial, faceMaterial, backMaterial, edgeMaterial, edgeMaterial],
     [edgeMaterial, faceMaterial, backMaterial],
   );
 
@@ -201,20 +202,32 @@ function CornerTile({ tile }: { tile: Tile }) {
   });
 
   // Corners always show face (they're mythic, never "owned")
-  const cardRotation: [number, number, number] = [-Math.PI / 2, 0, pos.rotation];
+  const cardRotation: [number, number, number] = [0, 0, pos.rotation];
 
   return (
-    <group ref={groupRef} position={[pos.x, CARD_THICKNESS / 2 + 0.01, pos.z]}>
+    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
+      {/* Card base (thin box for thickness) */}
       <mesh
-        geometry={cardGeometry}
-        material={cardMaterials}
+        rotation={[0, 0, pos.rotation]}
+        position={[0, CARD_THICKNESS / 2, 0]}
         castShadow
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
-        rotation={cardRotation}
-      />
+      >
+        <boxGeometry args={[CORNER_W, CARD_THICKNESS, CORNER_D]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} />
+      </mesh>
+      {/* Card face texture (flat plane on top) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, pos.rotation]}
+        position={[0, CARD_THICKNESS + 0.002, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[CORNER_W, CORNER_D]} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -323,17 +336,12 @@ function EdgeTile({ tile }: { tile: Tile }) {
   );
   const faceMaterial = useMemo(
     () =>
-      new THREE.MeshPhysicalMaterial({
+      new THREE.MeshStandardMaterial({
         map: faceTexture,
-        roughness: 0.3,
-        metalness: 0.1,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.2,
-        emissive: isSelected || hovered ? '#ffffff' : '#000000',
-        emissiveIntensity: isSelected ? 0.12 : hovered ? 0.06 : 0,
-        emissiveMap: faceTexture,
+        roughness: 0.4,
+        metalness: 0.05,
       }),
-    [faceTexture, isSelected, hovered],
+    [faceTexture],
   );
   const backMaterial = useMemo(
     () =>
@@ -344,31 +352,43 @@ function EdgeTile({ tile }: { tile: Tile }) {
       }),
     [backTexture],
   );
+  // BoxGeometry material order: [+X, -X, +Y (top), -Y (bottom), +Z, -Z]
+  // Card lies flat (rotation.x = -π/2) so +Y face points UP (visible).
+  // faceMaterial on top, backMaterial on bottom, edgeMaterial on the 4 sides.
   const cardMaterials = useMemo(
-    () => [edgeMaterial, edgeMaterial, edgeMaterial, edgeMaterial, faceMaterial, backMaterial],
+    () => [edgeMaterial, edgeMaterial, faceMaterial, backMaterial, edgeMaterial, edgeMaterial],
     [edgeMaterial, faceMaterial, backMaterial],
   );
 
-  // Card lies flat; Z-rotation orients long edge along the board perimeter.
-  // Card back faces UP when unowned; card flips (Y-rotation) to show face when owned.
-  const cardRotation: [number, number, number] = [-Math.PI / 2, 0, pos.rotation];
-  const flipAngle = hasOwner ? Math.PI : 0;
+  // Card lies flat — BoxGeometry(length, thickness, width) with NO X-rotation
+  // so the +Y face (large face with texture) points UP toward the camera.
+  // Z-rotation orients the long edge along the board perimeter.
+  const cardRotation: [number, number, number] = [0, 0, pos.rotation];
 
   return (
-    <group ref={groupRef} position={[pos.x, CARD_THICKNESS / 2 + 0.01, pos.z]}>
-      {/* ── The trading card (thick ExtrudeGeometry, rounded-rect Shape) ── */}
-      <group rotation={[0, flipAngle, 0]}>
-        <mesh
-          geometry={cardGeometry}
-          material={cardMaterials}
-          castShadow
-          receiveShadow
-          onClick={handleClick}
-          onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
-          onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
-          rotation={cardRotation}
-        />
-      </group>
+    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
+      {/* ── Card base (thin box for thickness) ── */}
+      <mesh
+        rotation={[0, 0, pos.rotation]}
+        position={[0, CARD_THICKNESS / 2, 0]}
+        castShadow
+        receiveShadow
+        onClick={handleClick}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+      >
+        <boxGeometry args={[CARD_LENGTH, CARD_THICKNESS, CARD_WIDTH]} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} />
+      </mesh>
+      {/* ── Card face texture (flat plane on top of the box) ── */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, pos.rotation]}
+        position={[0, CARD_THICKNESS + 0.002, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[CARD_LENGTH, CARD_WIDTH]} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
 
       {/* ── Owner flag pole (rises when owned) ── */}
       {hasOwner && ownerColor && (

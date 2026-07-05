@@ -643,3 +643,44 @@ Stage Summary:
 - Video merges seamlessly with the existing coalition chooser — no separate page, the video enhances the lobby.
 - Dark overlay + high-contrast text keep everything readable.
 - VLM-rated 8/10 visual appeal.
+
+---
+Task ID: 17
+Agent: Main Agent
+Task: Fix 3D dice not visible, black card faces, cards not looking like trading cards
+
+Work Log:
+- User reported 3 issues: (1) dice above Baling Dadu not real 3D, (2) card text invisible (black), (3) cards don't look like trading cards.
+- VLM confirmed: dice were flat UI elements (dashboard DiceDisplay with unicode ⚀⚁), 3D Dice3D was too small/far; cards were black because ExtrudeGeometry material groups weren't mapping correctly.
+
+Fixes:
+
+1. 3D DICE (Dice3D.tsx):
+   - Increased DICE_SIZE from 0.85 → 1.4 (64% bigger).
+   - Increased PIP_RADIUS from 0.07 → 0.12.
+   - Lowered dice tray position from [0, 2.6, 0] → [0, 1.8, 0] (closer to board).
+   - Widened dice spacing from ±0.7 → ±1.1.
+   - Enlarged glow disc from 2.4 → 3.2 radius.
+   - VLM: "3D dice clearly visible as white cubes with black pips — 9/10"
+
+2. CARD FACES BLACK → COLORFUL (CardTexture.ts + Board3D.tsx):
+   - Root cause: ExtrudeGeometry material group indices didn't map to front/back faces correctly; canvas texture wasn't uploading to GPU.
+   - Switched from ExtrudeGeometry to a simpler approach: thin box for thickness + flat plane on top with the face texture.
+   - Used meshBasicMaterial (not Standard) for the face plane so the texture shows at full brightness regardless of lighting.
+   - Added texture.flipY = true, texture.needsUpdate = true, texture.source.data = canvas to force GPU upload.
+   - VLM: "tiles are colorful with visible text — vibrant colors, readable names/prices"
+
+3. TRADING CARD LOOK (Board3D.tsx):
+   - Card = thin dark box (thickness) + textured plane on top showing the full trading-card face (color frame, art panel, type bar, rarity gem, name, rent table, price, mortgage, party badge).
+   - VLM: "3D glossy trading-card appearance with bold contrasting text"
+
+Verification (Agent Browser + VLM):
+- VLM: "tiles are colorful with visible text (not black)" ✓
+- VLM: "3D dice clearly visible as physical cubes with pips" ✓
+- VLM: "trading-card aesthetic with 3D glossy appearance" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- 3D dice enlarged and repositioned — clearly visible as physical 3D objects.
+- Card faces now render colorful canvas textures (was black) — property names, RM prices, rent tables all readable.
+- Cards look like trading cards: thick box base + glossy textured face on top.
