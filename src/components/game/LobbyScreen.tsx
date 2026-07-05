@@ -154,10 +154,14 @@ export default function LobbyScreen() {
 
   // Hero music state (default On, loops, toggle)
   const heroAudioRef = useRef<HTMLAudioElement>(null);
-  const [heroMusicOn, setHeroMusicOn] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('polinopoly-hero-music') !== 'false';
-  });
+  const [heroMusicOn, setHeroMusicOn] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('polinopoly-hero-music');
+    if (saved === 'false') setHeroMusicOn(false);
+  }, []);
 
   useEffect(() => {
     const audio = heroAudioRef.current;
@@ -700,8 +704,8 @@ export default function LobbyScreen() {
         className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/80 border border-slate-600/40 backdrop-blur-md text-xs font-medium text-slate-300 hover:text-amber-400 hover:border-amber-500/40 transition-colors shadow-lg"
         title={heroMusicOn ? 'Mute hero music' : 'Play hero music'}
       >
-        {heroMusicOn ? <Volume2 className="h-3.5 w-3.5 text-amber-400" /> : <VolumeX className="h-3.5 w-3.5" />}
-        <span className="hidden sm:inline">{heroMusicOn ? 'Hero Music On' : 'Hero Music Off'}</span>
+        {mounted && heroMusicOn ? <Volume2 className="h-3.5 w-3.5 text-amber-400" /> : <VolumeX className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">{mounted && heroMusicOn ? 'Hero Music On' : 'Hero Music Off'}</span>
       </button>
 
       {/* Version footer */}
