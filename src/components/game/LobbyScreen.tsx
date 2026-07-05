@@ -18,6 +18,8 @@ import {
   ChevronDown,
   FolderOpen,
   Plus,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 const COALITION_LIST = Object.values(COALITIONS).filter(c => c.id !== 'IND');
@@ -149,6 +151,36 @@ export default function LobbyScreen() {
   const hasSavedGame = useGameStore(s => s.hasSavedGame);
   const [hasSaved, setHasSaved] = useState(false);
   const [loadAttempted, setLoadAttempted] = useState(false);
+
+  // Hero music state (default On, loops, toggle)
+  const heroAudioRef = useRef<HTMLAudioElement>(null);
+  const [heroMusicOn, setHeroMusicOn] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('polinopoly-hero-music') !== 'false';
+  });
+
+  useEffect(() => {
+    const audio = heroAudioRef.current;
+    if (!audio) return;
+    audio.volume = 0.3;
+    if (heroMusicOn) {
+      audio.play().catch(() => {
+        // Autoplay blocked — will play on first user click
+        const handler = () => { audio.play().catch(() => {}); document.removeEventListener('click', handler); };
+        document.addEventListener('click', handler);
+      });
+    } else {
+      audio.pause();
+    }
+  }, [heroMusicOn]);
+
+  const toggleHeroMusic = () => {
+    setHeroMusicOn((prev) => {
+      const next = !prev;
+      localStorage.setItem('polinopoly-hero-music', String(next));
+      return next;
+    });
+  };
 
   // Custom party state
   const [showCustomParty, setShowCustomParty] = useState(false);
@@ -660,6 +692,17 @@ export default function LobbyScreen() {
           </p>
         </motion.div>
       </motion.div>
+
+      {/* Hero music audio element + toggle */}
+      <audio ref={heroAudioRef} src="/hero-music.mp3" loop preload="auto" />
+      <button
+        onClick={toggleHeroMusic}
+        className="absolute top-3 left-3 z-20 flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/80 border border-slate-600/40 backdrop-blur-md text-xs font-medium text-slate-300 hover:text-amber-400 hover:border-amber-500/40 transition-colors shadow-lg"
+        title={heroMusicOn ? 'Mute hero music' : 'Play hero music'}
+      >
+        {heroMusicOn ? <Volume2 className="h-3.5 w-3.5 text-amber-400" /> : <VolumeX className="h-3.5 w-3.5" />}
+        <span className="hidden sm:inline">{heroMusicOn ? 'Hero Music On' : 'Hero Music Off'}</span>
+      </button>
 
       {/* Version footer */}
       <div className="absolute bottom-3 text-[9px] text-slate-400/80 tracking-wider z-10">v3.0 — DENGKIL-UX · Pilihan Raya Edition</div>
