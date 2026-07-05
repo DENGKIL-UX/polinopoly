@@ -552,3 +552,55 @@ Stage Summary:
 - All 40 tiles' text now faces the same direction (toward the camera) — all 4 sides readable simultaneously.
 - Abandoned the classic 4-direction outward orientation (impossible with a single camera).
 - VLM-rated 8/10 readability.
+
+---
+Task ID: 15
+Agent: Main Agent
+Task: Transform tiles into Hearthstone-style trading cards (from uploaded reference files)
+
+Work Log:
+- Read the 3 uploaded reference files: pilihan_raya_cards.json (40-card schema), CardBoard.js (Three.js engine), index.html (demo harness).
+- Extracted key patterns: ExtrudeGeometry rounded-rect cards, CanvasTexture face generation, card back with Jalur Gemilang pattern, card state machine (UNOWNED/OWNED/MONOPOLY/MORTGAGED), cawangan/markas houses, flag poles, center card decks.
+- Adapted these into the existing React/R3F board (rather than replacing the whole engine, to preserve the working game logic).
+
+Changes implemented:
+
+1. NEW MODULE: src/components/game/CardTexture.ts
+   - generateCardFaceTexture(tile): draws each tile as a trading-card face on a 512×896 canvas (1:1.75 ratio). Layout: dark base → color-group frame border → art panel with description → type bar (HAK MILIK/INFRASTRUKTUR/CUKAI/etc.) → rarity gem (diamond) → card name → rent text box (Kosong/1-4 Cawangan/Markas with RM prices) → price (bottom-right gold) → mortgage value (bottom-left) → party affinity badge (top-left circle with coalition ID).
+   - generateCardBackTexture(): Jalur Gemilang 14-stripe pattern + dark overlay + gold border + "PILIHAN RAYA" center text.
+   - createCardGeometry(): rounded-rectangle ExtrudeGeometry (Shape with quadraticCurveTo corners, bevel enabled) — NOT BoxGeometry.
+
+2. Board3D.tsx — EdgeTile rewritten as trading cards:
+   - Each tile is a thick ExtrudeGeometry card (1.7 × 1.0 × 0.08) with 6 material groups: 4 edges (dark clearcoat) + front face (canvas texture) + back face (Jalur Gemilang).
+   - Card back faces UP when unowned; card flips (Y-rotation π) to show face when owned.
+   - Card lies flat with per-side Z-rotation (pos.rotation) so the long edge aligns with the board perimeter.
+   - Cawangan (houses): small party-colored cubes; Markas (hotel): cylinder with party color.
+   - Flag pole on owned tiles (silver pole + party-colored flag + gold finial).
+
+3. Board3D.tsx — CornerTile rewritten as mythic cards:
+   - Same thick ExtrudeGeometry card treatment, always showing face (corners are mythic rarity).
+   - Removed old shader-material references (useFlagScrollMaterial etc.) that caused a runtime error.
+
+4. Parliament3D.tsx — shrunk to 25% (was 45%) — decorative token, not dominant.
+
+5. Board3D.tsx — added CardDeck component + 2 center decks:
+   - Kad Nasib (Chance): orange card stack at 10 o'clock (-3.5, 0.02, 3.5).
+   - Kad SPR (Community Chest): blue card stack at 2 o'clock (3.5, 0.02, 3.5).
+   - Each deck: 8 stacked cards with slight random rotation, gold rim on top, floating breathe animation, label text.
+
+6. Copied pilihan_raya_cards.json to /public for reference.
+
+Verification (Agent Browser + VLM):
+- Game loads, no runtime errors. ✓
+- Flag poles visible on owned tiles after purchase. ✓
+- Cards render as thick 3D objects (not flat planes). ✓
+- Card backs (Jalur Gemilang) on unowned tiles; card faces flip up on owned. ✓
+- Center has Kad Nasib + Kad SPR card decks. ✓
+- Parliament shrunken to decorative size. ✓
+- Lint clean.
+
+Stage Summary:
+- All 40 tiles transformed into thick trading cards with canvas-generated faces.
+- Card state machine: UNOWNED (back up) → OWNED (flip to face + flag pole) → cawangan/markas houses.
+- Center redesigned: shrunken Parliament + Kad Nasib + Kad SPR card decks.
+- Malaysian political theme preserved (coalition badges, Jalur Gemilang card backs, party-colored houses/flags).

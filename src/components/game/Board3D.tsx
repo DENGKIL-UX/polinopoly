@@ -13,17 +13,10 @@ import {
 } from '@/lib/game-data';
 import { useGameStore } from '@/lib/game-store';
 import {
-  useIridescentMaterial,
-  useGoldShimmerMaterial,
-  useFlagScrollMaterial,
-  useShaderAnimation,
-  TileBuilding,
-  TileTrain,
-  TileCoinStack,
-  TileKeris,
-  TileCardStack,
-  TileMonitor,
-} from '@/components/game/Shader3D';
+  generateCardFaceTexture,
+  generateCardBackTexture,
+  createCardGeometry,
+} from '@/components/game/CardTexture';
 import { ParticleBurst, Shockwave, LightBeam, type ParticleType } from '@/components/game/Particle3D';
 import { Parliament3D } from '@/components/game/Parliament3D';
 
@@ -40,6 +33,11 @@ const CORNER_W = 2.3;
 const CORNER_D = 2.3;
 const EDGE_W = 1.9; // width along the edge
 const EDGE_D = 1.1; // depth perpendicular to edge (towards center)
+
+// Card dimensions (trading-card style — thick ExtrudeGeometry)
+const CARD_LENGTH = 1.7;   // long edge along the board perimeter
+const CARD_WIDTH = 1.0;    // short edge inward
+const CARD_THICKNESS = 0.08;
 
 const FELT_COLOR = '#1a472a';
 const FELT_INNER = '#153d22';
@@ -135,112 +133,88 @@ function textRotationForTile(_id: number): [number, number, number] {
 // ───────────────────────────────────────────────────────────────────
 
 function CornerTile({ tile }: { tile: Tile }) {
-  const matRef = useRef<THREE.MeshStandardMaterial>(null!);
   const groupRef = useRef<THREE.Group>(null!);
   const [hovered, setHovered] = useState(false);
   const pos = getTilePosition(tile.id, BOARD_SIZE);
 
-  // Shader materials for premium corners
-  const flagMat = useFlagScrollMaterial();
-  const goldMat = useGoldShimmerMaterial();
-  const iridescentMat = useIridescentMaterial();
-  useShaderAnimation([flagMat, goldMat, iridescentMat]);
-
   const selectedTileId = useGameStore((s) => s.selectedTileId);
   const selectTile = useGameStore((s) => s.selectTile);
   const isSelected = selectedTileId === tile.id;
-
-  // Choose material per corner: GO=flag scroll, SPR/Go-to-Jail=gold, Jail=iridescent, Istana=gold
-  const cornerMat = tile.id === 0 ? flagMat : (tile.id === 30 || tile.id === 20) ? goldMat : iridescentMat;
-  const isShader = tile.id === 0 || tile.id === 30 || tile.id === 20 || tile.id === 10;
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     selectTile(isSelected ? null : tile.id);
   };
 
-  // Gentle emissive pulse + flat hover lift (no tilt — tiles stay flat & readable)
-  useFrame(({ clock }, delta) => {
-    if (!matRef.current) return;
-    const t = clock.elapsedTime;
-    const pulse = 0.12 + 0.08 * Math.sin(t * 1.5 + tile.id * 0.7);
-    matRef.current.emissiveIntensity = isSelected ? 0.4 : hovered ? 0.28 : pulse;
+  // ── Mythic corner card (thick ExtrudeGeometry with canvas face texture) ──
+  const cardGeometry = useMemo(
+    () => createCardGeometry(CORNER_W, CORNER_D, CARD_THICKNESS),
+    [],
+  );
+  const faceTexture = useMemo(() => generateCardFaceTexture(tile), [tile]);
+  const backTexture = useMemo(() => generateCardBackTexture(), []);
+  const edgeMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: '#0a0a0a',
+        roughness: 0.3,
+        metalness: 0.1,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.2,
+      }),
+    [],
+  );
+  const faceMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        map: faceTexture,
+        roughness: 0.25,
+        metalness: 0.15,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.15,
+        emissive: isSelected || hovered ? '#ffffff' : '#000000',
+        emissiveIntensity: isSelected ? 0.15 : hovered ? 0.08 : 0,
+        emissiveMap: faceTexture,
+      }),
+    [faceTexture, isSelected, hovered],
+  );
+  const backMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        map: backTexture,
+        roughness: 0.4,
+        metalness: 0.05,
+      }),
+    [backTexture],
+  );
+  const cardMaterials = useMemo(
+    () => [edgeMaterial, edgeMaterial, edgeMaterial, edgeMaterial, faceMaterial, backMaterial],
+    [edgeMaterial, faceMaterial, backMaterial],
+  );
+
+  // Gentle pulse + hover lift
+  useFrame((_, delta) => {
     if (groupRef.current) {
-      const targetY = hovered || isSelected ? 0.08 : 0.02;
+      const targetY = hovered || isSelected ? 0.1 : 0.02;
       groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
     }
   });
 
-  // Corners are flat panels too (matching the 2D-style edge tiles)
+  // Corners always show face (they're mythic, never "owned")
+  const cardRotation: [number, number, number] = [-Math.PI / 2, 0, pos.rotation];
+
   return (
-    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
-      {/* Base mesh — FLAT 2D-style panel like the edge tiles */}
+    <group ref={groupRef} position={[pos.x, CARD_THICKNESS / 2 + 0.01, pos.z]}>
       <mesh
-        rotation={[-Math.PI / 2, 0, pos.rotation]}
-        position={[0, 0, 0]}
+        geometry={cardGeometry}
+        material={cardMaterials}
+        castShadow
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
-      >
-        <planeGeometry args={[CORNER_W, CORNER_D]} />
-        {isShader ? (
-          <primitive object={cornerMat} attach="material" />
-        ) : (
-          <meshStandardMaterial
-            ref={matRef}
-            color={TYPE_COLORS.corner}
-            roughness={0.4}
-            metalness={0.1}
-            emissive="#f5e6c8"
-            emissiveIntensity={0.12}
-            side={THREE.DoubleSide}
-          />
-        )}
-      </mesh>
-
-      {/* Icon */}
-      <Text
-        position={[0, 0.04, -0.5]}
-        fontSize={0.6}
-        anchorX="center"
-        anchorY="middle"
-        rotation={textRotationForTile(tile.id)}
-      >
-        {CORNER_ICONS[tile.id] ?? ''}
-      </Text>
-
-      {/* Name */}
-      <Text
-        position={[0, 0.04, 0.2]}
-        fontSize={0.3}
-        color="#3d2817"
-        anchorX="center"
-        anchorY="middle"
-        rotation={textRotationForTile(tile.id)}
-        maxWidth={2.0}
-        textAlign="center"
-        outlineWidth={0.012}
-        outlineColor="#ffffff"
-      >
-        {tile.name}
-      </Text>
-
-      {/* Sub-label (Malay) */}
-      <Text
-        position={[0, 0.04, 0.62]}
-        fontSize={0.17}
-        color="#6b4226"
-        anchorX="center"
-        anchorY="middle"
-        rotation={textRotationForTile(tile.id)}
-        maxWidth={2.0}
-        textAlign="center"
-        outlineWidth={0.01}
-        outlineColor="#ffffff"
-      >
-        {SUB_LABELS[tile.id] ?? ''}
-      </Text>
+        rotation={cardRotation}
+      />
     </group>
   );
 }
@@ -329,151 +303,74 @@ function EdgeTile({ tile }: { tile: Tile }) {
 
   const textY = 0.03; // flat on the felt, text hovers just above the surface
 
-  // 3D miniatures removed for classic Monopoly look — tiles are flat,
-  // the color bar on the outer edge provides visual identity.
+  // ── Trading-card textures (generated once per tile via canvas) ──
+  const cardGeometry = useMemo(
+    () => createCardGeometry(CARD_LENGTH, CARD_WIDTH, CARD_THICKNESS),
+    [],
+  );
+  const faceTexture = useMemo(() => generateCardFaceTexture(tile), [tile]);
+  const backTexture = useMemo(() => generateCardBackTexture(), []);
+  const edgeMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: '#0a0a0a',
+        roughness: 0.3,
+        metalness: 0.1,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.2,
+      }),
+    [],
+  );
+  const faceMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        map: faceTexture,
+        roughness: 0.3,
+        metalness: 0.1,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.2,
+        emissive: isSelected || hovered ? '#ffffff' : '#000000',
+        emissiveIntensity: isSelected ? 0.12 : hovered ? 0.06 : 0,
+        emissiveMap: faceTexture,
+      }),
+    [faceTexture, isSelected, hovered],
+  );
+  const backMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        map: backTexture,
+        roughness: 0.4,
+        metalness: 0.05,
+      }),
+    [backTexture],
+  );
+  const cardMaterials = useMemo(
+    () => [edgeMaterial, edgeMaterial, edgeMaterial, edgeMaterial, faceMaterial, backMaterial],
+    [edgeMaterial, faceMaterial, backMaterial],
+  );
+
+  // Card lies flat; Z-rotation orients long edge along the board perimeter.
+  // Card back faces UP when unowned; card flips (Y-rotation) to show face when owned.
+  const cardRotation: [number, number, number] = [-Math.PI / 2, 0, pos.rotation];
+  const flipAngle = hasOwner ? Math.PI : 0;
 
   return (
-    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
-      {/* ── Tile body — FLAT 2D-style panel lying on the felt ──
-          Like a printed Monopoly tile, not an extruded box. Thin plane
-          with a slight raise on hover/select for tactile feedback. */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, pos.rotation]}
-        position={[0, 0, 0]}
-        receiveShadow
-        onClick={handleClick}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
-      >
-        <planeGeometry args={[EDGE_W, EDGE_D]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.65}
-          metalness={0.05}
-          emissive={isSelected || hovered ? color : '#000000'}
-          emissiveIntensity={isSelected ? 0.18 : hovered ? 0.1 : 0}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* ── Tile border (thin gold outline like classic Monopoly) ── */}
-      <mesh rotation={[-Math.PI / 2, 0, pos.rotation]} position={[0, 0.001, 0]}>
-        <ringGeometry args={[Math.min(EDGE_W, EDGE_D) / 2 - 0.02, Math.min(EDGE_W, EDGE_D) / 2, 4]} />
-        <meshBasicMaterial color="#d4af37" transparent opacity={0} />
-      </mesh>
-
-      {/* ── Property colour strip — flat on the outer edge (classic Monopoly) ── */}
-      {showStrip && (
+    <group ref={groupRef} position={[pos.x, CARD_THICKNESS / 2 + 0.01, pos.z]}>
+      {/* ── The trading card (thick ExtrudeGeometry, rounded-rect Shape) ── */}
+      <group rotation={[0, flipAngle, 0]}>
         <mesh
-          rotation={[-Math.PI / 2, 0, pos.rotation]}
-          position={[stripOffX, 0.005, stripOffZ]}
+          geometry={cardGeometry}
+          material={cardMaterials}
+          castShadow
           receiveShadow
-        >
-          <planeGeometry args={isAlongX ? [EDGE_W - 0.1, stripDepth] : [stripDepth, EDGE_W - 0.1]} />
-          <meshStandardMaterial
-            color={COLOR_GROUP_HEX[tile.colorGroup!]}
-            roughness={0.5}
-            metalness={0.1}
-          />
-        </mesh>
-      )}
+          onClick={handleClick}
+          onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+          onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+          rotation={cardRotation}
+        />
+      </group>
 
-      {/* ── Tile name ── */}
-      <Text
-        position={[0, textY, 0]}
-        fontSize={0.34}
-        color="#0f172a"
-        anchorX="center"
-        anchorY="middle"
-        rotation={textRotationForTile(tile.id)}
-        maxWidth={EDGE_W - 0.2}
-        textAlign="center"
-        outlineWidth={0.024}
-        outlineColor="#ffffff"
-      >
-        {tile.name}
-      </Text>
-
-      {/* ── Malay / special sub-label ── */}
-      {SUB_LABELS[tile.id] && (
-        <Text
-          position={[subOffX, textY, subOffZ]}
-          fontSize={0.2}
-          color="#334155"
-          anchorX="center"
-          anchorY="middle"
-          rotation={textRotationForTile(tile.id)}
-          maxWidth={EDGE_W - 0.25}
-          textAlign="center"
-          outlineWidth={0.016}
-          outlineColor="#ffffff"
-        >
-          {SUB_LABELS[tile.id]}
-        </Text>
-      )}
-
-      {/* ── Price label ── */}
-      {tile.price != null && (
-        <Text
-          position={[priceOffX, textY - 0.004, priceOffZ]}
-          fontSize={0.42}
-          color="#0f172a"
-          anchorX="center"
-          anchorY="middle"
-          rotation={textRotationForTile(tile.id)}
-          outlineWidth={0.024}
-          outlineColor="#fde68a"
-        >
-          {`RM${tile.price}`}
-        </Text>
-      )}
-
-      {/* ── House indicators (green boxes / red hotel) ── */}
-      {houseCount > 0 && (
-        <group
-          position={[
-            -outX * 0.05,
-            0.06,
-            -outZ * 0.05,
-          ]}
-        >
-          {Array.from({ length: Math.min(houseCount, 4) }).map((_, i) => {
-            // Distribute along the edge direction
-            const hx = isAlongX
-              ? (i - 1.5) * 0.22
-              : 0;
-            const hz = isAlongX
-              ? 0
-              : (i - 1.5) * 0.22;
-            return (
-              <mesh key={`h${i}`} position={[hx, 0.05, hz]} castShadow>
-                <boxGeometry args={[0.13, 0.11, 0.13]} />
-                <meshStandardMaterial
-                  color="#22c55e"
-                  emissive="#22c55e"
-                  emissiveIntensity={0.15}
-                />
-              </mesh>
-            );
-          })}
-
-          {/* Hotel = 5th "house" rendered as a larger red block */}
-          {houseCount >= 5 && (
-            <mesh position={[0, 0.08, 0]} castShadow>
-              <boxGeometry args={[0.22, 0.18, 0.22]} />
-              <meshStandardMaterial
-                color="#dc2626"
-                emissive="#dc2626"
-                emissiveIntensity={0.2}
-              />
-            </mesh>
-          )}
-        </group>
-      )}
-
-      {/* ── Owner flag pole (classic Monopoly ownership feedback) ──
-          A small flag on a pole at the inner corner of the tile,
-          colored with the owning coalition's color. */}
+      {/* ── Owner flag pole (rises when owned) ── */}
       {hasOwner && ownerColor && (
         <group
           position={[
@@ -482,12 +379,10 @@ function EdgeTile({ tile }: { tile: Tile }) {
             -outZ * (EDGE_D / 2 - 0.15),
           ]}
         >
-          {/* Pole */}
           <mesh position={[0, 0.18, 0]} castShadow>
             <cylinderGeometry args={[0.015, 0.015, 0.36, 8]} />
             <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.7} />
           </mesh>
-          {/* Flag (waving quad) */}
           <mesh position={[0.06, 0.28, 0]} castShadow>
             <planeGeometry args={[0.12, 0.08]} />
             <meshStandardMaterial
@@ -498,11 +393,42 @@ function EdgeTile({ tile }: { tile: Tile }) {
               side={THREE.DoubleSide}
             />
           </mesh>
-          {/* Pole top finial */}
           <mesh position={[0, 0.37, 0]}>
             <sphereGeometry args={[0.025, 12, 12]} />
             <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.15} />
           </mesh>
+        </group>
+      )}
+
+      {/* ── Cawangan (houses) — small cubes in party color ── */}
+      {houseCount > 0 && hasOwner && ownerColor && (
+        <group position={[-outX * 0.05, CARD_THICKNESS + 0.02, -outZ * 0.05]}>
+          {Array.from({ length: Math.min(houseCount, 4) }).map((_, i) => {
+            const hx = isAlongX ? (i - 1.5) * 0.22 : 0;
+            const hz = isAlongX ? 0 : (i - 1.5) * 0.22;
+            return (
+              <mesh key={`h${i}`} position={[hx, 0.05, hz]} castShadow>
+                <boxGeometry args={[0.13, 0.11, 0.13]} />
+                <meshStandardMaterial
+                  color={ownerColor}
+                  emissive={ownerColor}
+                  emissiveIntensity={0.2}
+                />
+              </mesh>
+            );
+          })}
+          {/* Markas (hotel) = 5th level */}
+          {houseCount >= 5 && (
+            <mesh position={[0, 0.08, 0]} castShadow>
+              <cylinderGeometry args={[0.08, 0.09, 0.16, 8]} />
+              <meshStandardMaterial
+                color={ownerColor}
+                metalness={0.4}
+                emissive={ownerColor}
+                emissiveIntensity={0.25}
+              />
+            </mesh>
+          )}
         </group>
       )}
     </group>
@@ -871,6 +797,65 @@ function LandingEffects() {
 }
 
 // ───────────────────────────────────────────────────────────────────
+// CARD DECK — stack of cards in the center (Kad Nasib / Kad SPR)
+// ───────────────────────────────────────────────────────────────────
+
+function CardDeck({ position, color, label }: { position: [number, number, number]; color: string; label: string }) {
+  const deckRef = useRef<THREE.Group>(null!);
+  const labelRef = useRef<THREE.Mesh>(null!);
+
+  // Subtle hover/breathe
+  useFrame(({ clock }) => {
+    if (deckRef.current) {
+      deckRef.current.position.y = position[1] + Math.sin(clock.elapsedTime * 1.2) * 0.02;
+    }
+  });
+
+  return (
+    <group ref={deckRef} position={position}>
+      {/* Stack of 8 cards */}
+      {Array.from({ length: 8 }).map((_, i) => (
+        <mesh
+          key={i}
+          position={[0, i * 0.008, 0]}
+          rotation={[-Math.PI / 2, 0, (Math.random() - 0.5) * 0.08]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.9, 0.01, 1.4]} />
+          <meshPhysicalMaterial
+            color={color}
+            roughness={0.35}
+            metalness={0.2}
+            clearcoat={0.5}
+            emissive={color}
+            emissiveIntensity={i === 7 ? 0.15 : 0.05}
+          />
+        </mesh>
+      ))}
+      {/* Gold rim on top card */}
+      <mesh position={[0, 8 * 0.008 + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.62, 0.015, 8, 32]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.15} emissive="#f59e0b" emissiveIntensity={0.15} />
+      </mesh>
+      {/* Label */}
+      <Text
+        position={[0, 0.12, 0.85]}
+        fontSize={0.18}
+        color="#fbbf24"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        outlineWidth={0.01}
+        outlineColor="#1e293b"
+      >
+        {label}
+      </Text>
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ───────────────────────────────────────────────────────────────────
 
@@ -892,10 +877,16 @@ export default function Board3D() {
       {/* ── Board base (felt + wood frame) ── */}
       <BoardBase />
 
-      {/* ── 3D Parliament building replaces the empty center ── */}
+      {/* ── 3D Parliament building (shrunken to 25% — decorative token) ── */}
       <Suspense fallback={null}>
         <Parliament3D />
       </Suspense>
+
+      {/* ── Kad Nasib (Chance) deck — orange, 10 o'clock ── */}
+      <CardDeck position={[-3.5, 0.02, 3.5]} color="#c2410c" label="KAD NASIB" />
+
+      {/* ── Kad SPR (Community Chest) deck — blue, 2 o'clock ── */}
+      <CardDeck position={[3.5, 0.02, 3.5]} color="#1e40af" label="KAD SPR" />
 
       {/* ── Jalur Gemilang flags at two corners of the inner area ── */}
       <Suspense fallback={null}>
