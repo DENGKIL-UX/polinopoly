@@ -314,3 +314,51 @@ Stage Summary:
 - GitHub main now has the full 3D Polinopoly game (default branch).
 - Both development lineages unified under one merge commit.
 - 3d-edition branch is fully merged into main (can be deleted as cleanup if desired).
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Make the board look like classic Monopoly while keeping Malaysian political theme
+
+Work Log:
+- Analyzed uploaded screenshots with VLM: board looked like a generic 3D game, not Monopoly. Missing: white inner border, red outer trim, classic center diamond logo, classic color bars.
+- Researched classic Monopoly design elements: 8 property color groups (brown/lightblue/pink/orange/red/yellow/green/darkblue), white inner border separating tiles from center, red trim on the frame, rotated-square diamond logo medallion in center.
+
+Changes implemented:
+
+1. CLASSIC MONOPOLY COLORS (game-data.ts):
+   - Updated COLOR_GROUP_HEX to classic Monopoly hex values:
+     brown #955252, lightblue #aae0fa, pink #d93a96, orange #f79420,
+     red #ed1b24, yellow #fef200, green #1fb25a, darkblue #0072bb.
+
+2. WHITE INNER BORDER (Board3D.tsx BoardBase):
+   - Added 4 white planes (0.5 wide) along the inner edge of the tile loop,
+     raised to y=0.15 so visible above the felt. The iconic white trim
+     separating tiles from the center.
+
+3. RED OUTER TRIM (Board3D.tsx BoardBase):
+   - Added 4 red (#c8102e) planes on the inner edge of the wood frame,
+     the signature red border that frames the playing surface.
+
+4. DIAMOND LOGO MEDALLION (Parliament3D.tsx):
+   - Added a 7.5-unit red rotated-square (45°) on the ground around the
+     Parliament, with a 7.0-unit white inner diamond — the classic
+     Monopoly center medallion.
+   - "PILIHAN RAYA" + "EDITION" text on all 4 sides (top/bottom/sides,
+     rotated for readability from each angle).
+   - "DEWAN" and "RAKYAT" text on the left/right sides.
+
+5. 2D BOARD (GameBoard.tsx):
+   - Added red outer trim ring via inset boxShadow.
+   - Added classic diamond logo medallion (rotated red+white squares)
+     behind the "DEWAN RAKYAT" title in the center.
+
+Verification (Agent Browser + VLM):
+- 3D board: VLM confirms white inner border ✓, red trim ✓, diamond logo ✓. Rating 4/10 → 6/10.
+- 2D board: VLM confirms red border ✓, diamond logo ✓, classic color bars ✓. Rating 8/10.
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Board now has the iconic Monopoly visual cues: white inner border, red trim, diamond center logo, classic 8-color property groups.
+- Malaysian political theme preserved (coalition names, Parliament building, Jalur Gemilang).
+- 2D rated 8/10 Monopoly-like; 3D improved from 4/10 to 6/10.

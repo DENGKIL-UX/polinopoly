@@ -386,6 +386,11 @@ export default function GameBoard() {
           <div className="absolute inset-0 rounded-xl border-2 border-amber-600/40" />
         </div>
 
+        {/* ── CLASSIC MONOPOLY: Red outer trim ring ── */}
+        <div className="absolute inset-0 rounded-xl pointer-events-none" style={{
+          boxShadow: 'inset 0 0 0 4px #c8102e, inset 0 0 0 5px rgba(0,0,0,0.4)',
+        }} />
+
         {/* ===== CSS Grid Board Layout ===== */}
         {/* 11×11 grid: corners 1.6fr, edges 1fr each.
             CRITICAL: use minmax(0, 1fr) not 1fr — otherwise tile content
@@ -441,9 +446,36 @@ export default function GameBoard() {
             </div>
 
             <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
-              className="w-full h-full flex flex-col items-center justify-center p-2">
-              {/* Title with glow */}
-              <div className="relative">
+              className="w-full h-full flex flex-col items-center justify-center p-2 relative">
+
+              {/* ── CLASSIC MONOPOLY: Diamond logo medallion ──
+                  The iconic rotated red square with white inner + bold title. */}
+              <div
+                className="absolute"
+                style={{
+                  width: '52%',
+                  aspectRatio: '1',
+                  transform: 'rotate(45deg)',
+                  background: 'linear-gradient(135deg, #c8102e 0%, #a00d24 100%)',
+                  boxShadow: '0 0 30px rgba(200,16,46,0.4), inset 0 0 20px rgba(0,0,0,0.3)',
+                  borderRadius: '4px',
+                  opacity: 0.92,
+                }}
+              />
+              <div
+                className="absolute"
+                style={{
+                  width: '48%',
+                  aspectRatio: '1',
+                  transform: 'rotate(45deg)',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%)',
+                  borderRadius: '3px',
+                  opacity: 0.95,
+                }}
+              />
+
+              {/* Title with glow (sits on top of the diamond) */}
+              <div className="relative z-10">
                 <div className="absolute inset-0 blur-md bg-amber-400/20" />
                 <div className="relative text-xl md:text-3xl font-black tracking-tighter">
                   <span className="bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-200 bg-clip-text text-transparent drop-shadow-lg"
@@ -452,7 +484,7 @@ export default function GameBoard() {
                   </span>
                 </div>
               </div>
-              <div className="text-[7px] md:text-[9px] text-amber-300/40 tracking-[0.3em] uppercase mt-0.5 font-light">
+              <div className="relative z-10 text-[7px] md:text-[9px] text-amber-300/40 tracking-[0.3em] uppercase mt-0.5 font-light">
                 Pilihan Raya Edition
               </div>
 

@@ -162,6 +162,100 @@ export function Parliament3D() {
           emissiveIntensity={0.15}
         />
       </mesh>
+
+      {/* ── CLASSIC MONOPOLY: Diamond logo medallion on the ground ──
+          The iconic rotated-square red banner with bold text, positioned
+          AROUND the Parliament base so it's visible from above. Larger
+          than the building footprint. */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
+        <planeGeometry args={[7.5, 7.5]} />
+        <meshStandardMaterial
+          color="#c8102e"
+          roughness={0.35}
+          metalness={0.2}
+          emissive="#c8102e"
+          emissiveIntensity={0.1}
+        />
+      </mesh>
+      {/* White inner diamond */}
+      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
+        <planeGeometry args={[7.0, 7.0]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} metalness={0.05} />
+      </mesh>
+      {/* "MONOPOLY"-style bold title text — positioned on the white diamond,
+          visible between the Parliament base and the tile loop. */}
+      <Text
+        position={[0, 0.03, 4.4]}
+        fontSize={0.5}
+        color="#c8102e"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        outlineWidth={0.02}
+        outlineColor="#1e293b"
+      >
+        PILIHAN RAYA
+      </Text>
+      <Text
+        position={[0, 0.03, 3.8]}
+        fontSize={0.28}
+        color="#1e293b"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        letterSpacing={0.15}
+      >
+        EDITION
+      </Text>
+      {/* Bottom text (rotated 180° so readable from the other side) */}
+      <Text
+        position={[0, 0.03, -4.0]}
+        fontSize={0.5}
+        color="#c8102e"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, Math.PI]}
+        outlineWidth={0.02}
+        outlineColor="#1e293b"
+      >
+        PILIHAN RAYA
+      </Text>
+      <Text
+        position={[0, 0.03, -3.4]}
+        fontSize={0.28}
+        color="#1e293b"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, Math.PI]}
+        letterSpacing={0.15}
+      >
+        EDITION
+      </Text>
+      {/* Side text */}
+      <Text
+        position={[4.0, 0.03, 0]}
+        fontSize={0.5}
+        color="#c8102e"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, Math.PI / 2, 0]}
+        outlineWidth={0.02}
+        outlineColor="#1e293b"
+      >
+        DEWAN
+      </Text>
+      <Text
+        position={[-4.0, 0.03, 0]}
+        fontSize={0.5}
+        color="#c8102e"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, -Math.PI / 2, 0]}
+        outlineWidth={0.02}
+        outlineColor="#1e293b"
+      >
+        RAKYAT
+      </Text>
     </group>
   );
 }

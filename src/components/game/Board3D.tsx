@@ -529,6 +529,26 @@ function BoardBase() {
         <meshStandardMaterial color={FELT_INNER} roughness={0.95} />
       </mesh>
 
+      {/* ── CLASSIC MONOPOLY: White inner border trim ──
+          The iconic white border separating the tile loop from the center.
+          Raised slightly so it's visible above the felt. */}
+      <mesh position={[0, 0.15, HALF]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[BOARD_SIZE, 0.5]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.4} metalness={0.1} emissive="#ffffff" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[0, 0.15, -HALF]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[BOARD_SIZE, 0.5]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.4} metalness={0.1} emissive="#ffffff" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[HALF, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.5, BOARD_SIZE]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.4} metalness={0.1} emissive="#ffffff" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[-HALF, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.5, BOARD_SIZE]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.4} metalness={0.1} emissive="#ffffff" emissiveIntensity={0.05} />
+      </mesh>
+
       {/* ── Wood frame — four bars ── */}
       {/* Bottom */}
       <mesh position={[0, 0, frameEdge]} castShadow receiveShadow>
@@ -549,6 +569,25 @@ function BoardBase() {
       <mesh position={[-frameEdge, 0, 0]} castShadow receiveShadow>
         <boxGeometry args={[FRAME_W, FRAME_H, outer]} />
         <meshStandardMaterial color={WOOD_COLOR} roughness={0.7} metalness={0.1} />
+      </mesh>
+
+      {/* ── CLASSIC MONOPOLY: Red trim on the inner edge of the wood frame ──
+          The signature red border that frames the playing surface. */}
+      <mesh position={[0, 0.02, frameEdge - FRAME_W / 2 + 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[outer, 0.25]} />
+        <meshStandardMaterial color="#c8102e" roughness={0.4} metalness={0.2} emissive="#c8102e" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[0, 0.02, -frameEdge + FRAME_W / 2 - 0.05]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[outer, 0.25]} />
+        <meshStandardMaterial color="#c8102e" roughness={0.4} metalness={0.2} emissive="#c8102e" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[frameEdge - FRAME_W / 2 + 0.05, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.25, outer]} />
+        <meshStandardMaterial color="#c8102e" roughness={0.4} metalness={0.2} emissive="#c8102e" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[-frameEdge + FRAME_W / 2 - 0.05, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.25, outer]} />
+        <meshStandardMaterial color="#c8102e" roughness={0.4} metalness={0.2} emissive="#c8102e" emissiveIntensity={0.05} />
       </mesh>
 
       {/* ── Corner accents (lighter wood) ── */}
