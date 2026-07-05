@@ -215,7 +215,7 @@ function CornerTile({ tile }: { tile: Tile }) {
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CORNER_W, CARD_THICKNESS, CORNER_D]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.05} depthWrite={false} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.0} depthWrite={false} visible={false} />
       </mesh>
       {/* Card face texture (semi-transparent so board image shows through) */}
       <mesh
@@ -373,7 +373,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CARD_LENGTH, CARD_THICKNESS, CARD_WIDTH]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.05} depthWrite={false} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.0} depthWrite={false} visible={false} />
       </mesh>
       {/* ── Card face texture (semi-transparent so board image shows through) ── */}
       <mesh
@@ -463,11 +463,14 @@ function BoardBase() {
     (tex as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
   });
 
+  // The uploaded image's tile loop occupies ~88% of the image.
+  // Scale the image plane so its tile loop matches the 3D tile loop (BOARD_SIZE).
+  // imagePlaneSize = BOARD_SIZE / 0.88 ≈ 22.7
+  const imagePlaneSize = BOARD_SIZE / 0.88;
+
   return (
     <group>
-      {/* ── Board surface with uploaded Malaysian political Monopoly image ──
-          The image fills the entire felt area (tile loop + margin).
-          The box sides + bottom keep the dark felt color. */}
+      {/* ── Felt base (dark green, sides + bottom) ── */}
       <mesh position={[0, -0.1, 0]} receiveShadow>
         <boxGeometry args={[feltSize, 0.2, feltSize]} />
         <meshStandardMaterial
@@ -476,9 +479,9 @@ function BoardBase() {
           metalness={0}
         />
       </mesh>
-      {/* Board image on top of the felt — shows the full Malaysian political board art */}
+      {/* Board image — scaled so its 40 tile boxes align with the 3D tile positions */}
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[feltSize, feltSize]} />
+        <planeGeometry args={[imagePlaneSize, imagePlaneSize]} />
         <meshBasicMaterial map={boardTexture} toneMapped={false} />
       </mesh>
 

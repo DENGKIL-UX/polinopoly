@@ -794,3 +794,42 @@ Verification (Agent Browser + VLM):
 Stage Summary:
 - Shadow outlines removed from all 40 transparent tiles.
 - Board artwork now shows through cleanly with no shadow artifacts.
+
+---
+Task ID: 22
+Agent: Main Agent
+Task: Remove all remaining tile outlines + align tiles with board image boxes
+
+Work Log:
+- User reported still seeing outlines of the 40 tiles. Root cause: the canvas card texture still drew colored backgrounds (frame border, art panel gradient, type bar, text boxes) that created visible outlines/backgrounds on each tile.
+
+Changes:
+
+1. CardTexture.ts — removed ALL background fills:
+   - Removed frame border (strokeRect in color-group color) — was the main outline.
+   - Removed art panel gradient fill (groupHex+'30' → groupHex+'10') — was a visible colored rectangle.
+   - Removed type bar background fill (TYPE_COLORS fillRect) — was a colored bar.
+   - Set all text box backgrounds to rgba(20,20,35,0.0) — fully transparent.
+   - Removed gold border from card back texture (strokeRect #D4AF37).
+   - Canvas now draws ONLY: text (names, prices, rent), rarity gem, party badge — no backgrounds.
+
+2. Board3D.tsx — card box base completely invisible:
+   - Changed opacity from 0.05 → 0.0 + visible={false} (both CornerTile + EdgeTile).
+   - Card box no longer renders at all — only the face texture plane (transparent canvas with text).
+
+3. Board image alignment:
+   - Scaled the board image plane to imagePlaneSize = BOARD_SIZE / 0.88 ≈ 22.7 (was feltSize = 26.4).
+   - The uploaded image's tile loop occupies ~88% of the image; scaling the plane so its tile loop matches the 3D tile loop (BOARD_SIZE = 20).
+   - VLM: "3D tile text positions align precisely with the board's 40 boxes."
+
+Verification (Agent Browser + VLM):
+- VLM: "board artwork clearly visible — central logo, buildings, thematic details" ✓
+- VLM: "text on tiles is legible — property names, prices, icons" ✓
+- VLM: "3D tile text positions align precisely with the board's 40 boxes" ✓
+- The "outlines" now visible are the board IMAGE's own drawn tiles (desired), not 3D mesh outlines.
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- All 3D tile outlines/backgrounds removed — cards are now just transparent text overlays.
+- Board image's own 40 boxes provide the visual tile structure.
+- 3D tile text aligned with the board image's boxes.
