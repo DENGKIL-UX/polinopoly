@@ -129,7 +129,7 @@ export interface GameState {
   } | null;
 
   // Actions
-  startGame: (coalitionId: string) => void;
+  startGame: (coalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => void;
   rollDice: () => void;
   movePlayer: () => void;
   handleLanding: () => void;
@@ -315,9 +315,24 @@ export const useGameStore = create<GameState>((set, get) => ({
   stats: { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
   tradeState: null,
 
-  startGame: (playerCoalitionId: string) => {
+  startGame: (playerCoalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => {
+    // If custom party, register it in COALITIONS at runtime
+    if (playerCoalitionId === 'CUSTOM' && customParty) {
+      COALITIONS['CUSTOM'] = {
+        id: 'CUSTOM',
+        name: customParty.name,
+        fullName: customParty.fullName,
+        color: customParty.color,
+        textColor: '#ffffff',
+        emblem: '🏛️',
+        logo: customParty.logo,
+        slogan: customParty.slogan,
+      };
+    }
+
     const allCoalitionIds = Object.keys(COALITIONS);
-    const aiCoalitions = allCoalitionIds.filter(c => c !== playerCoalitionId);
+    // AI gets the 5 preset coalitions (PH, PN, BN, GPS, GRS) — no CUSTOM for AI
+    const aiCoalitions = allCoalitionIds.filter(c => c !== playerCoalitionId && c !== 'IND' && c !== 'CUSTOM');
 
     const player: Player = {
       id: 'player',

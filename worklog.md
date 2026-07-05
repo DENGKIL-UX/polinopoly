@@ -925,3 +925,31 @@ Stage Summary:
 - 1000 Malaysian political satire narrations created, categorized by game event.
 - Pop-up appears during AI turns as a soap opera dialog with the AI player's coalition identity.
 - Narrations reference real Malaysian political events (Sheraton Move, 1MDB, GE15, party hopping, etc.).
+
+---
+Task ID: 24
+Agent: Main Agent
+Task: Replace IND with "Create Your Own Party" (name, slogan, color, logo upload)
+
+Work Log:
+- Removed IND (Independent) from the coalition selection grid.
+- Added a "CREATE PARTY" card with dashed border + Plus icon.
+- When selected, shows a form with:
+  * Party Name (short, e.g. "PRIBUMI") — auto-uppercase, max 12 chars
+  * Full Party Name (e.g. "Parti Pribumi Bersatu") — max 50 chars
+  * Slogan / Battle Cry — max 60 chars
+  * Party Color — 10 preset color swatches + custom color picker
+  * Party Logo upload — file input (PNG/JPEG/SVG, max 2MB) → base64 data URL
+  * Live preview badge with chosen color/name/slogan/logo
+- Start button changes to "Mulakan Parti Baru!" and is disabled until name + slogan are filled.
+- game-store.ts startGame: accepts optional customParty param; registers it as COALITIONS['CUSTOM'] at runtime; AI players get the 5 preset coalitions (PH/PN/BN/GPS/GRS).
+
+Verification (Agent Browser + VLM):
+- VLM: "CREATE PARTY card visible in grid, IND gone, 5 coalitions still present" ✓
+- VLM: "form with party name, full name, slogan, color picker (10 swatches), Upload Logo button" ✓
+- VLM: "Mulakan Parti Baru! button present" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- IND replaced with "Create Your Own Party" — players design their own political party.
+- Custom name, slogan, color, and uploaded logo all work as the player's coalition identity in-game.
