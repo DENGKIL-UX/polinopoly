@@ -1,0 +1,1904 @@
+     1→import { create } from 'zustand';
+     2→import {
+     3→  BOARD_TILES,
+     4→  COALITIONS,
+     5→  JAWATAN_MENTERI_CARDS,
+     6→  KRISIS_NASIONAL_CARDS,
+     7→  DEFAULT_MARKET_STATE,
+     8→  getRandomQuote,
+     9→  type Tile,
+    10→  type Coalition,
+    11→  type GameCard,
+    12→  type MarketState,
+    13→  type ColorGroup,
+    14→} from './game-data';
+    15→
+    16→// --- Types ---
+    17→export interface Player {
+    18→  id: string;
+    19→  coalitionId: string;
+    20→  name: string;
+    21→  position: number;
+    22→  money: number;
+    23→  isAI: boolean;
+    24→  isInJail: boolean;
+    25→  jailTurns: number;
+    26→  hasGetOutOfJailFree: boolean;
+    27→  properties: number[]; // tile IDs owned
+    28→  isBankrupt: boolean;
+    29→  quote?: string;
+    30→  avatarEmoji: string;
+    31→}
+    32→
+    33→export type GamePhase = 'lobby' | 'playing' | 'rolling' | 'moving' | 'landed' | 'buying' | 'paying_rent' | 'card' | 'jail_decision' | 'auction' | 'managing' | 'game_over';
+    34→
+    35→export interface AuctionState {
+    36→  tileId: number;
+    37→  highestBid: number;
+    38→  highestBidder: string | null;
+    39→  currentBidderIndex: number;
+    40→  bidderOrder: string[];
+    41→  isActive: boolean;
+    42→}
+    43→
+    44→export interface GameLogEntry {
+    45→  id: string;
+    46→  turn: number;
+    47→  playerId: string;
+    48→  playerName: string;
+    49→  message: string;
+    50→  type: 'move' | 'buy' | 'rent' | 'card' | 'jail' | 'bankrupt' | 'ai_quote' | 'system' | 'tax' | 'pass_go' | 'auction';
+    51→}
+    52→
+    53→export interface Achievement {
+    54→  id: string;
+    55→  name: string;
+    56→  description: string;
+    57→  emoji: string;
+    58→  unlockedAt: number | null;
+    59→}
+    60→
+    61→export interface GameStats {
+    62→  timesJailed: number;
+    63→  auctionsWon: number;
+    64→  highestRentPaid: number;
+    65→}
+    66→
+    67→export interface GameState {
+    68→  // Game setup
+    69→  phase: GamePhase;
+    70→  players: Player[];
+    71→  tiles: Tile[];
+    72→  turnOrder: string[];
+    73→  currentTurnIndex: number;
+    74→  turnCount: number;
+    75→  diceValues: [number, number] | null;
+    76→  isDoubles: boolean;
+    77→  consecutiveDoubles: number;
+    78→
+    79→  // Cards
+    80→  jawatanMenteriDeck: GameCard[];
+    81→  krisisNasionalDeck: GameCard[];
+    82→
+    83→  // Market
+    84→  marketState: MarketState;
+    85→
+    86→  // UI State
+    87→  selectedTileId: number | null;
+    88→  currentCard: GameCard | null;
+    89→  currentRentPayment: { from: string; to: string; amount: number } | null;
+    90→  gameLog: GameLogEntry[];
+    91→  winner: string | null;
+    92→  aiThinking: boolean;
+    93→  showPortfolio: boolean;
+    94→
+    95→  // Auction
+    96→  auctionState: AuctionState | null;
+    97→
+    98→  // Mortgage
+    99→  mortgagedTiles: number[];
+   100→
+   101→  // AI Speed (1=normal, 2=fast, 3=fastest)
+   102→  aiSpeed: number;
+   103→
+   104→  // Achievements
+   105→  achievements: Achievement[];
+   106→  stats: GameStats;
+   107→
+   108→  // Trade
+   109→  tradeState: {
+   110→    initiator: string | null;
+   111→    responder: string | null;
+   112→    offeredProperties: number[];
+   113→    offeredCash: number;
+   114→    requestedProperties: number[];
+   115→    requestedCash: number;
+   116→    isActive: boolean;
+   117→  } | null;
+   118→
+   119→  // Actions
+   120→  startGame: (coalitionId: string) => void;
+   121→  rollDice: () => void;
+   122→  movePlayer: () => void;
+   123→  handleLanding: () => void;
+   124→  buyProperty: () => void;
+   125→  skipBuy: () => void;
+   126→  payRent: () => void;
+   127→  drawCard: (type: 'chest' | 'chance') => GameCard;
+   128→  applyCard: (card: GameCard) => void;
+   129→  endTurn: () => void;
+   130→  handleJailDecision: (pay: boolean) => void;
+   131→  selectTile: (tileId: number | null) => void;
+   132→  addLog: (entry: Omit<GameLogEntry, 'id' | 'turn'>) => void;
+   133→  setAIThinking: (thinking: boolean) => void;
+   134→  aiTurn: () => Promise<void>;
+   135→  getMarketState: () => MarketState;
+   136→  buildHouse: (tileId: number) => void;
+   137→  sellProperty: (tileId: number) => void;
+   138→  togglePortfolio: () => void;
+   139→  startAuction: (tileId: number) => void;
+   140→  placeBid: (playerId: string, amount: number) => void;
+   141→  passBid: (playerId: string) => void;
+   142→  resolveAuction: () => void;
+   143→  aiAuctionTurn: () => void;
+   144→  mortgageProperty: (tileId: number) => void;
+   145→  unmortgageProperty: (tileId: number) => void;
+   146→  setAISpeed: (speed: number) => void;
+   147→  unlockAchievement: (id: string) => void;
+   148→  saveGame: () => void;
+   149→  loadGame: () => boolean;
+   150→  hasSavedGame: () => boolean;
+   151→  enterManaging: () => void;
+   152→  exitManaging: () => void;
+   153→  simulateMarket: () => void;
+   154→  initiateTrade: (targetPlayerId: string) => void;
+   155→  updateTradeOffer: (offeredProperties: number[], offeredCash: number, requestedProperties: number[], requestedCash: number) => void;
+   156→  acceptTrade: () => void;
+   157→  rejectTrade: () => void;
+   158→  aiTradeResponse: () => void;
+   159→}
+   160→
+   161→function shuffleDeck<T>(deck: T[]): T[] {
+   162→  const shuffled = [...deck];
+   163→  for (let i = shuffled.length - 1; i > 0; i--) {
+   164→    const j = Math.floor(Math.random() * (i + 1));
+   165→    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+   166→  }
+   167→  return shuffled;
+   168→}
+   169→
+   170→function calculateRent(tile: Tile, owner: Player, marketState: MarketState, mortgagedTiles: number[]): number {
+   171→  if (!tile.rent || tile.rent.length === 0) return 0;
+   172→
+   173→  // Mortgaged properties produce no rent
+   174→  if (mortgagedTiles.includes(tile.id)) return 0;
+   175→
+   176→  // Highway: count owned highways
+   177→  if (tile.type === 'highway') {
+   178→    const highwayTiles = BOARD_TILES.filter(t => t.type === 'highway');
+   179→    const ownedCount = highwayTiles.filter(t => owner.properties.includes(t.id)).length;
+   180→    const baseRent = tile.rent[Math.min(ownedCount - 1, tile.rent.length - 1)] || tile.rent[0];
+   181→    return Math.round(baseRent * marketState.inflationMultiplier);
+   182→  }
+   183→
+   184→  // Media: count owned media
+   185→  if (tile.type === 'media') {
+   186→    const mediaTiles = BOARD_TILES.filter(t => t.type === 'media');
+   187→    const ownedCount = mediaTiles.filter(t => owner.properties.includes(t.id)).length;
+   188→    const baseRent = tile.rent[Math.min(ownedCount - 1, tile.rent.length - 1)] || tile.rent[0];
+   189→    return Math.round(baseRent * marketState.inflationMultiplier);
+   190→  }
+   191→
+   192→  // Regular property
+   193→  const houses = tile.houses || 0;
+   194→  const baseRent = tile.rent[Math.min(houses, tile.rent.length - 1)] || tile.rent[0];
+   195→  
+   196→  // Check if owner has full color group
+   197→  if (tile.colorGroup) {
+   198→    const colorGroupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+   199→    const ownsAll = colorGroupTiles.every(t => owner.properties.includes(t.id));
+   200→    if (ownsAll) {
+   201→      return Math.round(baseRent * 2 * marketState.inflationMultiplier);
+   202→    }
+   203→  }
+   204→
+   205→  // Federal power bonus
+   206→  if (tile.colorGroup === 'darkblue') {
+   207→    return Math.round(baseRent * marketState.federalRentBonus * marketState.inflationMultiplier);
+   208→  }
+   209→
+   210→  return Math.round(baseRent * marketState.inflationMultiplier);
+   211→}
+   212→
+   213→const INITIAL_ACHIEVEMENTS: Achievement[] = [
+   214→  { id: 'first_property', name: 'First Seat Won', description: 'Buy your first property', emoji: '🏛️', unlockedAt: null },
+   215→  { id: 'landlord', name: 'Full Color Set', description: 'Own all properties in a color group', emoji: '🌈', unlockedAt: null },
+   216→  { id: 'hotel_mogul', name: 'Hotel Mogul', description: 'Build a hotel on any property', emoji: '🏨', unlockedAt: null },
+   217→  { id: 'banker', name: 'Money Bags', description: 'Accumulate RM3000+', emoji: '💰', unlockedAt: null },
+   218→  { id: 'jailbird', name: 'Jailbird', description: 'Go to jail 3 times', emoji: '⛓️', unlockedAt: null },
+   219→  { id: 'auction_king', name: 'Auction King', description: 'Win 3 auctions', emoji: '🔨', unlockedAt: null },
+   220→  { id: 'survivor', name: 'Survivor', description: 'Still in game after 10 rounds', emoji: '🏆', unlockedAt: null },
+   221→  { id: 'monopolist', name: 'Monopolist', description: 'Own 10+ properties', emoji: '👑', unlockedAt: null },
+   222→  { id: 'high_roller', name: 'High Roller', description: 'Pay over RM500 in a single rent payment', emoji: '🎰', unlockedAt: null },
+   223→];
+   224→
+   225→const AI_COALITION_EMOJIS: Record<string, string> = {
+   226→  PH: '🏛️', PN: '🕌', BN: '⭐', GPS: '🦅', GRS: '🏝️', IND: '👤',
+   227→};
+   228→
+   229→export const useGameStore = create<GameState>((set, get) => ({
+   230→  phase: 'lobby',
+   231→  players: [],
+   232→  tiles: BOARD_TILES.map(t => ({ ...t })),
+   233→  turnOrder: [],
+   234→  currentTurnIndex: 0,
+   235→  turnCount: 0,
+   236→  diceValues: null,
+   237→  isDoubles: false,
+   238→  consecutiveDoubles: 0,
+   239→  jawatanMenteriDeck: shuffleDeck(JAWATAN_MENTERI_CARDS),
+   240→  krisisNasionalDeck: shuffleDeck(KRISIS_NASIONAL_CARDS),
+   241→  marketState: DEFAULT_MARKET_STATE,
+   242→  selectedTileId: null,
+   243→  currentCard: null,
+   244→  currentRentPayment: null,
+   245→  gameLog: [],
+   246→  winner: null,
+   247→  aiThinking: false,
+   248→  showPortfolio: false,
+   249→  auctionState: null,
+   250→  mortgagedTiles: [],
+   251→  aiSpeed: 1,
+   252→  achievements: INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
+   253→  stats: { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
+   254→  tradeState: null,
+   255→
+   256→  startGame: (playerCoalitionId: string) => {
+   257→    const allCoalitionIds = Object.keys(COALITIONS);
+   258→    const aiCoalitions = allCoalitionIds.filter(c => c !== playerCoalitionId);
+   259→
+   260→    const player: Player = {
+   261→      id: 'player',
+   262→      coalitionId: playerCoalitionId,
+   263→      name: COALITIONS[playerCoalitionId].name,
+   264→      position: 0,
+   265→      money: 1500,
+   266→      isAI: false,
+   267→      isInJail: false,
+   268→      jailTurns: 0,
+   269→      hasGetOutOfJailFree: false,
+   270→      properties: [],
+   271→      isBankrupt: false,
+   272→      avatarEmoji: '🎮',
+   273→    };
+   274→
+   275→    const aiPlayers: Player[] = aiCoalitions.map((cId, i) => ({
+   276→      id: `ai_${cId}`,
+   277→      coalitionId: cId,
+   278→      name: COALITIONS[cId].name,
+   279→      position: 0,
+   280→      money: 1500,
+   281→      isAI: true,
+   282→      isInJail: false,
+   283→      jailTurns: 0,
+   284→      hasGetOutOfJailFree: false,
+   285→      properties: [],
+   286→      isBankrupt: false,
+   287→      avatarEmoji: AI_COALITION_EMOJIS[cId] || '🤖',
+   288→    }));
+   289→
+   290→    const allPlayers = [player, ...aiPlayers];
+   291→    const turnOrder = allPlayers.map(p => p.id);
+   292→
+   293→    set({
+   294→      phase: 'playing',
+   295→      players: allPlayers,
+   296→      turnOrder,
+   297→      currentTurnIndex: 0,
+   298→      turnCount: 1,
+   299→      gameLog: [{
+   300→        id: crypto.randomUUID(),
+   301→        turn: 1,
+   302→        playerId: 'system',
+   303→        playerName: 'System',
+   304→        message: '🗳️ Pilihan Raya dimulakan! The game has begun!',
+   305→        type: 'system',
+   306→      }],
+   307→    });
+   308→  },
+   309→
+   310→  rollDice: () => {
+   311→    const d1 = Math.floor(Math.random() * 6) + 1;
+   312→    const d2 = Math.floor(Math.random() * 6) + 1;
+   313→    const doubles = d1 === d2;
+   314→    const state = get();
+   315→    const newConsecutive = doubles ? state.consecutiveDoubles + 1 : 0;
+   316→
+   317→    set({
+   318→      diceValues: [d1, d2],
+   319→      isDoubles: doubles,
+   320→      consecutiveDoubles: newConsecutive,
+   321→      phase: 'rolling',
+   322→    });
+   323→
+   324→    // Check for 3 consecutive doubles = go to jail
+   325→    if (newConsecutive >= 3) {
+   326→      const cp = state.players.find(p => p.id === state.turnOrder[state.currentTurnIndex]);
+   327→      if (cp) {
+   328→        set(state => ({
+   329→          players: state.players.map(p =>
+   330→            p.id === cp.id ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   331→          ),
+   332→          phase: 'jail_decision',
+   333→        }));
+   334→        get().addLog({
+   335→          playerId: cp.id,
+   336→          playerName: cp.name,
+   337→          message: `🎲 Tiga kali doubles! ${cp.name} dihantar ke Tahanan SPR! (3 consecutive doubles = jail)`,
+   338→          type: 'jail',
+   339→        });
+   340→      }
+   341→      return;
+   342→    }
+   343→
+   344→    // Auto-move after short delay is handled by the UI
+   345→    setTimeout(() => get().movePlayer(), 800);
+   346→  },
+   347→
+   348→  movePlayer: () => {
+   349→    const state = get();
+   350→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   351→    const player = state.players.find(p => p.id === currentPlayerId);
+   352→    if (!player || !state.diceValues) return;
+   353→
+   354→    const total = state.diceValues[0] + state.diceValues[1];
+   355→    let newPosition = player.position + total;
+   356→
+   357→    // Pass GO
+   358→    if (newPosition >= 40) {
+   359→      newPosition = newPosition % 40;
+   360→      set(state => ({
+   361→        players: state.players.map(p =>
+   362→          p.id === currentPlayerId ? { ...p, money: p.money + 200 } : p
+   363→        ),
+   364→      }));
+   365→      get().addLog({
+   366→        playerId: currentPlayerId,
+   367→        playerName: player.name,
+   368→        message: `💰 Lalu Pilihan Raya! Collected RM200 campaign funds from KWSP Bank!`,
+   369→        type: 'pass_go',
+   370→      });
+   371→    }
+   372→
+   373→    set(state => ({
+   374→      players: state.players.map(p =>
+   375→        p.id === currentPlayerId ? { ...p, position: newPosition } : p
+   376→      ),
+   377→      phase: 'moving',
+   378→    }));
+   379→
+   380→    // After movement animation, handle landing
+   381→    setTimeout(() => get().handleLanding(), 1500);
+   382→  },
+   383→
+   384→  handleLanding: () => {
+   385→    const state = get();
+   386→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   387→    const player = state.players.find(p => p.id === currentPlayerId);
+   388→    if (!player) return;
+   389→
+   390→    const tile = state.tiles[player.position];
+   391→
+   392→    // Go to Jail tile
+   393→    if (tile.id === 30) {
+   394→      set(state => ({
+   395→        players: state.players.map(p =>
+   396→          p.id === currentPlayerId ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   397→        ),
+   398→        phase: 'jail_decision',
+   399→      }));
+   400→      get().addLog({
+   401→        playerId: currentPlayerId,
+   402→        playerName: player.name,
+   403→        message: `⛓️ ${player.name} disyorkan ke SPR! Off to Tahanan!`,
+   404→        type: 'jail',
+   405→      });
+   406→      return;
+   407→    }
+   408→
+   409→    // Tax tiles
+   410→    if (tile.type === 'tax') {
+   411→      const amount = tile.id === 4 ? 200 : 100;
+   412→      const newMoney = player.money - amount;
+   413→      const isBankrupt = newMoney < 0;
+   414→      set(state => ({
+   415→        players: state.players.map(p =>
+   416→          p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt } : p
+   417→        ),
+   418→        phase: isBankrupt ? 'game_over' : 'landed',
+   419→      }));
+   420→      get().addLog({
+   421→        playerId: currentPlayerId,
+   422→        playerName: player.name,
+   423→        message: `💸 ${player.name} pays RM${amount} in ${tile.name}! (${tile.description})`,
+   424→        type: 'tax',
+   425→      });
+   426→      return;
+   427→    }
+   428→
+   429→    // Card tiles
+   430→    if (tile.type === 'chest' || tile.type === 'chance') {
+   431→      const card = get().drawCard(tile.type === 'chest' ? 'chest' : 'chance');
+   432→      set({ currentCard: card, phase: 'card' });
+   433→      get().addLog({
+   434→        playerId: currentPlayerId,
+   435→        playerName: player.name,
+   436→        message: `🃏 ${player.name} draws: "${card.title}"`,
+   437→        type: 'card',
+   438→      });
+   439→      return;
+   440→    }
+   441→
+   442→    // Property / Highway / Media
+   443→    if (tile.type === 'property' || tile.type === 'highway' || tile.type === 'media') {
+   444→      // Unowned
+   445→      if (!tile.owner) {
+   446→        if (player.money >= (tile.price || 0)) {
+   447→          if (player.isAI) {
+   448→            // AI decides — try LLM API, fallback to random
+   449→            set({ aiThinking: true });
+   450→            const aiDecide = async () => {
+   451→              try {
+   452→                const res = await fetch('/api/ai-decision', {
+   453→                  method: 'POST',
+   454→                  headers: { 'Content-Type': 'application/json' },
+   455→                  body: JSON.stringify({
+   456→                    coalitionId: player.coalitionId,
+   457→                    coalitionName: COALITIONS[player.coalitionId]?.fullName || player.name,
+   458→                    property: { name: tile.name, id: tile.id, price: tile.price, rent: tile.rent },
+   459→                    money: player.money,
+   460→                    ownedProperties: player.properties.map(pid => BOARD_TILES[pid]?.name || `Tile ${pid}`),
+   461→                    marketData: get().marketState,
+   462→                  }),
+   463→                });
+   464→                const data = await res.json();
+   465→                const quote = data.quote || getRandomQuote(player.coalitionId);
+   466→                if (data.action === 'BUY' && player.money >= (tile.price || 0)) {
+   467→                  get().buyProperty();
+   468→                } else {
+   469→                  get().skipBuy();
+   470→                }
+   471→                set(state => ({
+   472→                  players: state.players.map(p =>
+   473→                    p.id === currentPlayerId ? { ...p, quote } : p
+   474→                  ),
+   475→                  aiThinking: false,
+   476→                }));
+   477→                get().addLog({
+   478→                  playerId: currentPlayerId,
+   479→                  playerName: player.name,
+   480→                  message: `🤖 ${player.name}: "${quote}"`,
+   481→                  type: 'ai_quote',
+   482→                });
+   483→              } catch {
+   484→                // Fallback to random decision
+   485→                const shouldBuy = Math.random() > 0.2;
+   486→                const quote = getRandomQuote(player.coalitionId);
+   487→                if (shouldBuy && player.money >= (tile.price || 0)) {
+   488→                  get().buyProperty();
+   489→                } else {
+   490→                  get().skipBuy();
+   491→                }
+   492→                set(state => ({
+   493→                  players: state.players.map(p =>
+   494→                    p.id === currentPlayerId ? { ...p, quote } : p
+   495→                  ),
+   496→                  aiThinking: false,
+   497→                }));
+   498→                get().addLog({
+   499→                  playerId: currentPlayerId,
+   500→                  playerName: player.name,
+   501→                  message: `🤖 ${player.name}: "${quote}"`,
+   502→                  type: 'ai_quote',
+   503→                });
+   504→              }
+   505→            };
+   506→            setTimeout(aiDecide, 800);
+   507→          } else {
+   508→            set({ phase: 'buying', selectedTileId: tile.id });
+   509→          }
+   510→        } else {
+   511→          get().addLog({
+   512→            playerId: currentPlayerId,
+   513→            playerName: player.name,
+   514→            message: `😅 ${player.name} cannot afford ${tile.name} (RM${tile.price})!`,
+   515→            type: 'move',
+   516→          });
+   517→          set({ phase: 'landed' });
+   518→        }
+   519→        return;
+   520→      }
+   521→
+   522→      // Owned by someone else
+   523→      if (tile.owner && tile.owner !== currentPlayerId) {
+   524→        const owner = state.players.find(p => p.id === tile.owner);
+   525→        if (owner && !owner.isBankrupt) {
+   526→          const rent = calculateRent(tile, owner, state.marketState, state.mortgagedTiles);
+   527→          set({
+   528→            currentRentPayment: { from: currentPlayerId, to: tile.owner, amount: rent },
+   529→            phase: 'paying_rent',
+   530→          });
+   531→          get().addLog({
+   532→            playerId: currentPlayerId,
+   533→            playerName: player.name,
+   534→            message: `🏠 ${player.name} pays RM${rent} rent to ${owner.name} for ${tile.name}!`,
+   535→            type: 'rent',
+   536→          });
+   537→        } else {
+   538→          set({ phase: 'landed' });
+   539→        }
+   540→        return;
+   541→      }
+   542→
+   543→      // Owned by self
+   544→      set({ phase: 'landed' });
+   545→      return;
+   546→    }
+   547→
+   548→    // Corner or other
+   549→    set({ phase: 'landed' });
+   550→  },
+   551→
+   552→  buyProperty: () => {
+   553→    const state = get();
+   554→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   555→    const player = state.players.find(p => p.id === currentPlayerId);
+   556→    if (!player) return;
+   557→
+   558→    const tile = state.tiles[player.position];
+   559→    if (!tile.price || player.money < tile.price) return;
+   560→
+   561→    const newProperties = [...player.properties, tile.id];
+   562→
+   563→    set(state => ({
+   564→      players: state.players.map(p =>
+   565→        p.id === currentPlayerId
+   566→          ? { ...p, money: p.money - tile.price, properties: newProperties }
+   567→          : p
+   568→      ),
+   569→      tiles: state.tiles.map(t =>
+   570→        t.id === tile.id ? { ...t, owner: currentPlayerId } : t
+   571→      ),
+   572→      phase: 'landed',
+   573→      selectedTileId: null,
+   574→    }));
+   575→
+   576→    get().addLog({
+   577→      playerId: currentPlayerId,
+   578→      playerName: player.name,
+   579→      message: `🏗️ ${player.name} buys ${tile.name} for RM${tile.price}!`,
+   580→      type: 'buy',
+   581→    });
+   582→
+   583→    // Achievement: first_property (only for human player)
+   584→    if (currentPlayerId === 'player') {
+   585→      get().unlockAchievement('first_property');
+   586→    }
+   587→
+   588→    // Achievement: landlord — check if player now owns full color group
+   589→    if (tile.colorGroup && currentPlayerId === 'player') {
+   590→      const colorGroupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+   591→      const ownsAll = colorGroupTiles.every(t => newProperties.includes(t.id));
+   592→      if (ownsAll) {
+   593→        get().unlockAchievement('landlord');
+   594→      }
+   595→    }
+   596→
+   597→    // Achievement: monopolist — 10+ properties
+   598→    if (newProperties.length >= 10 && currentPlayerId === 'player') {
+   599→      get().unlockAchievement('monopolist');
+   600→    }
+   601→
+   602→    // Achievement: banker — money check happens in endTurn
+   603→  },
+   604→
+   605→  skipBuy: () => {
+   606→    const state = get();
+   607→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   608→    const player = state.players.find(p => p.id === currentPlayerId);
+   609→    if (!player) return;
+   610→
+   611→    const tile = state.tiles[player.position];
+   612→    get().addLog({
+   613→      playerId: currentPlayerId,
+   614→      playerName: player.name,
+   615→      message: `🚶 ${player.name} passes on ${tile.name}. Lelangan bermula!`,
+   616→      type: 'move',
+   617→    });
+   618→
+   619→    set({ selectedTileId: null });
+   620→    get().startAuction(tile.id);
+   621→  },
+   622→
+   623→  payRent: () => {
+   624→    const state = get();
+   625→    if (!state.currentRentPayment) return;
+   626→
+   627→    const { from, to, amount } = state.currentRentPayment;
+   628→    const payer = state.players.find(p => p.id === from);
+   629→    const payee = state.players.find(p => p.id === to);
+   630→    if (!payer || !payee) return;
+   631→
+   632→    const payerNew = payer.money - amount;
+   633→    const payeeNew = payee.money + amount;
+   634→
+   635→    set(state => ({
+   636→      players: state.players.map(p => {
+   637→        if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 };
+   638→        if (p.id === to) return { ...p, money: payeeNew };
+   639→        return p;
+   640→      }),
+   641→      currentRentPayment: null,
+   642→      phase: payerNew < 0 ? 'game_over' : 'landed',
+   643→    }));
+   644→
+   645→    // Achievement: high_roller — player pays > RM500 rent in a single payment
+   646→    if (from === 'player' && amount > 500) {
+   647→      const currentHighest = get().stats.highestRentPaid;
+   648→      if (amount > currentHighest) {
+   649→        set(state => ({
+   650→          stats: { ...state.stats, highestRentPaid: amount },
+   651→        }));
+   652→      }
+   653→      get().unlockAchievement('high_roller');
+   654→    }
+   655→  },
+   656→
+   657→  drawCard: (type: 'chest' | 'chance') => {
+   658→    const state = get();
+   659→    if (type === 'chest') {
+   660→      const card = state.jawatanMenteriDeck[0];
+   661→      const remaining = state.jawatanMenteriDeck.slice(1);
+   662→      if (remaining.length === 0) {
+   663→        set({ jawatanMenteriDeck: shuffleDeck(JAWATAN_MENTERI_CARDS), currentCard: card });
+   664→      } else {
+   665→        set({ jawatanMenteriDeck: remaining, currentCard: card });
+   666→      }
+   667→      return card;
+   668→    } else {
+   669→      const card = state.krisisNasionalDeck[0];
+   670→      const remaining = state.krisisNasionalDeck.slice(1);
+   671→      if (remaining.length === 0) {
+   672→        set({ krisisNasionalDeck: shuffleDeck(KRISIS_NASIONAL_CARDS), currentCard: card });
+   673→      } else {
+   674→        set({ krisisNasionalDeck: remaining, currentCard: card });
+   675→      }
+   676→      return card;
+   677→    }
+   678→  },
+   679→
+   680→  applyCard: (card: GameCard) => {
+   681→    const state = get();
+   682→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   683→    const player = state.players.find(p => p.id === currentPlayerId);
+   684→    if (!player) return;
+   685→
+   686→    const { effect } = card;
+   687→
+   688→    switch (effect.type) {
+   689→      case 'money': {
+   690→        const newMoney = player.money + effect.value;
+   691→        set(state => ({
+   692→          players: state.players.map(p =>
+   693→            p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt: newMoney < 0 } : p
+   694→          ),
+   695→          currentCard: null,
+   696→          phase: newMoney < 0 ? 'game_over' : 'landed',
+   697→        }));
+   698→        break;
+   699→      }
+   700→      case 'move': {
+   701→        let newPos = player.position + effect.value;
+   702→        if (newPos < 0) newPos += 40;
+   703→        if (newPos >= 40) {
+   704→          newPos = newPos % 40;
+   705→          // Pass GO
+   706→          set(state => ({
+   707→            players: state.players.map(p =>
+   708→              p.id === currentPlayerId ? { ...p, money: p.money + 200, position: newPos } : p
+   709→            ),
+   710→            currentCard: null,
+   711→            phase: 'landed',
+   712→          }));
+   713→          get().addLog({
+   714→            playerId: currentPlayerId,
+   715→            playerName: player.name,
+   716→            message: `💰 Passed GO during card! +RM200!`,
+   717→            type: 'pass_go',
+   718→          });
+   719→        } else {
+   720→          set(state => ({
+   721→            players: state.players.map(p =>
+   722→              p.id === currentPlayerId ? { ...p, position: newPos } : p
+   723→            ),
+   724→            currentCard: null,
+   725→            phase: 'landed',
+   726→          }));
+   727→        }
+   728→        break;
+   729→      }
+   730→      case 'go_to': {
+   731→        const targetPos = effect.value ?? effect.tileId ?? 0;
+   732→        const passedGo = player.position > targetPos;
+   733→        set(state => ({
+   734→          players: state.players.map(p =>
+   735→            p.id === currentPlayerId
+   736→              ? { ...p, position: targetPos, money: passedGo ? p.money + 200 : p.money }
+   737→              : p
+   738→          ),
+   739→          currentCard: null,
+   740→        }));
+   741→        if (passedGo) {
+   742→          get().addLog({
+   743→            playerId: currentPlayerId,
+   744→            playerName: player.name,
+   745→            message: `💰 Passed GO during card! +RM200!`,
+   746→            type: 'pass_go',
+   747→          });
+   748→        }
+   749→        // CRITICAL FIX: Trigger handleLanding after position update
+   750→        setTimeout(() => get().handleLanding(), 500);
+   751→        break;
+   752→      }
+   753→      case 'jail': {
+   754→        set(state => ({
+   755→          players: state.players.map(p =>
+   756→            p.id === currentPlayerId ? { ...p, position: 10, isInJail: true, jailTurns: 0 } : p
+   757→          ),
+   758→          currentCard: null,
+   759→          phase: 'jail_decision',
+   760→        }));
+   761→        break;
+   762→      }
+   763→      case 'collect_all': {
+   764→        const amount = effect.value;
+   765→        const totalCollected = (state.players.length - 1) * amount;
+   766→        set(state => ({
+   767→          players: state.players.map(p => {
+   768→            if (p.id === currentPlayerId) return { ...p, money: p.money + totalCollected };
+   769→            return { ...p, money: p.money - amount };
+   770→          }),
+   771→          currentCard: null,
+   772→          phase: 'landed',
+   773→        }));
+   774→        break;
+   775→      }
+   776→      case 'pay_all': {
+   777→        const amount = effect.value;
+   778→        const totalPaid = (state.players.length - 1) * amount;
+   779→        set(state => ({
+   780→          players: state.players.map(p => {
+   781→            if (p.id === currentPlayerId) return { ...p, money: p.money - totalPaid };
+   782→            return { ...p, money: p.money + amount };
+   783→          }),
+   784→          currentCard: null,
+   785→          phase: 'landed',
+   786→        }));
+   787→        break;
+   788→      }
+   789→      case 'repair': {
+   790→        const cost = effect.value;
+   791→        set(state => ({
+   792→          players: state.players.map(p =>
+   793→            p.id === currentPlayerId ? { ...p, money: p.money - cost } : p
+   794→          ),
+   795→          currentCard: null,
+   796→          phase: 'landed',
+   797→        }));
+   798→        break;
+   799→      }
+   800→    }
+   801→
+   802→    // Check all players for bankruptcy after pay_all / collect_all
+   803→    if (effect.type === 'collect_all' || effect.type === 'pay_all') {
+   804→      const postState = get();
+   805→      const anyBankrupt = postState.players.some(p => p.money < 0 && !p.isBankrupt);
+   806→      if (anyBankrupt) {
+   807→        set(state => ({
+   808→          players: state.players.map(p =>
+   809→            p.money < 0 ? { ...p, isBankrupt: true } : p
+   810→          ),
+   811→        }));
+   812→        // Check game over
+   813→        const activePlayers = get().players.filter(p => !p.isBankrupt);
+   814→        if (activePlayers.length <= 1) {
+   815→          set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+   816→          return;
+   817→        }
+   818→      }
+   819→    }
+   820→
+   821→    // Check for bankruptcy
+   822→    const newState = get();
+   823→    const updatedPlayer = newState.players.find(p => p.id === currentPlayerId);
+   824→    if (updatedPlayer && updatedPlayer.money < 0) {
+   825→      set({ phase: 'game_over' });
+   826→    }
+   827→  },
+   828→
+   829→  endTurn: () => {
+   830→    const state = get();
+   831→    
+   832→    // Check game over
+   833→    const activePlayers = state.players.filter(p => !p.isBankrupt);
+   834→    if (activePlayers.length <= 1) {
+   835→      const winner = activePlayers[0]?.id || null;
+   836→      set({ phase: 'game_over', winner });
+   837→      return;
+   838→    }
+   839→
+   840→    // Next player
+   841→    let nextIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
+   842→    let nextPlayerId = state.turnOrder[nextIndex];
+   843→    let nextPlayer = state.players.find(p => p.id === nextPlayerId);
+   844→
+   845→    // Skip bankrupt players
+   846→    let safety = 0;
+   847→    while (nextPlayer?.isBankrupt && safety < 10) {
+   848→      nextIndex = (nextIndex + 1) % state.turnOrder.length;
+   849→      nextPlayerId = state.turnOrder[nextIndex];
+   850→      nextPlayer = state.players.find(p => p.id === nextPlayerId);
+   851→      safety++;
+   852→    }
+   853→
+   854→    const isNextTurn = nextIndex <= state.currentTurnIndex;
+   855→    const newTurnCount = isNextTurn ? state.turnCount + 1 : state.turnCount;
+   856→
+   857→    set({
+   858→      currentTurnIndex: nextIndex,
+   859→      turnCount: newTurnCount,
+   860→      diceValues: null,
+   861→      isDoubles: false,
+   862→      consecutiveDoubles: 0,
+   863→      phase: 'playing',
+   864→      selectedTileId: null,
+   865→    });
+   866→
+   867→    // Achievement: survivor — player still in game after 10 rounds
+   868→    const humanPlayer = get().players.find(p => p.id === 'player');
+   869→    if (humanPlayer && !humanPlayer.isBankrupt && newTurnCount >= 10) {
+   870→      get().unlockAchievement('survivor');
+   871→    }
+   872→
+   873→    // Achievement: banker — check if player has RM3000+
+   874→    if (humanPlayer && humanPlayer.money >= 3000) {
+   875→      get().unlockAchievement('banker');
+   876→    }
+   877→
+   878→    // Auto-save after each turn
+   879→    get().saveGame();
+   880→
+   881→    // Simulate market fluctuations at start of each turn
+   882→    get().simulateMarket();
+   883→
+   884→    // If next player is AI, auto-play
+   885→    if (nextPlayer?.isAI) {
+   886→      get().setAIThinking(true);
+   887→      const aiDelay = Math.round(500 / state.aiSpeed);
+   888→      setTimeout(() => {
+   889→        get().aiTurn();
+   890→      }, aiDelay);
+   891→    }
+   892→  },
+   893→
+   894→  handleJailDecision: (pay: boolean) => {
+   895→    const state = get();
+   896→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   897→    const player = state.players.find(p => p.id === currentPlayerId);
+   898→    if (!player) return;
+   899→
+   900→    // Track jail entry for player (jailTurns === 0 means just entered)
+   901→    if (currentPlayerId === 'player' && player.jailTurns === 0) {
+   902→      const newTimesJailed = state.stats.timesJailed + 1;
+   903→      set(s => ({ stats: { ...s.stats, timesJailed: newTimesJailed } }));
+   904→      if (newTimesJailed >= 3) {
+   905→        get().unlockAchievement('jailbird');
+   906→      }
+   907→    }
+   908→
+   909→    if (pay || player.hasGetOutOfJailFree) {
+   910→      const cost = pay ? 50 : 0;
+   911→      set(state => ({
+   912→        players: state.players.map(p =>
+   913→          p.id === currentPlayerId
+   914→            ? { ...p, money: p.money - cost, isInJail: false, jailTurns: 0, hasGetOutOfJailFree: pay ? p.hasGetOutOfJailFree : false }
+   915→            : p
+   916→        ),
+   917→        phase: 'playing',
+   918→      }));
+   919→      get().addLog({
+   920→        playerId: currentPlayerId,
+   921→        playerName: player.name,
+   922→        message: `🔓 ${player.name} ${pay ? `pays RM50 bail` : 'uses Get Out of Jail Free card'}!`,
+   923→        type: 'jail',
+   924→      });
+   925→    } else {
+   926→      // Try to roll doubles
+   927→      const d1 = Math.floor(Math.random() * 6) + 1;
+   928→      const d2 = Math.floor(Math.random() * 6) + 1;
+   929→      if (d1 === d2) {
+   930→        set(state => ({
+   931→          players: state.players.map(p =>
+   932→            p.id === currentPlayerId ? { ...p, isInJail: false, jailTurns: 0 } : p
+   933→          ),
+   934→          diceValues: [d1, d2],
+   935→          isDoubles: true,
+   936→          phase: 'rolling',
+   937→        }));
+   938→        get().addLog({
+   939→          playerId: currentPlayerId,
+   940→          playerName: player.name,
+   941→          message: `🎲 ${player.name} rolls doubles (${d1},${d2}) and escapes jail!`,
+   942→          type: 'jail',
+   943→        });
+   944→        setTimeout(() => get().movePlayer(), 1500);
+   945→      } else {
+   946→        const newJailTurns = player.jailTurns + 1;
+   947→        const forcedOut = newJailTurns >= 3;
+   948→        set(state => ({
+   949→          players: state.players.map(p =>
+   950→            p.id === currentPlayerId
+   951→              ? {
+   952→                  ...p,
+   953→                  jailTurns: newJailTurns,
+   954→                  isInJail: !forcedOut,
+   955→                  money: forcedOut ? p.money - 50 : p.money,
+   956→                }
+   957→              : p
+   958→          ),
+   959→          diceValues: [d1, d2],
+   960→          isDoubles: false,
+   961→          phase: forcedOut ? 'landed' : 'jail_decision',
+   962→        }));
+   963→        get().addLog({
+   964→          playerId: currentPlayerId,
+   965→          playerName: player.name,
+   966→          message: forcedOut
+   967→            ? `⏰ ${player.name} serves full sentence! Pays RM50 and is released.`
+   968→            : `Dice: ${d1},${d2} — No doubles. ${player.name} remains in Tahanan SPR. (Turn ${newJailTurns}/3)`,
+   969→          type: 'jail',
+   970→        });
+   971→      }
+   972→    }
+   973→  },
+   974→
+   975→  selectTile: (tileId: number | null) => {
+   976→    set({ selectedTileId: tileId });
+   977→  },
+   978→
+   979→  addLog: (entry) => {
+   980→    const state = get();
+   981→    set({
+   982→      gameLog: [
+   983→        ...state.gameLog,
+   984→        { ...entry, id: crypto.randomUUID(), turn: state.turnCount },
+   985→      ],
+   986→    });
+   987→  },
+   988→
+   989→  setAIThinking: (thinking) => {
+   990→    set({ aiThinking: thinking });
+   991→  },
+   992→
+   993→  aiTurn: async () => {
+   994→    const state = get();
+   995→    const speed = state.aiSpeed;
+   996→    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.round(ms / (speed * 2))));
+   997→
+   998→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+   999→    const player = state.players.find(p => p.id === currentPlayerId);
+  1000→    if (!player || !player.isAI || player.isBankrupt) {
+  1001→      get().endTurn();
+  1002→      return;
+  1003→    }
+  1004→
+  1005→    // Handle jail for AI
+  1006→    if (player.isInJail) {
+  1007→      get().handleJailDecision(Math.random() > 0.5);
+  1008→      await delay(1500);
+  1009→    }
+  1010→
+  1011→    const currentState = get();
+  1012→    if (currentState.phase === 'jail_decision') {
+  1013→      // Still in jail, end turn
+  1014→      get().endTurn();
+  1015→      return;
+  1016→    }
+  1017→
+  1018→    // Roll dice
+  1019→    get().rollDice();
+  1020→
+  1021→    // Wait for move to complete
+  1022→    await delay(1500);
+  1023→
+  1024→    // Check if we need to buy, pay rent, or handle card
+  1025→    const afterMoveState = get();
+  1026→
+  1027→    // AI: Buy property if affordable and strategic
+  1028→    if (afterMoveState.phase === 'buying') {
+  1029→      const aiPlayerNow = get().players.find(p => p.id === currentPlayerId);
+  1030→      const currentTile = get().tiles[aiPlayerNow?.position ?? 0];
+  1031→      if (aiPlayerNow && currentTile?.price && aiPlayerNow.money >= currentTile.price) {
+  1032→        // AI buying strategy: buy if we have enough cash (keep 300 RM buffer)
+  1033→        if (aiPlayerNow.money - currentTile.price >= 300) {
+  1034→          get().buyProperty();
+  1035→          await delay(300);
+  1036→        } else {
+  1037→          get().skipBuy();
+  1038→          await delay(300);
+  1039→        }
+  1040→      } else {
+  1041→        get().skipBuy();
+  1042→        await delay(300);
+  1043→      }
+  1044→    }
+  1045→
+  1046→    // Re-check phase after buying
+  1047→    const postBuyState = get();
+  1048→    if (postBuyState.phase === 'paying_rent') {
+  1049→      get().payRent();
+  1050→      await delay(300);
+  1051→    }
+  1052→    if (postBuyState.phase === 'card') {
+  1053→      const card = postBuyState.currentCard;
+  1054→      if (card) {
+  1055→        get().applyCard(card);
+  1056→        await delay(300);
+  1057→      }
+  1058→    }
+  1059→
+  1060→    // Wait for auction to complete if one was triggered
+  1061→    let auctionWaitCount = 0;
+  1062→    while (get().phase === 'auction' && auctionWaitCount < 30) {
+  1063→      await delay(1000);
+  1064→      auctionWaitCount++;
+  1065→    }
+  1066→
+  1067→    // AI: Build houses on full color sets
+  1068→    const aiState = get();
+  1069→    const aiPlayer = aiState.players.find(p => p.id === currentPlayerId);
+  1070→    if (aiPlayer && aiPlayer.money > 300) {
+  1071→      const aiColorGroups = new Set<string>();
+  1072→      for (const tileId of aiPlayer.properties) {
+  1073→        const t = aiState.tiles.find(tile => tile.id === tileId);
+  1074→        if (t?.colorGroup && t?.type === 'property' && t.housePrice) {
+  1075→          aiColorGroups.add(t.colorGroup);
+  1076→        }
+  1077→      }
+  1078→      for (const cg of aiColorGroups) {
+  1079→        const groupTiles = aiState.tiles.filter(t => t.colorGroup === cg && t.type === 'property');
+  1080→        const ownsAll = groupTiles.every(t => t.owner === currentPlayerId);
+  1081→        if (!ownsAll) continue;
+  1082→        // Build houses on the cheapest properties first
+  1083→        const buildable = groupTiles
+  1084→          .filter(t => (t.houses || 0) < 5 && !aiState.mortgagedTiles.includes(t.id))
+  1085→          .sort((a, b) => (a.housePrice || 0) - (b.housePrice || 0));
+  1086→        for (const bt of buildable) {
+  1087→          const currentAI = get().players.find(p => p.id === currentPlayerId);
+  1088→          if (!currentAI || currentAI.money < (bt.housePrice || 0)) break;
+  1089→          // Only build if we have enough cash buffer (keep 200 RM minimum)
+  1090→          if (currentAI.money - (bt.housePrice || 0) < 200) break;
+  1091→          const newHouses = (bt.houses || 0) + 1;
+  1092→          set(state => ({
+  1093→            players: state.players.map(p =>
+  1094→              p.id === currentPlayerId ? { ...p, money: p.money - (bt.housePrice || 0) } : p
+  1095→            ),
+  1096→            tiles: state.tiles.map(t =>
+  1097→              t.id === bt.id ? { ...t, houses: newHouses } : t
+  1098→            ),
+  1099→          }));
+  1100→          get().addLog({
+  1101→            playerId: currentPlayerId,
+  1102→            playerName: currentAI.name,
+  1103→            message: newHouses === 5
+  1104→              ? `🏨 ${currentAI.name} builds HOTEL on ${bt.name}!`
+  1105→              : `🏠 ${currentAI.name} builds house on ${bt.name} (${newHouses}/4)`,
+  1106→            type: 'buy',
+  1107→          });
+  1108→        }
+  1109→      }
+  1110→    }
+  1111→
+  1112→    get().setAIThinking(false);
+  1113→    // Only end turn if we're in a terminal sub-phase
+  1114→    const finalPhase = get().phase;
+  1115→    if (finalPhase === 'landed' || finalPhase === 'playing') {
+  1116→      get().endTurn();
+  1117→    }
+  1118→  },
+  1119→
+  1120→  getMarketState: () => get().marketState,
+  1121→
+  1122→  buildHouse: (tileId: number) => {
+  1123→    const state = get();
+  1124→    const tile = state.tiles.find(t => t.id === tileId);
+  1125→    const player = state.players.find(p => p.id === 'player');
+  1126→    if (!tile || !player || tile.owner !== 'player') return;
+  1127→    if (tile.type !== 'property' || !tile.housePrice) return;
+  1128→    if ((tile.houses || 0) >= 5) return;
+  1129→
+  1130→    // Cannot build on mortgaged properties
+  1131→    if (state.mortgagedTiles.includes(tileId)) return;
+  1132→
+  1133→    const cost = tile.housePrice;
+  1134→    if (player.money < cost) return;
+  1135→
+  1136→    // Must own full color group to build
+  1137→    if (tile.colorGroup) {
+  1138→      const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+  1139→      const ownsAll = groupTiles.every(t => t.owner === 'player');
+  1140→      if (!ownsAll) return;
+  1141→    }
+  1142→
+  1143→    const newHouses = (tile.houses || 0) + 1;
+  1144→    set(state => ({
+  1145→      players: state.players.map(p =>
+  1146→        p.id === 'player' ? { ...p, money: p.money - cost } : p
+  1147→      ),
+  1148→      tiles: state.tiles.map(t =>
+  1149→        t.id === tileId ? { ...t, houses: newHouses } : t
+  1150→      ),
+  1151→    }));
+  1152→    get().addLog({
+  1153→      playerId: 'player',
+  1154→      playerName: player.name,
+  1155→      message: newHouses === 5
+  1156→        ? `🏨 Built a HOTEL on ${tile.name}! (RM${cost})`
+  1157→        : `🏠 Built house ${newHouses}/4 on ${tile.name} (RM${cost})`,
+  1158→      type: 'buy',
+  1159→    });
+  1160→
+  1161→    // Achievement: hotel_mogul — built a hotel (5 houses)
+  1162→    if (newHouses === 5) {
+  1163→      get().unlockAchievement('hotel_mogul');
+  1164→    }
+  1165→  },
+  1166→
+  1167→  sellProperty: (tileId: number) => {
+  1168→    const state = get();
+  1169→    const tile = state.tiles.find(t => t.id === tileId);
+  1170→    const player = state.players.find(p => p.id === 'player');
+  1171→    if (!tile || !player || tile.owner !== 'player') return;
+  1172→
+  1173→    // If mortgaged, sell price is reduced (only get mortgage value, not 80% of price)
+  1174→    const isMortgaged = state.mortgagedTiles.includes(tileId);
+  1175→    const sellPrice = isMortgaged
+  1176→      ? Math.round((tile.mortgageValue || tile.price || 0) * 0.5)
+  1177→      : Math.round((tile.mortgageValue || tile.price || 0) * 0.8);
+  1178→    const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);
+  1179→
+  1180→    set(state => ({
+  1181→      players: state.players.map(p =>
+  1182→        p.id === 'player'
+  1183→          ? { ...p, money: p.money + sellPrice + houseRefund, properties: p.properties.filter(pid => pid !== tileId) }
+  1184→          : p
+  1185→      ),
+  1186→      tiles: state.tiles.map(t =>
+  1187→        t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t
+  1188→      ),
+  1189→      mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1190→    }));
+  1191→    get().addLog({
+  1192→      playerId: 'player',
+  1193→      playerName: player.name,
+  1194→      message: `📉 Sold ${tile.name} for RM${sellPrice + houseRefund}`,
+  1195→      type: 'buy',
+  1196→    });
+  1197→  },
+  1198→
+  1199→  togglePortfolio: () => {
+  1200→    set(state => ({ showPortfolio: !state.showPortfolio }));
+  1201→  },
+  1202→
+  1203→  startAuction: (tileId: number) => {
+  1204→    const state = get();
+  1205→    const tile = state.tiles.find(t => t.id === tileId);
+  1206→    if (!tile || tile.owner) return;
+  1207→
+  1208→    const price = tile.price || 0;
+  1209→    const activePlayers = state.players.filter(
+  1210→      p => !p.isBankrupt && p.money >= Math.floor(price * 0.5)
+  1211→    );
+  1212→
+  1213→    if (activePlayers.length === 0) {
+  1214→      set({ phase: 'landed' });
+  1215→      get().addLog({
+  1216→        playerId: 'system',
+  1217→        playerName: 'System',
+  1218→        message: `🔨 Lelangan ${tile.name} dibatalkan — tiada pembida layak!`,
+  1219→        type: 'auction',
+  1220→      });
+  1221→      return;
+  1222→    }
+  1223→
+  1224→    const floorPrice = Math.floor(price * 0.5);
+  1225→    const passingPlayerId = state.turnOrder[state.currentTurnIndex];
+  1226→    const bidderOrder: string[] = [];
+  1227→    const startIdx = state.currentTurnIndex;
+  1228→    for (let i = 1; i <= state.turnOrder.length; i++) {
+  1229→      const idx = (startIdx + i) % state.turnOrder.length;
+  1230→      const pid = state.turnOrder[idx];
+  1231→      const p = state.players.find(pl => pl.id === pid);
+  1232→      if (p && !p.isBankrupt && pid !== passingPlayerId) {
+  1233→        bidderOrder.push(pid);
+  1234→      }
+  1235→    }
+  1236→
+  1237→    if (bidderOrder.length === 0) {
+  1238→      set({ phase: 'landed' });
+  1239→      return;
+  1240→    }
+  1241→
+  1242→    const auctionState: AuctionState = {
+  1243→      tileId,
+  1244→      highestBid: floorPrice,
+  1245→      highestBidder: null,
+  1246→      currentBidderIndex: 0,
+  1247→      bidderOrder,
+  1248→      isActive: true,
+  1249→    };
+  1250→
+  1251→    set({ auctionState, phase: 'auction' });
+  1252→    get().addLog({
+  1253→      playerId: 'system',
+  1254→      playerName: 'System',
+  1255→      message: `🔨 Lelangan ${tile.name} bermula! Harga mula: RM${floorPrice}`,
+  1256→      type: 'auction',
+  1257→    });
+  1258→
+  1259→    const firstBidder = state.players.find(p => p.id === bidderOrder[0]);
+  1260→    if (firstBidder?.isAI) {
+  1261→      get().setAIThinking(true);
+  1262→      setTimeout(() => get().aiAuctionTurn(), 2000);
+  1263→    }
+  1264→  },
+  1265→
+  1266→  placeBid: (playerId: string, amount: number) => {
+  1267→    const state = get();
+  1268→    const auction = state.auctionState;
+  1269→    if (!auction || !auction.isActive) return;
+  1270→
+  1271→    const player = state.players.find(p => p.id === playerId);
+  1272→    if (!player || player.money < amount) return;
+  1273→    if (amount <= auction.highestBid) return;
+  1274→
+  1275→    const newAuction: AuctionState = {
+  1276→      ...auction,
+  1277→      highestBid: amount,
+  1278→      highestBidder: playerId,
+  1279→    };
+  1280→
+  1281→    const nextBidderIndex = auction.currentBidderIndex + 1;
+  1282→    if (nextBidderIndex >= auction.bidderOrder.length) {
+  1283→      const hasOtherBidders = auction.bidderOrder.some(id => id !== playerId);
+  1284→      if (!hasOtherBidders || auction.bidderOrder.length === 1) {
+  1285→        set({ auctionState: { ...newAuction, currentBidderIndex: nextBidderIndex, isActive: false } });
+  1286→        get().resolveAuction();
+  1287→        return;
+  1288→      }
+  1289→      newAuction.currentBidderIndex = 0;
+  1290→    } else {
+  1291→      newAuction.currentBidderIndex = nextBidderIndex;
+  1292→    }
+  1293→
+  1294→    set({ auctionState: newAuction });
+  1295→    get().addLog({
+  1296→      playerId,
+  1297→      playerName: player.name,
+  1298→      message: `📢 ${player.name} bida RM${amount}!`,
+  1299→      type: 'auction',
+  1300→    });
+  1301→
+  1302→    const nextBidderId = newAuction.bidderOrder[newAuction.currentBidderIndex];
+  1303→    const nextBidder = state.players.find(p => p.id === nextBidderId);
+  1304→    if (nextBidder?.isAI) {
+  1305→      get().setAIThinking(true);
+  1306→      setTimeout(() => get().aiAuctionTurn(), 2000);
+  1307→    }
+  1308→  },
+  1309→
+  1310→  passBid: (playerId: string) => {
+  1311→    const state = get();
+  1312→    const auction = state.auctionState;
+  1313→    if (!auction || !auction.isActive) return;
+  1314→
+  1315→    const player = state.players.find(p => p.id === playerId);
+  1316→
+  1317→    const newBidderOrder = auction.bidderOrder.filter(id => id !== playerId);
+  1318→    const remainingBidders = newBidderOrder.filter(id => id !== auction.highestBidder);
+  1319→
+  1320→    if (remainingBidders.length === 0 && auction.highestBidder) {
+  1321→      set({ auctionState: { ...auction, bidderOrder: newBidderOrder, isActive: false } });
+  1322→      get().addLog({
+  1323→        playerId,
+  1324→        playerName: player?.name || playerId,
+  1325→        message: `🚫 ${player?.name || playerId} lalu (pass).`,
+  1326→        type: 'auction',
+  1327→      });
+  1328→      get().resolveAuction();
+  1329→      return;
+  1330→    }
+  1331→
+  1332→    if (!auction.highestBidder && newBidderOrder.length === 0) {
+  1333→      set({ auctionState: null, phase: 'landed' });
+  1334→      get().addLog({
+  1335→        playerId: 'system',
+  1336→        playerName: 'System',
+  1337→        message: `🔨 Lelangan dibatalkan — tiada pembida!`,
+  1338→        type: 'auction',
+  1339→      });
+  1340→      return;
+  1341→    }
+  1342→
+  1343→    let newBidderIndex = 0;
+  1344→    const currentBidderId = auction.bidderOrder[auction.currentBidderIndex];
+  1345→    if (playerId === currentBidderId) {
+  1346→      newBidderIndex = 0;
+  1347→    } else {
+  1348→      const idx = newBidderOrder.indexOf(currentBidderId);
+  1349→      newBidderIndex = idx >= 0 ? idx : 0;
+  1350→    }
+  1351→
+  1352→    const newAuction: AuctionState = {
+  1353→      ...auction,
+  1354→      bidderOrder: newBidderOrder,
+  1355→      currentBidderIndex: newBidderIndex,
+  1356→    };
+  1357→
+  1358→    set({ auctionState: newAuction });
+  1359→    get().addLog({
+  1360→      playerId,
+  1361→      playerName: player?.name || playerId,
+  1362→      message: `🚫 ${player?.name || playerId} lalu (pass).`,
+  1363→      type: 'auction',
+  1364→    });
+  1365→
+  1366→    const nextBidderId = newBidderOrder[newBidderIndex];
+  1367→    const nextBidder = state.players.find(p => p.id === nextBidderId);
+  1368→    if (nextBidder?.isAI) {
+  1369→      get().setAIThinking(true);
+  1370→      setTimeout(() => get().aiAuctionTurn(), 2000);
+  1371→    }
+  1372→  },
+  1373→
+  1374→  resolveAuction: () => {
+  1375→    const state = get();
+  1376→    const auction = state.auctionState;
+  1377→    if (!auction) return;
+  1378→
+  1379→    const tile = state.tiles.find(t => t.id === auction.tileId);
+  1380→    if (!tile) {
+  1381→      set({ auctionState: null, phase: 'landed' });
+  1382→      return;
+  1383→    }
+  1384→
+  1385→    if (auction.highestBidder) {
+  1386→      const winner = state.players.find(p => p.id === auction.highestBidder);
+  1387→      if (winner) {
+  1388→        set(state => ({
+  1389→          players: state.players.map(p =>
+  1390→            p.id === auction.highestBidder
+  1391→              ? { ...p, money: p.money - auction.highestBid, properties: [...p.properties, auction.tileId] }
+  1392→              : p
+  1393→          ),
+  1394→          tiles: state.tiles.map(t =>
+  1395→            t.id === auction.tileId ? { ...t, owner: auction.highestBidder } : t
+  1396→          ),
+  1397→          auctionState: null,
+  1398→          phase: 'landed',
+  1399→        }));
+  1400→        get().addLog({
+  1401→          playerId: auction.highestBidder,
+  1402→          playerName: winner.name,
+  1403→          message: `🔨 ${winner.name} menang lelangan ${tile.name} untuk RM${auction.highestBid}!`,
+  1404→          type: 'auction',
+  1405→        });
+  1406→
+  1407→        // Track auction wins for player
+  1408→        if (auction.highestBidder === 'player') {
+  1409→          const newAuctionsWon = get().stats.auctionsWon + 1;
+  1410→          set(s => ({ stats: { ...s.stats, auctionsWon: newAuctionsWon } }));
+  1411→          if (newAuctionsWon >= 3) {
+  1412→            get().unlockAchievement('auction_king');
+  1413→          }
+  1414→        }
+  1415→
+  1416→        return;
+  1417→      }
+  1418→    }
+  1419→
+  1420→    set({ auctionState: null, phase: 'landed' });
+  1421→    get().addLog({
+  1422→      playerId: 'system',
+  1423→      playerName: 'System',
+  1424→      message: `🔨 Lelangan ${tile.name} tamat tanpa pembida.`,
+  1425→      type: 'auction',
+  1426→    });
+  1427→  },
+  1428→
+  1429→  aiAuctionTurn: () => {
+  1430→    const state = get();
+  1431→    const auction = state.auctionState;
+  1432→    if (!auction || !auction.isActive) {
+  1433→      get().setAIThinking(false);
+  1434→      return;
+  1435→    }
+  1436→
+  1437→    const currentBidderId = auction.bidderOrder[auction.currentBidderIndex];
+  1438→    const player = state.players.find(p => p.id === currentBidderId);
+  1439→    if (!player || !player.isAI) {
+  1440→      get().setAIThinking(false);
+  1441→      return;
+  1442→    }
+  1443→
+  1444→    const tile = state.tiles.find(t => t.id === auction.tileId);
+  1445→    if (!tile) {
+  1446→      get().setAIThinking(false);
+  1447→      return;
+  1448→    }
+  1449→
+  1450→    const baseRent = tile.rent?.[0] || 0;
+  1451→    const maxWillingToPay = Math.floor(baseRent * 15);
+  1452→    const minIncrement = Math.max(10, Math.floor(auction.highestBid * 0.1));
+  1453→    const proposedBid = auction.highestBid + minIncrement;
+  1454→
+  1455→    const quote = getRandomQuote(player.coalitionId);
+  1456→
+  1457→    if (proposedBid <= maxWillingToPay && proposedBid <= player.money && Math.random() > 0.3) {
+  1458→      get().placeBid(currentBidderId, proposedBid);
+  1459→      set(state => ({
+  1460→        players: state.players.map(p =>
+  1461→          p.id === currentBidderId ? { ...p, quote } : p
+  1462→        ),
+  1463→      }));
+  1464→      get().addLog({
+  1465→        playerId: currentBidderId,
+  1466→        playerName: player.name,
+  1467→        message: `🤖 ${player.name}: "${quote}"`,
+  1468→        type: 'ai_quote',
+  1469→      });
+  1470→    } else {
+  1471→      get().passBid(currentBidderId);
+  1472→      set(state => ({
+  1473→        players: state.players.map(p =>
+  1474→          p.id === currentBidderId ? { ...p, quote } : p
+  1475→        ),
+  1476→      }));
+  1477→      get().addLog({
+  1478→        playerId: currentBidderId,
+  1479→        playerName: player.name,
+  1480→        message: `🤖 ${player.name}: "${quote}"`,
+  1481→        type: 'ai_quote',
+  1482→      });
+  1483→    }
+  1484→
+  1485→    get().setAIThinking(false);
+  1486→  },
+  1487→
+  1488→  // --- Mortgage / Unmortgage ---
+  1489→  mortgageProperty: (tileId: number) => {
+  1490→    const state = get();
+  1491→    const tile = state.tiles.find(t => t.id === tileId);
+  1492→    const player = state.players.find(p => p.id === 'player');
+  1493→    if (!tile || !player || tile.owner !== 'player') return;
+  1494→    if (state.mortgagedTiles.includes(tileId)) return;
+  1495→
+  1496→    // Cannot mortgage if there are houses on the tile
+  1497→    if ((tile.houses || 0) > 0) return;
+  1498→
+  1499→    const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1500→
+  1501→    set(state => ({
+  1502→      players: state.players.map(p =>
+  1503→        p.id === 'player' ? { ...p, money: p.money + mortgageValue } : p
+  1504→      ),
+  1505→      mortgagedTiles: [...state.mortgagedTiles, tileId],
+  1506→    }));
+  1507→
+  1508→    get().addLog({
+  1509→      playerId: 'player',
+  1510→      playerName: player.name,
+  1511→      message: `🏦 ${player.name} menggadai ${tile.name} for RM${mortgageValue}! (Mortgaged)`,
+  1512→      type: 'buy',
+  1513→    });
+  1514→  },
+  1515→
+  1516→  unmortgageProperty: (tileId: number) => {
+  1517→    const state = get();
+  1518→    const tile = state.tiles.find(t => t.id === tileId);
+  1519→    const player = state.players.find(p => p.id === 'player');
+  1520→    if (!tile || !player || tile.owner !== 'player') return;
+  1521→    if (!state.mortgagedTiles.includes(tileId)) return;
+  1522→
+  1523→    const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1524→    const cost = Math.round(mortgageValue * 1.1); // 10% interest
+  1525→
+  1526→    if (player.money < cost) return;
+  1527→
+  1528→    set(state => ({
+  1529→      players: state.players.map(p =>
+  1530→        p.id === 'player' ? { ...p, money: p.money - cost } : p
+  1531→      ),
+  1532→      mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1533→    }));
+  1534→
+  1535→    get().addLog({
+  1536→      playerId: 'player',
+  1537→      playerName: player.name,
+  1538→      message: `🏦 ${player.name} membuka gadai ${tile.name} for RM${cost} (incl. 10% interest)!`,
+  1539→      type: 'buy',
+  1540→    });
+  1541→  },
+  1542→
+  1543→  // --- AI Speed Control ---
+  1544→  setAISpeed: (speed: number) => {
+  1545→    set({ aiSpeed: Math.max(1, Math.min(3, speed)) });
+  1546→  },
+  1547→
+  1548→  // --- Achievements ---
+  1549→  unlockAchievement: (id: string) => {
+  1550→    const state = get();
+  1551→    const achievement = state.achievements.find(a => a.id === id);
+  1552→    if (!achievement || achievement.unlockedAt !== null) return; // already unlocked
+  1553→
+  1554→    const now = Date.now();
+  1555→    set(state => ({
+  1556→      achievements: state.achievements.map(a =>
+  1557→        a.id === id ? { ...a, unlockedAt: now } : a
+  1558→      ),
+  1559→    }));
+  1560→
+  1561→    get().addLog({
+  1562→      playerId: 'system',
+  1563→      playerName: 'System',
+  1564→      message: `🏆 Achievement Unlocked: ${achievement.emoji} ${achievement.name} — ${achievement.description}!`,
+  1565→      type: 'system',
+  1566→    });
+  1567→  },
+  1568→
+  1569→  // --- Save / Load Game ---
+  1570→  saveGame: () => {
+  1571→    try {
+  1572→      if (typeof window === 'undefined') return;
+  1573→      const state = get();
+  1574→      const saveData = {
+  1575→        phase: state.phase,
+  1576→        players: state.players,
+  1577→        tiles: state.tiles,
+  1578→        turnOrder: state.turnOrder,
+  1579→        currentTurnIndex: state.currentTurnIndex,
+  1580→        turnCount: state.turnCount,
+  1581→        diceValues: state.diceValues,
+  1582→        isDoubles: state.isDoubles,
+  1583→        consecutiveDoubles: state.consecutiveDoubles,
+  1584→        jawatanMenteriDeck: state.jawatanMenteriDeck,
+  1585→        krisisNasionalDeck: state.krisisNasionalDeck,
+  1586→        marketState: state.marketState,
+  1587→        selectedTileId: state.selectedTileId,
+  1588→        gameLog: state.gameLog,
+  1589→        winner: state.winner,
+  1590→        showPortfolio: state.showPortfolio,
+  1591→        auctionState: state.auctionState,
+  1592→        mortgagedTiles: state.mortgagedTiles,
+  1593→        aiSpeed: state.aiSpeed,
+  1594→        achievements: state.achievements,
+  1595→        stats: state.stats,
+  1596→      };
+  1597→      localStorage.setItem('dewan-rakyat-save', JSON.stringify(saveData));
+  1598→    } catch {
+  1599→      // Silently fail if localStorage not available
+  1600→    }
+  1601→  },
+  1602→
+  1603→  loadGame: () => {
+  1604→    try {
+  1605→      if (typeof window === 'undefined') return false;
+  1606→      const raw = localStorage.getItem('dewan-rakyat-save');
+  1607→      if (!raw) return false;
+  1608→      const saveData = JSON.parse(raw);
+  1609→
+  1610→      set({
+  1611→        phase: saveData.phase || 'lobby',
+  1612→        players: saveData.players || [],
+  1613→        tiles: saveData.tiles || BOARD_TILES.map(t => ({ ...t })),
+  1614→        turnOrder: saveData.turnOrder || [],
+  1615→        currentTurnIndex: saveData.currentTurnIndex || 0,
+  1616→        turnCount: saveData.turnCount || 1,
+  1617→        diceValues: saveData.diceValues || null,
+  1618→        isDoubles: saveData.isDoubles || false,
+  1619→        consecutiveDoubles: saveData.consecutiveDoubles || 0,
+  1620→        jawatanMenteriDeck: saveData.jawatanMenteriDeck || shuffleDeck(JAWATAN_MENTERI_CARDS),
+  1621→        krisisNasionalDeck: saveData.krisisNasionalDeck || shuffleDeck(KRISIS_NASIONAL_CARDS),
+  1622→        marketState: saveData.marketState || DEFAULT_MARKET_STATE,
+  1623→        selectedTileId: saveData.selectedTileId || null,
+  1624→        currentCard: null, // transient UI state
+  1625→        currentRentPayment: null, // transient UI state
+  1626→        gameLog: saveData.gameLog || [],
+  1627→        winner: saveData.winner || null,
+  1628→        aiThinking: false, // transient UI state
+  1629→        showPortfolio: saveData.showPortfolio || false,
+  1630→        auctionState: saveData.auctionState || null,
+  1631→        mortgagedTiles: saveData.mortgagedTiles || [],
+  1632→        aiSpeed: saveData.aiSpeed || 1,
+  1633→        achievements: saveData.achievements || INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
+  1634→        stats: saveData.stats || { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
+  1635→      });
+  1636→      return true;
+  1637→    } catch {
+  1638→      return false;
+  1639→    }
+  1640→  },
+  1641→
+  1642→  hasSavedGame: () => {
+  1643→    try {
+  1644→      if (typeof window === 'undefined') return false;
+  1645→      return localStorage.getItem('dewan-rakyat-save') !== null;
+  1646→    } catch {
+  1647→      return false;
+  1648→    }
+  1649→  },
+  1650→
+  1651→  // --- Managing Phase ---
+  1652→  enterManaging: () => {
+  1653→    const state = get();
+  1654→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+  1655→    const player = state.players.find(p => p.id === currentPlayerId);
+  1656→    if (!player || player.isAI || player.isBankrupt) return;
+  1657→    if (state.phase !== 'landed' && state.phase !== 'playing') return;
+  1658→    set({ phase: 'managing' });
+  1659→  },
+  1660→
+  1661→  exitManaging: () => {
+  1662→    set({ phase: 'landed' });
+  1663→  },
+  1664→
+  1665→  // --- Market Simulation ---
+  1666→  simulateMarket: () => {
+  1667→    const state = get();
+  1668→    const klciChange = (Math.random() - 0.5) * 3;
+  1669→    const cpoChange = (Math.random() - 0.5) * 5;
+  1670→    const ringgitChange = (Math.random() - 0.5) * 0.08;
+  1671→
+  1672→    const newKlci = Math.max(1200, Math.min(2000, state.marketState.klci + klciChange * 10));
+  1673→    const newCpo = Math.max(2000, Math.min(6000, state.marketState.cpoPrice + cpoChange * 50));
+  1674→    const newRinggit = Math.max(3.5, Math.min(5.5, state.marketState.ringgitUsd + ringgitChange));
+  1675→
+  1676→    // Inflation: driven by KLCI and CPO
+  1677→    const inflationMultiplier = 0.85 + (newKlci - 1400) / 2000 + (newCpo - 3500) / 20000;
+  1678→    const federalRentBonus = 1.0 + (newRinggit - 4.47) * 0.3;
+  1679→
+  1680→    set({
+  1681→      marketState: {
+  1682→        klci: Math.round(newKlci * 10) / 10,
+  1683→        klciChange: Math.round(klciChange * 10) / 10,
+  1684→        cpoPrice: Math.round(newCpo),
+  1685→        cpoChange: Math.round(cpoChange * 10) / 10,
+  1686→        ringgitUsd: Math.round(newRinggit * 100) / 100,
+  1687→        ringgitChange: Math.round(ringgitChange * 100) / 100,
+  1688→        inflationMultiplier: Math.round(inflationMultiplier * 100) / 100,
+  1689→        federalRentBonus: Math.round(federalRentBonus * 100) / 100,
+  1690→        timestamp: new Date().toISOString(),
+  1691→      },
+  1692→    });
+  1693→  },
+  1694→
+  1695→  // --- Trade System ---
+  1696→  initiateTrade: (targetPlayerId: string) => {
+  1697→    const state = get();
+  1698→    const currentPlayerId = state.turnOrder[state.currentTurnIndex];
+  1699→    const player = state.players.find(p => p.id === currentPlayerId);
+  1700→    if (!player || player.isAI) return;
+  1701→    if (state.phase !== 'landed' && state.phase !== 'playing') return;
+  1702→
+  1703→    const target = state.players.find(p => p.id === targetPlayerId);
+  1704→    if (!target || target.isBankrupt || target.isBankrupt === undefined) return;
+  1705→
+  1706→    set({
+  1707→      tradeState: {
+  1708→        initiator: currentPlayerId,
+  1709→        responder: targetPlayerId,
+  1710→        offeredProperties: [],
+  1711→        offeredCash: 0,
+  1712→        requestedProperties: [],
+  1713→        requestedCash: 0,
+  1714→        isActive: true,
+  1715→      },
+  1716→    });
+  1717→
+  1718→    // If responder is AI, trigger AI evaluation after a short delay
+  1719→    if (target.isAI) {
+  1720→      setTimeout(() => get().aiTradeResponse(), 1500);
+  1721→    }
+  1722→  },
+  1723→
+  1724→  updateTradeOffer: (offeredProperties: number[], offeredCash: number, requestedProperties: number[], requestedCash: number) => {
+  1725→    const state = get();
+  1726→    if (!state.tradeState) return;
+  1727→    set({
+  1728→      tradeState: {
+  1729→        ...state.tradeState,
+  1730→        offeredProperties,
+  1731→        offeredCash,
+  1732→        requestedProperties,
+  1733→        requestedCash,
+  1734→      },
+  1735→    });
+  1736→  },
+  1737→
+  1738→  acceptTrade: () => {
+  1739→    const state = get();
+  1740→    const trade = state.tradeState;
+  1741→    if (!trade || !trade.initiator || !trade.responder) return;
+  1742→
+  1743→    const initiator = state.players.find(p => p.id === trade.initiator);
+  1744→    const responder = state.players.find(p => p.id === trade.responder);
+  1745→    if (!initiator || !responder) return;
+  1746→
+  1747→    // Validate that players own the properties they're offering
+  1748→    const initiatorOwnsOffered = trade.offeredProperties.every(id => initiator.properties.includes(id));
+  1749→    const responderOwnsRequested = trade.requestedProperties.every(id => responder.properties.includes(id));
+  1750→    if (!initiatorOwnsOffered || !responderOwnsRequested) {
+  1751→      get().addLog({
+  1752→        playerId: 'system',
+  1753→        playerName: 'System',
+  1754→        message: `❌ Trade failed — invalid property ownership!`,
+  1755→        type: 'system',
+  1756→      });
+  1757→      set({ tradeState: null });
+  1758→      return;
+  1759→    }
+  1760→
+  1761→    // Validate cash availability
+  1762→    if (initiator.money < trade.offeredCash || responder.money < trade.requestedCash) {
+  1763→      get().addLog({
+  1764→        playerId: 'system',
+  1765→        playerName: 'System',
+  1766→        message: `❌ Trade failed — insufficient funds!`,
+  1767→        type: 'system',
+  1768→      });
+  1769→      set({ tradeState: null });
+  1770→      return;
+  1771→    }
+  1772→
+  1773→    // Execute trade: swap properties and transfer cash
+  1774→    const initiatorNewProperties = [
+  1775→      ...initiator.properties.filter(id => !trade.offeredProperties.includes(id)),
+  1776→      ...trade.requestedProperties,
+  1777→    ];
+  1778→    const responderNewProperties = [
+  1779→      ...responder.properties.filter(id => !trade.requestedProperties.includes(id)),
+  1780→      ...trade.offeredProperties,
+  1781→    ];
+  1782→
+  1783→    set(state => ({
+  1784→      players: state.players.map(p => {
+  1785→        if (p.id === trade.initiator) {
+  1786→          return {
+  1787→            ...p,
+  1788→            properties: initiatorNewProperties,
+  1789→            money: p.money - trade.offeredCash + trade.requestedCash,
+  1790→          };
+  1791→        }
+  1792→        if (p.id === trade.responder) {
+  1793→          return {
+  1794→            ...p,
+  1795→            properties: responderNewProperties,
+  1796→            money: p.money - trade.requestedCash + trade.offeredCash,
+  1797→          };
+  1798→        }
+  1799→        return p;
+  1800→      }),
+  1801→      tiles: state.tiles.map(t => {
+  1802→        if (trade.offeredProperties.includes(t.id)) {
+  1803→          return { ...t, owner: trade.responder };
+  1804→        }
+  1805→        if (trade.requestedProperties.includes(t.id)) {
+  1806→          return { ...t, owner: trade.initiator };
+  1807→        }
+  1808→        return t;
+  1809→      }),
+  1810→      mortgagedTiles: [
+  1811→        ...state.mortgagedTiles.filter(id => !trade.offeredProperties.includes(id) && !trade.requestedProperties.includes(id)),
+  1812→      ],
+  1813→      tradeState: null,
+  1814→    }));
+  1815→
+  1816→    // Log the trade
+  1817→    const offeredDesc = [
+  1818→      ...trade.offeredProperties.map(id => state.tiles.find(t => t.id === id)?.name).filter(Boolean),
+  1819→      trade.offeredCash > 0 ? `RM${trade.offeredCash}` : null,
+  1820→    ].filter(Boolean).join(', ');
+  1821→
+  1822→    const requestedDesc = [
+  1823→      ...trade.requestedProperties.map(id => state.tiles.find(t => t.id === id)?.name).filter(Boolean),
+  1824→      trade.requestedCash > 0 ? `RM${trade.requestedCash}` : null,
+  1825→    ].filter(Boolean).join(', ');
+  1826→
+  1827→    get().addLog({
+  1828→      playerId: trade.initiator,
+  1829→      playerName: initiator.name,
+  1830→      message: `🤝 ${initiator.name} trades [${offeredDesc}] with ${responder.name} for [${requestedDesc}]!`,
+  1831→      type: 'system',
+  1832→    });
+  1833→
+  1834→    // Check bankruptcy after trade
+  1835→    const postTrade = get();
+  1836→    const anyBankrupt = postTrade.players.some(p => p.money < 0 && !p.isBankrupt);
+  1837→    if (anyBankrupt) {
+  1838→      set(state => ({
+  1839→        players: state.players.map(p =>
+  1840→          p.money < 0 ? { ...p, isBankrupt: true } : p
+  1841→        ),
+  1842→      }));
+  1843→      const activePlayers = get().players.filter(p => !p.isBankrupt);
+  1844→      if (activePlayers.length <= 1) {
+  1845→        set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+  1846→      }
+  1847→    }
+  1848→  },
+  1849→
+  1850→  rejectTrade: () => {
+  1851→    const state = get();
+  1852→    const trade = state.tradeState;
+  1853→    if (!trade) return;
+  1854→
+  1855→    const responder = state.players.find(p => p.id === trade.responder);
+  1856→    get().addLog({
+  1857→      playerId: trade.responder,
+  1858→      playerName: responder?.name || trade.responder,
+  1859→      message: `🚫 ${responder?.name || 'Opponent'} rejected the trade offer!`,
+  1860→      type: 'system',
+  1861→    });
+  1862→
+  1863→    set({ tradeState: null });
+  1864→  },
+  1865→
+  1866→  aiTradeResponse: () => {
+  1867→    const state = get();
+  1868→    const trade = state.tradeState;
+  1869→    if (!trade || !trade.responder) return;
+  1870→
+  1871→    const responder = state.players.find(p => p.id === trade.responder);
+  1872→    if (!responder || !responder.isAI) return;
+  1873→
+  1874→    // Calculate total value offered to AI (responder)
+  1875→    let offeredValue = trade.offeredCash;
+  1876→    for (const tileId of trade.offeredProperties) {
+  1877→      const t = state.tiles.find(tile => tile.id === tileId);
+  1878→      if (t) offeredValue += Math.round((t.price || 0) * 0.8);
+  1879→    }
+  1880→
+  1881→    // Calculate total value requested from AI
+  1882→    let requestedValue = trade.requestedCash;
+  1883→    for (const tileId of trade.requestedProperties) {
+  1884→      const t = state.tiles.find(tile => tile.id === tileId);
+  1885→      if (t) requestedValue += Math.round((t.price || 0) * 0.8);
+  1886→    }
+  1887→
+  1888→    // Heuristic: accept if offered value is reasonably close to requested, with randomness
+  1889→    const ratio = offeredValue / Math.max(1, requestedValue);
+  1890→    const shouldAccept = ratio > 0.7 && Math.random() > 0.25;
+  1891→
+  1892→    if (shouldAccept && responder.money >= trade.requestedCash) {
+  1893→      get().addLog({
+  1894→        playerId: trade.responder,
+  1895→        playerName: responder.name,
+  1896→        message: `🤝 ${responder.name} accepts the trade! "Deal lah, bro!"`,
+  1897→        type: 'system',
+  1898→      });
+  1899→      get().acceptTrade();
+  1900→    } else {
+  1901→      get().rejectTrade();
+  1902→    }
+  1903→  },
+  1904→}));

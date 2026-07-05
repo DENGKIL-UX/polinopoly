@@ -1,0 +1,679 @@
+'use client';
+
+import { useRef, useMemo, useState } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { Text, RoundedBox } from '@react-three/drei';
+import * as THREE from 'three';
+import {
+  BOARD_TILES,
+  COLOR_GROUP_HEX,
+  COALITIONS,
+  getTilePosition,
+  type Tile,
+} from '@/lib/game-data';
+import { useGameStore } from '@/lib/game-store';
+
+// ───────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ───────────────────────────────────────────────────────────────────
+
+const BOARD_SIZE = 20;
+const HALF = BOARD_SIZE / 2;
+
+const TILE_H = 0.15; // tile thickness
+const CORNER_W = 2.0;
+const CORNER_D = 2.0;
+const EDGE_W = 1.7; // width along the edge
+const EDGE_D = 0.85; // depth perpendicular to edge (towards center)
+
+const FELT_COLOR = '#1a472a';
+const FELT_INNER = '#153d22';
+const WOOD_COLOR = '#3d2817';
+const WOOD_ACCENT = '#5c3d21';
+
+const FRAME_W = 1.0;
+const FRAME_H = 0.45;
+
+// Tile type → base colour
+const TYPE_COLORS: Record<string, string> = {
+  corner: '#f5e6c8',
+  highway: '#e5e7eb',
+  media: '#f0abfc',
+  tax: '#fca5a5',
+  chest: '#fef3c7',
+  chance: '#93c5fd',
+};
+
+// Short Malay sub-labels for special tiles
+const SUB_LABELS: Record<number, string> = {
+  0: 'UNDI — Kumpul RM200',
+  10: 'LAWAT SAHAJA',
+  20: 'PARKIR PERCUMA',
+  30: 'SPR SIASAT!',
+  2: 'Peti Khazanah',
+  4: 'Cukai GST',
+  7: 'Peluang!',
+  17: 'Peti Khazanah',
+  22: 'Peluang!',
+  33: 'Peti Khazanah',
+  36: 'Peluang!',
+  38: 'Cukai Mewah',
+};
+
+// Corner-tile emoji icons
+const CORNER_ICONS: Record<number, string> = {
+  0: '\u{1F5F3}\u{FE0F}',   // ballot box
+  10: '\u{1F512}',          // lock
+  20: '\u{1F3F0}',           // castle
+  30: '\u{26A0}\u{FE0F}',   // warning
+};
+
+// ───────────────────────────────────────────────────────────────────
+// HELPERS
+// ───────────────────────────────────────────────────────────────────
+
+function getTileColor(tile: Tile): string {
+  if (tile.type === 'property' && tile.colorGroup) {
+    return COLOR_GROUP_HEX[tile.colorGroup];
+  }
+  return TYPE_COLORS[tile.type] || '#e5e7eb';
+}
+
+/**
+ * Returns outward-facing unit vector and whether the edge runs along X.
+ * outX / outZ = direction from center → outside the board.
+ */
+function edgeInfo(id: number): {
+  outX: number;
+  outZ: number;
+  isAlongX: boolean;
+} {
+  if (id >= 1 && id <= 9) return { outX: 0, outZ: 1, isAlongX: true };
+  if (id >= 11 && id <= 19) return { outX: -1, outZ: 0, isAlongX: false };
+  if (id >= 21 && id <= 29) return { outX: 0, outZ: -1, isAlongX: true };
+  return { outX: 1, outZ: 0, isAlongX: false }; // 31-39
+}
+
+// ───────────────────────────────────────────────────────────────────
+// CORNER TILE  (animated glow)
+// ───────────────────────────────────────────────────────────────────
+
+function CornerTile({ tile }: { tile: Tile }) {
+  const matRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const groupRef = useRef<THREE.Group>(null!);
+  const [hovered, setHovered] = useState(false);
+  const pos = getTilePosition(tile.id, BOARD_SIZE);
+
+  const selectedTileId = useGameStore((s) => s.selectedTileId);
+  const selectTile = useGameStore((s) => s.selectTile);
+  const isSelected = selectedTileId === tile.id;
+
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    selectTile(isSelected ? null : tile.id);
+  };
+
+  // Gentle emissive pulse + hover lift
+  useFrame(({ clock }, delta) => {
+    if (!matRef.current) return;
+    const t = clock.elapsedTime;
+    const pulse = 0.12 + 0.08 * Math.sin(t * 1.5 + tile.id * 0.7);
+    matRef.current.emissiveIntensity = isSelected ? 0.5 : hovered ? 0.32 : pulse;
+    if (groupRef.current) {
+      const targetY = TILE_H / 2 + (hovered || isSelected ? 0.18 : 0);
+      groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[pos.x, TILE_H / 2, pos.z]}>
+      {/* Base mesh — RoundedBox for softer corners */}
+      <RoundedBox
+        args={[CORNER_W, TILE_H, CORNER_D]}
+        radius={0.06}
+        smoothness={4}
+        castShadow
+        receiveShadow
+        onClick={handleClick}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+      >
+        <meshStandardMaterial
+          ref={matRef}
+          color={TYPE_COLORS.corner}
+          roughness={0.3}
+          metalness={0.15}
+          emissive="#f5e6c8"
+          emissiveIntensity={0.12}
+        />
+      </RoundedBox>
+
+      {/* Icon */}
+      <Text
+        position={[0, TILE_H + 0.09, -0.38]}
+        fontSize={0.5}
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, pos.rotation, 0]}
+      >
+        {CORNER_ICONS[tile.id] ?? ''}
+      </Text>
+
+      {/* Name */}
+      <Text
+        position={[0, TILE_H + 0.01, 0.15]}
+        fontSize={0.22}
+        color="#3d2817"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        maxWidth={1.7}
+        textAlign="center"
+      >
+        {tile.name}
+      </Text>
+
+      {/* Sub-label (Malay) */}
+      <Text
+        position={[0, TILE_H + 0.01, 0.5]}
+        fontSize={0.13}
+        color="#6b4226"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        maxWidth={1.7}
+        textAlign="center"
+      >
+        {SUB_LABELS[tile.id] ?? ''}
+      </Text>
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// EDGE TILE  (property / highway / media / tax / chest / chance)
+// ───────────────────────────────────────────────────────────────────
+
+function EdgeTile({ tile }: { tile: Tile }) {
+  const pos = getTilePosition(tile.id, BOARD_SIZE);
+  const tiles = useGameStore((s) => s.tiles);
+  const selectedTileId = useGameStore((s) => s.selectedTileId);
+  const selectTile = useGameStore((s) => s.selectTile);
+  const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null!);
+
+  const tileState = tiles[tile.id];
+  const isSelected = selectedTileId === tile.id;
+  const color = getTileColor(tile);
+
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    selectTile(isSelected ? null : tile.id);
+  };
+
+  // Hover / select lift
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const targetY = TILE_H / 2 + (hovered || isSelected ? 0.2 : 0);
+    groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
+  });
+
+  const houseCount = tileState?.houses ?? 0;
+  const hasOwner = !!tileState?.owner;
+
+  // Owner coalition colour
+  const ownerColor = useMemo(() => {
+    if (hasOwner && tileState?.owner) {
+      return COALITIONS[tileState.owner]?.color ?? '#78716c';
+    }
+    return null;
+  }, [hasOwner, tileState?.owner]);
+
+  // Edge geometry helpers
+  const { outX, outZ, isAlongX } = edgeInfo(tile.id);
+
+  // Property colour-strip positioning
+  const showStrip = tile.type === 'property' && !!tile.colorGroup;
+  const stripOffX = -outX * (EDGE_D / 2 - 0.08);
+  const stripOffZ = -outZ * (EDGE_D / 2 - 0.08);
+  const stripGeo: [number, number, number] = isAlongX
+    ? [EDGE_W - 0.15, 0.06, 0.16]
+    : [0.16, 0.06, EDGE_W - 0.15];
+
+  // Text offsets (name at centre, sub towards centre, price towards edge)
+  const subOffX = -outX * 0.16;
+  const subOffZ = -outZ * 0.16;
+  const priceOffX = outX * 0.25;
+  const priceOffZ = outZ * 0.25;
+
+  const textY = TILE_H + 0.01;
+
+  return (
+    <group ref={groupRef} position={[pos.x, TILE_H / 2, pos.z]}>
+      {/* ── Tile body ── */}
+      <mesh
+        castShadow
+        receiveShadow
+        onClick={handleClick}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
+      >
+        <boxGeometry args={[EDGE_W, TILE_H, EDGE_D]} />
+        <meshStandardMaterial
+          color={color}
+          roughness={0.35}
+          metalness={0.1}
+          emissive={isSelected || hovered ? color : '#000000'}
+          emissiveIntensity={isSelected ? 0.45 : hovered ? 0.28 : 0}
+        />
+      </mesh>
+
+      {/* ── Property colour strip ── */}
+      {showStrip && (
+        <mesh
+          position={[stripOffX, TILE_H / 2 + 0.03, stripOffZ]}
+          castShadow
+        >
+          <boxGeometry args={stripGeo} />
+          <meshStandardMaterial
+            color={COLOR_GROUP_HEX[tile.colorGroup!]}
+            roughness={0.25}
+            metalness={0.2}
+          />
+        </mesh>
+      )}
+
+      {/* ── Tile name ── */}
+      <Text
+        position={[0, textY, 0]}
+        fontSize={0.14}
+        color="#1a1a2e"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        maxWidth={EDGE_W - 0.2}
+        textAlign="center"
+      >
+        {tile.name}
+      </Text>
+
+      {/* ── Malay / special sub-label ── */}
+      {SUB_LABELS[tile.id] && (
+        <Text
+          position={[subOffX, textY, subOffZ]}
+          fontSize={0.09}
+          color="#6b7280"
+          anchorX="center"
+          anchorY="middle"
+          rotation={[-Math.PI / 2, pos.rotation, 0]}
+          maxWidth={EDGE_W - 0.25}
+          textAlign="center"
+        >
+          {SUB_LABELS[tile.id]}
+        </Text>
+      )}
+
+      {/* ── Price label ── */}
+      {tile.price != null && (
+        <Text
+          position={[priceOffX, textY - 0.004, priceOffZ]}
+          fontSize={0.17}
+          color="#1e293b"
+          anchorX="center"
+          anchorY="middle"
+          rotation={[-Math.PI / 2, pos.rotation, 0]}
+        >
+          {`RM${tile.price}`}
+        </Text>
+      )}
+
+      {/* ── House indicators (green boxes / red hotel) ── */}
+      {houseCount > 0 && (
+        <group
+          position={[
+            -outX * 0.05,
+            TILE_H + 0.04,
+            -outZ * 0.05,
+          ]}
+        >
+          {Array.from({ length: Math.min(houseCount, 4) }).map((_, i) => {
+            // Distribute along the edge direction
+            const hx = isAlongX
+              ? (i - 1.5) * 0.22
+              : 0;
+            const hz = isAlongX
+              ? 0
+              : (i - 1.5) * 0.22;
+            return (
+              <mesh key={`h${i}`} position={[hx, 0.05, hz]} castShadow>
+                <boxGeometry args={[0.13, 0.11, 0.13]} />
+                <meshStandardMaterial
+                  color="#22c55e"
+                  emissive="#22c55e"
+                  emissiveIntensity={0.15}
+                />
+              </mesh>
+            );
+          })}
+
+          {/* Hotel = 5th "house" rendered as a larger red block */}
+          {houseCount >= 5 && (
+            <mesh position={[0, 0.08, 0]} castShadow>
+              <boxGeometry args={[0.22, 0.18, 0.22]} />
+              <meshStandardMaterial
+                color="#dc2626"
+                emissive="#dc2626"
+                emissiveIntensity={0.2}
+              />
+            </mesh>
+          )}
+        </group>
+      )}
+
+      {/* ── Owner indicator sphere ── */}
+      {hasOwner && ownerColor && (
+        <mesh
+          position={[
+            (isAlongX ? EDGE_W / 2 - 0.22 : 0),
+            TILE_H + 0.09,
+            (isAlongX ? 0 : EDGE_W / 2 - 0.22),
+          ]}
+          castShadow
+        >
+          <sphereGeometry args={[0.1, 16, 16]} />
+          <meshStandardMaterial
+            color={ownerColor}
+            emissive={ownerColor}
+            emissiveIntensity={0.3}
+            roughness={0.3}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// BOARD BASE + WOOD FRAME
+// ───────────────────────────────────────────────────────────────────
+
+function BoardBase() {
+  const outer = BOARD_SIZE + FRAME_W * 2 + 0.2;
+  const frameEdge = HALF + FRAME_W / 2 + 0.1;
+
+  return (
+    <group>
+      {/* ── Green felt playing surface ── */}
+      <mesh position={[0, -0.1, 0]} receiveShadow>
+        <boxGeometry args={[BOARD_SIZE + 0.4, 0.2, BOARD_SIZE + 0.4]} />
+        <meshStandardMaterial
+          color={FELT_COLOR}
+          roughness={0.92}
+          metalness={0}
+        />
+      </mesh>
+
+      {/* Inner felt accent (slightly darker centre patch) */}
+      <mesh position={[0, 0.001, 0]} receiveShadow>
+        <boxGeometry args={[BOARD_SIZE - 2, 0.003, BOARD_SIZE - 2]} />
+        <meshStandardMaterial color={FELT_INNER} roughness={0.95} />
+      </mesh>
+
+      {/* ── Wood frame — four bars ── */}
+      {/* Bottom */}
+      <mesh position={[0, 0, frameEdge]} castShadow receiveShadow>
+        <boxGeometry args={[outer, FRAME_H, FRAME_W]} />
+        <meshStandardMaterial color={WOOD_COLOR} roughness={0.7} metalness={0.1} />
+      </mesh>
+      {/* Top */}
+      <mesh position={[0, 0, -frameEdge]} castShadow receiveShadow>
+        <boxGeometry args={[outer, FRAME_H, FRAME_W]} />
+        <meshStandardMaterial color={WOOD_COLOR} roughness={0.7} metalness={0.1} />
+      </mesh>
+      {/* Left */}
+      <mesh position={[frameEdge, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[FRAME_W, FRAME_H, outer]} />
+        <meshStandardMaterial color={WOOD_COLOR} roughness={0.7} metalness={0.1} />
+      </mesh>
+      {/* Right */}
+      <mesh position={[-frameEdge, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[FRAME_W, FRAME_H, outer]} />
+        <meshStandardMaterial color={WOOD_COLOR} roughness={0.7} metalness={0.1} />
+      </mesh>
+
+      {/* ── Corner accents (lighter wood) ── */}
+      {[
+        [frameEdge, FRAME_H / 2 + 0.01, frameEdge],
+        [-frameEdge, FRAME_H / 2 + 0.01, frameEdge],
+        [frameEdge, FRAME_H / 2 + 0.01, -frameEdge],
+        [-frameEdge, FRAME_H / 2 + 0.01, -frameEdge],
+      ].map(([cx, cy, cz], i) => (
+        <mesh key={`ca${i}`} position={[cx, cy, cz]}>
+          <boxGeometry args={[FRAME_W + 0.1, 0.08, FRAME_W + 0.1]} />
+          <meshStandardMaterial
+            color={WOOD_ACCENT}
+            roughness={0.55}
+            metalness={0.15}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// CENTRE DECORATION
+// ───────────────────────────────────────────────────────────────────
+
+function CenterDecoration() {
+  const glowRef = useRef<THREE.MeshStandardMaterial>(null!);
+
+  // Subtle breathing glow on the title backing plane
+  useFrame(({ clock }) => {
+    if (!glowRef.current) return;
+    glowRef.current.emissiveIntensity =
+      0.15 + 0.06 * Math.sin(clock.elapsedTime * 0.8);
+  });
+
+  return (
+    <group position={[0, 0.02, 0]}>
+      {/* ── Decorative gold rings ── */}
+      <mesh>
+        <torusGeometry args={[5.5, 0.05, 8, 64]} />
+        <meshStandardMaterial
+          color="#b8860b"
+          roughness={0.35}
+          metalness={0.45}
+        />
+      </mesh>
+      <mesh>
+        <torusGeometry args={[4.5, 0.04, 8, 64]} />
+        <meshStandardMaterial
+          color="#d4a843"
+          roughness={0.3}
+          metalness={0.5}
+        />
+      </mesh>
+      <mesh>
+        <torusGeometry args={[3.5, 0.03, 8, 64]} />
+        <meshStandardMaterial
+          color="#d4a843"
+          roughness={0.3}
+          metalness={0.5}
+        />
+      </mesh>
+
+      {/* ── Diagonal cross-lines ── */}
+      <mesh rotation={[0, Math.PI / 4, 0]}>
+        <boxGeometry args={[11, 0.008, 0.05]} />
+        <meshStandardMaterial
+          color="#d4a843"
+          roughness={0.4}
+          metalness={0.4}
+        />
+      </mesh>
+      <mesh rotation={[0, -Math.PI / 4, 0]}>
+        <boxGeometry args={[11, 0.008, 0.05]} />
+        <meshStandardMaterial
+          color="#d4a843"
+          roughness={0.4}
+          metalness={0.4}
+        />
+      </mesh>
+
+      {/* ── Title backing plane (translucent) ── */}
+      <mesh position={[0, 0.015, 1.5]}>
+        <planeGeometry args={[6, 0.9]} />
+        <meshStandardMaterial
+          ref={glowRef}
+          color="#1a472a"
+          emissive="#d4a843"
+          emissiveIntensity={0.15}
+          transparent
+          opacity={0.55}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* ── "DEWAN RAKYAT" ── */}
+      <Text
+        position={[0, 0.035, 1.5]}
+        fontSize={0.7}
+        color="#d4a843"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        letterSpacing={0.12}
+      >
+        DEWAN RAKYAT
+      </Text>
+
+      {/* ── "PILIHAN RAYA EDITION" ── */}
+      <Text
+        position={[0, 0.035, 0.55]}
+        fontSize={0.32}
+        color="#c9956b"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        letterSpacing={0.08}
+      >
+        PILIHAN RAYA EDITION
+      </Text>
+
+      {/* ── Coalition emblem row ── */}
+      <Text
+        position={[0, 0.03, -0.5]}
+        fontSize={0.24}
+        color="#8b7355"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        letterSpacing={0.15}
+      >
+        {'\u{1F7E6} \u{1F7E9} \u{1F7E7} \u{1F7E5} \u{1F7E8} \u2B1B'}
+      </Text>
+
+      {/* ── Satirical motto ── */}
+      <Text
+        position={[0, 0.025, -1.3]}
+        fontSize={0.2}
+        color="#7c6b5a"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        maxWidth={6}
+        textAlign="center"
+      >
+        &quot;Demokrasi Terjamin&hellip; Maybe&quot;
+      </Text>
+
+      {/* ── Copyright gag ── */}
+      <Text
+        position={[0, 0.02, -2.2]}
+        fontSize={0.14}
+        color="#6b5e50"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        maxWidth={6}
+        textAlign="center"
+      >
+        &copy; Suruhanjaya Pilihan Raya (Satirical Edition)
+      </Text>
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ───────────────────────────────────────────────────────────────────
+
+export default function Board3D() {
+  const boardRef = useRef<THREE.Group>(null!);
+
+  // Pre-compute tile positions (stable, never changes)
+  const tilePositions = useMemo(
+    () =>
+      BOARD_TILES.map((tile) => ({
+        tile,
+        pos: getTilePosition(tile.id, BOARD_SIZE),
+      })),
+    [],
+  );
+
+  return (
+    <group ref={boardRef} position={[0, 0, 0]}>
+      {/* ── Board base (felt + wood frame) ── */}
+      <BoardBase />
+
+      {/* ── Centre decoration ── */}
+      <CenterDecoration />
+
+      {/* ── All 40 tiles ── */}
+      <group>
+        {tilePositions.map(({ tile }) =>
+          tile.type === 'corner' ? (
+            <CornerTile key={tile.id} tile={tile} />
+          ) : (
+            <EdgeTile key={tile.id} tile={tile} />
+          ),
+        )}
+      </group>
+
+      {/* ── Lighting (self-contained; move to parent scene if desired) ── */}
+      <ambientLight intensity={0.45} color="#fef3c7" />
+
+      <directionalLight
+        position={[18, 22, 12]}
+        intensity={0.85}
+        color="#fffaf0"
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={60}
+        shadow-camera-left={-16}
+        shadow-camera-right={16}
+        shadow-camera-top={16}
+        shadow-camera-bottom={-16}
+        shadow-bias={-0.001}
+      />
+
+      {/* Fill light from opposite side */}
+      <directionalLight
+        position={[-12, 16, -8]}
+        intensity={0.25}
+        color="#e0e7ff"
+      />
+
+      {/* Soft overhead point for the title glow */}
+      <pointLight
+        position={[0, 8, 0]}
+        intensity={0.35}
+        color="#fef9ef"
+        distance={20}
+        decay={2}
+      />
+    </group>
+  );
+}
