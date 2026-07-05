@@ -3,6 +3,8 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useThree, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Environment, Stars, ContactShadows, Float } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import Board3D from './Board3D';
 import Token3D from './Token3D';
@@ -166,6 +168,23 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
       <CameraRig controlsRef={controlsRef} />
 
       <Environment preset="night" />
+
+      {/* ── Post-processing: Bloom + Vignette + ACES tone mapping ──
+          Makes emissive elements (gold, neon, light beams, particle bursts)
+          glow cinematically; vignette draws the eye to the center.
+          SSAO removed (requires NormalPass which is heavy); ContactShadows
+          already provides ground contact depth. */}
+      <EffectComposer multisampling={4}>
+        <Bloom
+          intensity={0.85}
+          luminanceThreshold={0.35}
+          luminanceSmoothing={0.4}
+          mipmapBlur
+          radius={0.7}
+        />
+        <Vignette eskil={false} offset={0.25} darkness={0.65} />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      </EffectComposer>
     </>
   );
 }
@@ -205,7 +224,12 @@ export default function GameScene() {
         camera={camera}
         shadows
         dpr={[1, 2]}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        gl={{
+          antialias: true,
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
         onPointerMissed={() => useGameStore.getState().selectTile(null)}
       >
         <SceneContent controlsRef={controlsRef} />

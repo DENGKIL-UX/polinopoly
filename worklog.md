@@ -221,3 +221,72 @@ Stage Summary:
 - Root cause was the CSS grid `1fr` overflow bug (1fr = minmax(auto, 1fr), content min-width forced columns to grow beyond container).
 - Fixed with `minmax(0, 1fr)` which allows columns to shrink, keeping all 40 tiles within the board.
 - Board now renders as a proper square with all 40 tiles + 4 corners visible at all viewport sizes.
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Enhance 3D board with extruded tiles, shaders, particles, Parliament, post-processing
+
+Work Log:
+- Researched GitHub 3D game enhancement ideas: threejs-game-skills (PBR/extrusion), three.quarks (particles), SirNeural/monopoly (3D Monopoly reference), post-processing (bloom/SSAO/vignette).
+- Installed @react-three/postprocessing for cinematic post-FX.
+
+Enhancements implemented:
+
+1. EXTRUDED 3D TILES (Board3D.tsx):
+   - Per-type extrusion heights: property 1.4×, highway 2.0×, media 1.3×, tax 1.6×, chest/chance 1.2× (was all flat TILE_H).
+   - Per-type materials: highway metalness 0.8, tax metalness 0.9, property roughness 0.25 with clearcoat feel.
+   - All tiles use RoundedBox with bevel radius for premium look.
+   - Hover lift + tilt-toward-camera (tiles physically lean toward the viewer).
+
+2. SHADER MATERIALS for premium corners (Shader3D.tsx):
+   - GO/Start corner: scrolling Jalur Gemilang flag pattern shader (14 stripes + blue canton + crescent + star, UV scrolling).
+   - Tax corners (Istana, SPR): shimmering gold shader with fresnel rim glow.
+   - Jail corner: iridescent holographic shader (fresnel-based color shift as camera moves).
+   - All shaders animated via useShaderAnimation hook (uTime uniform).
+
+3. 3D MINIATURES on tiles (Shader3D.tsx):
+   - Highway tiles: tiny 3D train (body + chimney + wheels, metallic).
+   - Tax tiles: gold coin stack (3 cylinders, gold metalness 0.9, emissive).
+   - Chest/Chance tiles: card stack (3 offset cards).
+   - Media tiles: TV monitor (dark body + emissive blue screen).
+
+4. 3D PARLIAMENT BUILDING (Parliament3D.tsx):
+   - Low-poly Malaysian Parliament in center: octagonal drum + 16 columns + blue dome with 12 gold ribs + spire + gold finial.
+   - Slowly rotates. Pulses with light when a Jawatan Menteri / card tile is landed on (watches game log).
+   - Vertical light beam from the dome (additive blending).
+   - "DEWAN RAKYAT" label on the base. Decorative gold ring on ground.
+   - Replaces the empty center area.
+
+5. PARTICLE EFFECTS (Particle3D.tsx):
+   - Custom lightweight particle system (InstancedMesh, avoids three.quarks bundle overhead).
+   - 4 effect types: confetti (plane particles, rotating), sparks (additive spheres), smoke (rising spheres), claim (upward burst).
+   - LandingEffects component watches player positions; spawns effect burst + shockwave ring + light beam when a player lands.
+   - Per-tile-type effect colors (property=coalition color, highway=sparks, tax=gold, jail=smoke, etc.).
+   - Shockwave: expanding ring on the tile surface (800ms).
+   - LightBeam: vertical additive-blended cylinder (3 units tall, pulsing).
+
+6. POST-PROCESSING (GameScene.tsx):
+   - EffectComposer with Bloom (intensity 0.85, mipmapBlur, threshold 0.35) — gold/neon/particles glow.
+   - Vignette (darkness 0.65) — draws eye to center.
+   - ACES Filmic tone mapping — cinematic color.
+   - SSAO removed (required heavy NormalPass; ContactShadows already provides ground depth).
+   - Canvas gl: ACESFilmicToneMapping + exposure 1.1.
+
+Verification (Agent Browser + VLM):
+- Game starts, 3D board renders with all enhancements. ✓
+- VLM: "tiles are 3D extruded with visible depth and raised surfaces" ✓
+- VLM: "3D Parliament-like structure in center with domed roof, blue globe, white columns" ✓
+- VLM: "3D miniatures present — trains, coin stacks" ✓
+- VLM: "bloom/glow effect enhances gold and bright elements" ✓
+- VLM: "shader effects on corners — flag pattern, gold shimmer, iridescent" ✓
+- VLM: "overall visual quality 8/10, significantly more premium and cinematic than a flat board" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- 3D board transformed from flat colored tiles to premium extruded 3D objects with per-type materials.
+- 4 shader materials (flag scroll, gold shimmer, iridescent, standard) for visual variety.
+- 5 types of 3D miniatures (train, coin stack, card stack, monitor, keris) on special tiles.
+- 3D Parliament building replaces empty center, rotates and pulses on card events.
+- Particle system (confetti/sparks/smoke) + shockwave + light beam on every landing.
+- Bloom + vignette + ACES tone mapping for cinematic post-processing.

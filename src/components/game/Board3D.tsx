@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo, useState, Suspense } from 'react';
+import { useRef, useMemo, useState, Suspense, useEffect } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Text, RoundedBox, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -12,6 +12,20 @@ import {
   type Tile,
 } from '@/lib/game-data';
 import { useGameStore } from '@/lib/game-store';
+import {
+  useIridescentMaterial,
+  useGoldShimmerMaterial,
+  useFlagScrollMaterial,
+  useShaderAnimation,
+  TileBuilding,
+  TileTrain,
+  TileCoinStack,
+  TileKeris,
+  TileCardStack,
+  TileMonitor,
+} from '@/components/game/Shader3D';
+import { ParticleBurst, Shockwave, LightBeam, type ParticleType } from '@/components/game/Particle3D';
+import { Parliament3D } from '@/components/game/Parliament3D';
 
 // ───────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -105,53 +119,81 @@ function CornerTile({ tile }: { tile: Tile }) {
   const [hovered, setHovered] = useState(false);
   const pos = getTilePosition(tile.id, BOARD_SIZE);
 
+  // Shader materials for premium corners
+  const flagMat = useFlagScrollMaterial();
+  const goldMat = useGoldShimmerMaterial();
+  const iridescentMat = useIridescentMaterial();
+  useShaderAnimation([flagMat, goldMat, iridescentMat]);
+
   const selectedTileId = useGameStore((s) => s.selectedTileId);
   const selectTile = useGameStore((s) => s.selectTile);
   const isSelected = selectedTileId === tile.id;
+
+  // Choose material per corner: GO=flag scroll, SPR/Go-to-Jail=gold, Jail=iridescent, Istana=gold
+  const cornerMat = tile.id === 0 ? flagMat : (tile.id === 30 || tile.id === 20) ? goldMat : iridescentMat;
+  const isShader = tile.id === 0 || tile.id === 30 || tile.id === 20 || tile.id === 10;
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     selectTile(isSelected ? null : tile.id);
   };
 
-  // Gentle emissive pulse + hover lift
-  useFrame(({ clock }, delta) => {
+  // Gentle emissive pulse + hover lift + tilt toward camera
+  useFrame(({ clock, camera }, delta) => {
     if (!matRef.current) return;
     const t = clock.elapsedTime;
     const pulse = 0.12 + 0.08 * Math.sin(t * 1.5 + tile.id * 0.7);
     matRef.current.emissiveIntensity = isSelected ? 0.5 : hovered ? 0.32 : pulse;
     if (groupRef.current) {
-      const targetY = TILE_H / 2 + (hovered || isSelected ? 0.18 : 0);
+      const targetY = TILE_H / 2 + (hovered || isSelected ? 0.25 : 0);
       groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
+      // Tilt toward camera on hover
+      if (hovered || isSelected) {
+        const dir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
+        const targetTiltX = dir.y * 0.15;
+        const targetTiltZ = -dir.x * 0.1;
+        groupRef.current.rotation.x += (targetTiltX - groupRef.current.rotation.x) * Math.min(delta * 5, 1);
+        groupRef.current.rotation.z += (targetTiltZ - groupRef.current.rotation.z) * Math.min(delta * 5, 1);
+      } else {
+        groupRef.current.rotation.x *= 1 - Math.min(delta * 5, 1);
+        groupRef.current.rotation.z *= 1 - Math.min(delta * 5, 1);
+      }
     }
   });
 
+  // Extruded height for corners
+  const cornerH = TILE_H * 2.2;
+
   return (
-    <group ref={groupRef} position={[pos.x, TILE_H / 2, pos.z]}>
-      {/* Base mesh — RoundedBox for softer corners */}
+    <group ref={groupRef} position={[pos.x, cornerH / 2, pos.z]}>
+      {/* Base mesh — extruded with bevel for premium feel */}
       <RoundedBox
-        args={[CORNER_W, TILE_H, CORNER_D]}
-        radius={0.06}
-        smoothness={4}
+        args={[CORNER_W, cornerH, CORNER_D]}
+        radius={0.1}
+        smoothness={5}
         castShadow
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
-        <meshStandardMaterial
-          ref={matRef}
-          color={TYPE_COLORS.corner}
-          roughness={0.3}
-          metalness={0.15}
-          emissive="#f5e6c8"
-          emissiveIntensity={0.12}
-        />
+        {isShader ? (
+          <primitive object={cornerMat} attach="material" />
+        ) : (
+          <meshStandardMaterial
+            ref={matRef}
+            color={TYPE_COLORS.corner}
+            roughness={0.3}
+            metalness={0.15}
+            emissive="#f5e6c8"
+            emissiveIntensity={0.12}
+          />
+        )}
       </RoundedBox>
 
       {/* Icon */}
       <Text
-        position={[0, TILE_H + 0.09, -0.5]}
+        position={[0, cornerH / 2 + 0.09, -0.5]}
         fontSize={0.6}
         anchorX="center"
         anchorY="middle"
@@ -162,7 +204,7 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Name */}
       <Text
-        position={[0, TILE_H + 0.01, 0.2]}
+        position={[0, cornerH / 2 + 0.01, 0.2]}
         fontSize={0.3}
         color="#3d2817"
         anchorX="center"
@@ -178,7 +220,7 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Sub-label (Malay) */}
       <Text
-        position={[0, TILE_H + 0.01, 0.62]}
+        position={[0, cornerH / 2 + 0.01, 0.62]}
         fontSize={0.17}
         color="#6b4226"
         anchorX="center"
@@ -211,16 +253,48 @@ function EdgeTile({ tile }: { tile: Tile }) {
   const isSelected = selectedTileId === tile.id;
   const color = getTileColor(tile);
 
+  // Per-type extrusion height & material config
+  const typeConfig = useMemo(() => {
+    switch (tile.type) {
+      case 'property':
+        return { height: TILE_H * 1.4, roughness: 0.25, metalness: 0.15, clearcoat: true };
+      case 'highway':
+        return { height: TILE_H * 2.0, roughness: 0.2, metalness: 0.8, clearcoat: false };
+      case 'media':
+        return { height: TILE_H * 1.3, roughness: 0.2, metalness: 0.5, clearcoat: false };
+      case 'tax':
+        return { height: TILE_H * 1.6, roughness: 0.3, metalness: 0.9, clearcoat: false };
+      case 'chest':
+        return { height: TILE_H * 1.2, roughness: 0.4, metalness: 0.1, clearcoat: false };
+      case 'chance':
+        return { height: TILE_H * 1.2, roughness: 0.4, metalness: 0.1, clearcoat: false };
+      default:
+        return { height: TILE_H, roughness: 0.35, metalness: 0.1, clearcoat: false };
+    }
+  }, [tile.type]);
+
+  const tileH = typeConfig.height;
+
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     selectTile(isSelected ? null : tile.id);
   };
 
-  // Hover / select lift
-  useFrame((_, delta) => {
+  // Hover / select lift + tilt toward camera
+  useFrame(({ camera }, delta) => {
     if (!groupRef.current) return;
-    const targetY = TILE_H / 2 + (hovered || isSelected ? 0.2 : 0);
+    const targetY = tileH / 2 + (hovered || isSelected ? 0.3 : 0);
     groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
+    if (hovered || isSelected) {
+      const dir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
+      const targetTiltX = dir.y * 0.12;
+      const targetTiltZ = -dir.x * 0.08;
+      groupRef.current.rotation.x += (targetTiltX - groupRef.current.rotation.x) * Math.min(delta * 5, 1);
+      groupRef.current.rotation.z += (targetTiltZ - groupRef.current.rotation.z) * Math.min(delta * 5, 1);
+    } else {
+      groupRef.current.rotation.x *= 1 - Math.min(delta * 5, 1);
+      groupRef.current.rotation.z *= 1 - Math.min(delta * 5, 1);
+    }
   });
 
   const houseCount = tileState?.houses ?? 0;
@@ -251,32 +325,56 @@ function EdgeTile({ tile }: { tile: Tile }) {
   const priceOffX = outX * 0.25;
   const priceOffZ = outZ * 0.25;
 
-  const textY = TILE_H + 0.01;
+  const textY = tileH + 0.01;
+
+  // 3D miniature to place on the tile (toward center of board)
+  const miniature = useMemo(() => {
+    const mx = -outX * (EDGE_D / 2 - 0.2);
+    const mz = -outZ * (EDGE_D / 2 - 0.2);
+    switch (tile.type) {
+      case 'highway':
+        return <group position={[mx, tileH / 2, mz]}><TileTrain /></group>;
+      case 'tax':
+        return <group position={[mx, tileH / 2, mz]}><TileCoinStack /></group>;
+      case 'chest':
+      case 'chance':
+        return <group position={[mx, tileH / 2, mz]}><TileCardStack color={tile.type === 'chest' ? '#fbbf24' : '#3b82f6'} /></group>;
+      case 'media':
+        return <group position={[mx, tileH / 2, mz]}><TileMonitor /></group>;
+      default:
+        return null;
+    }
+  }, [tile.type, outX, outZ, tileH, tile.id]);
 
   return (
-    <group ref={groupRef} position={[pos.x, TILE_H / 2, pos.z]}>
-      {/* ── Tile body ── */}
-      <mesh
+    <group ref={groupRef} position={[pos.x, tileH / 2, pos.z]}>
+      {/* ── Tile body — extruded with per-type material ── */}
+      <RoundedBox
+        args={[EDGE_W, tileH, EDGE_D]}
+        radius={0.05}
+        smoothness={4}
         castShadow
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
-        <boxGeometry args={[EDGE_W, TILE_H, EDGE_D]} />
         <meshStandardMaterial
           color={color}
-          roughness={0.35}
-          metalness={0.1}
+          roughness={typeConfig.roughness}
+          metalness={typeConfig.metalness}
           emissive={isSelected || hovered ? color : '#000000'}
-          emissiveIntensity={isSelected ? 0.45 : hovered ? 0.28 : 0}
+          emissiveIntensity={isSelected ? 0.5 : hovered ? 0.32 : 0}
         />
-      </mesh>
+      </RoundedBox>
+
+      {/* ── 3D miniature on top ── */}
+      {miniature}
 
       {/* ── Property colour strip ── */}
       {showStrip && (
         <mesh
-          position={[stripOffX, TILE_H / 2 + 0.03, stripOffZ]}
+          position={[stripOffX, tileH / 2 + 0.03, stripOffZ]}
           castShadow
         >
           <boxGeometry args={stripGeo} />
@@ -343,7 +441,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         <group
           position={[
             -outX * 0.05,
-            TILE_H + 0.04,
+            tileH + 0.04,
             -outZ * 0.05,
           ]}
         >
@@ -386,7 +484,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         <mesh
           position={[
             (isAlongX ? EDGE_W / 2 - 0.22 : 0),
-            TILE_H + 0.09,
+            tileH + 0.09,
             (isAlongX ? 0 : EDGE_W / 2 - 0.22),
           ]}
           castShadow
@@ -666,6 +764,106 @@ function CenterDecoration() {
 }
 
 // ───────────────────────────────────────────────────────────────────
+// LANDING EFFECTS — watches player positions; spawns particles +
+// shockwave + light beam when a player lands on a tile.
+// ───────────────────────────────────────────────────────────────────
+
+interface EffectInstance {
+  id: number;
+  tileId: number;
+  type: ParticleType;
+  color: string;
+  ts: number;
+}
+
+function getEffectTypeForTile(tile: Tile | undefined): { type: ParticleType; color: string } {
+  if (!tile) return { type: 'confetti', color: '#facc15' };
+  switch (tile.type) {
+    case 'property':
+      return { type: 'confetti', color: tile.colorGroup ? COLOR_GROUP_HEX[tile.colorGroup] : '#facc15' };
+    case 'highway':
+      return { type: 'sparks', color: '#e5e7eb' };
+    case 'media':
+      return { type: 'sparks', color: '#f0abfc' };
+    case 'tax':
+      return { type: 'sparks', color: '#fbbf24' };
+    case 'chest':
+      return { type: 'confetti', color: '#fbbf24' };
+    case 'chance':
+      return { type: 'confetti', color: '#3b82f6' };
+    case 'corner':
+      if (tile.id === 10) return { type: 'smoke', color: '#6b7280' };
+      if (tile.id === 30) return { type: 'smoke', color: '#ef4444' };
+      return { type: 'confetti', color: '#facc15' };
+    default:
+      return { type: 'confetti', color: '#facc15' };
+  }
+}
+
+function LandingEffects() {
+  const players = useGameStore((s) => s.players);
+  const phase = useGameStore((s) => s.phase);
+  const prevPositions = useRef<Record<string, number>>({});
+  const effectsRef = useRef<EffectInstance[]>([]);
+  const effectIdRef = useRef(0);
+  const [, forceUpdate] = useState(0);
+
+  // Detect position changes during render (not in an effect)
+  let hasNew = false;
+  if (phase === 'landed' || phase === 'buying' || phase === 'paying_rent' || phase === 'card') {
+    for (const p of players) {
+      const prev = prevPositions.current[p.id];
+      if (prev !== undefined && prev !== p.position && !p.isBankrupt) {
+        const tile = BOARD_TILES[p.position];
+        const { type, color } = getEffectTypeForTile(tile);
+        effectsRef.current.push({
+          id: effectIdRef.current++,
+          tileId: p.position,
+          type,
+          color,
+          ts: Date.now(),
+        });
+        hasNew = true;
+      }
+      prevPositions.current[p.id] = p.position;
+    }
+  }
+
+  // Schedule cleanup + re-render via microtask (avoids setState-in-effect lint)
+  if (hasNew) {
+    const currentIds = effectsRef.current.slice(-6).map((e) => e.id);
+    queueMicrotask(() => {
+      setTimeout(() => {
+        effectsRef.current = effectsRef.current.filter((e) => !currentIds.includes(e.id));
+        forceUpdate((n) => n + 1);
+      }, 2500);
+    });
+  }
+
+  const effects = effectsRef.current;
+
+  return (
+    <group>
+      {effects.map((e) => {
+        const pos = getTilePosition(e.tileId, BOARD_SIZE);
+        return (
+          <group key={e.id}>
+            <ParticleBurst
+              position={[pos.x, 0.8, pos.z]}
+              type={e.type}
+              color={e.color}
+              color2="#ffffff"
+            />
+            <Shockwave position={[pos.x, 0.15, pos.z]} color={e.color} duration={800} />
+            <LightBeam position={[pos.x, 0.15, pos.z]} color={e.color} height={3} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ───────────────────────────────────────────────────────────────────
 
@@ -687,14 +885,19 @@ export default function Board3D() {
       {/* ── Board base (felt + wood frame) ── */}
       <BoardBase />
 
-      {/* ── Centre decoration ── */}
-      <CenterDecoration />
+      {/* ── 3D Parliament building replaces the empty center ── */}
+      <Suspense fallback={null}>
+        <Parliament3D />
+      </Suspense>
 
       {/* ── Jalur Gemilang flags at two corners of the inner area ── */}
       <Suspense fallback={null}>
         <FlagMesh position={[-6.5, 1.2, -6.5]} />
         <FlagMesh position={[6.5, 1.2, 6.5]} />
       </Suspense>
+
+      {/* ── Landing effects (particles + shockwave + beam) ── */}
+      <LandingEffects />
 
       {/* ── All 40 tiles ── */}
       <group>
