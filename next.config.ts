@@ -10,11 +10,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // Exclude server-side-only packages that don't work on Workers
-  experimental: {
-    // Cloudflare Workers compatibility
-    serverComponentsExternalPackages: [],
-  },
 };
 
 export default nextConfig;
