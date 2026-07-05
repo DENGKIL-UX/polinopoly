@@ -298,7 +298,16 @@ export default function GameBoard() {
   const diceValues = useGameStore(s => s.diceValues);
 
   return (
-    <div className="w-full h-full relative overflow-hidden">
+    <div
+      className="w-full h-full relative overflow-hidden flex items-center justify-center"
+      style={{
+        /* Reserve horizontal space for dashboard sidebars on desktop.
+           Left sidebar w-44 (11rem) + right sidebar w-52 (13rem) + gaps.
+           This padding guarantees the board never sits behind the sidebars. */
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       {/* Deep space background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#0a1628] to-emerald-950" />
       <div className="absolute inset-0 opacity-20" style={{
@@ -310,28 +319,33 @@ export default function GameBoard() {
       <div className="absolute bottom-[15%] right-[15%] w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
       <div className="absolute top-[50%] right-[30%] w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
 
-      {/* Centering wrapper — keeps the board centered & sized to fit between sidebars.
-          Framer Motion's transform would override translate(-50%,-50%), so we separate
-          the centering (this static wrapper) from the animation (inner motion.div). */}
+      {/* Responsive padding wrapper — reserves space for dashboard sidebars + top/bottom bars.
+          The board lives inside as a square (aspect-ratio:1) constrained by both max-width
+          and max-height, so it ALWAYS fits and stays centered via flexbox. */}
       <div
+        className="relative z-10 flex items-center justify-center w-full h-full"
         style={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          // Mobile: leave room for top dice bar (~4rem) and bottom action bar (~8rem)
-          width: 'min(92vw, 70vh)',
-          height: 'min(92vw, 70vh)',
+          /* Reserve vertical space for the dashboard top bar (dice/turn ~5rem) and
+             bottom action bar (Baling Dadu button ~6rem) so corners aren't covered. */
+          paddingTop: '5rem',
+          paddingBottom: '7rem',
         }}
       >
         <style>{`
+          [data-board-frame] {
+            /* Mobile: full width with small margins, capped by height (leave room for top/bottom bars) */
+            width: min(94vw, 68vh);
+            height: min(94vw, 68vh);
+          }
           @media (min-width: 768px) {
-            [data-board-center] {
-              width: min(70vh, calc(100vw - 32rem)) !important;
-              height: min(70vh, calc(100vw - 32rem)) !important;
+            [data-board-frame] {
+              /* Desktop: reserve 30rem total for sidebars (left 11rem + right 13rem + gaps 6rem) */
+              width: min(72vh, calc(100vw - 30rem));
+              height: min(72vh, calc(100vw - 30rem));
             }
           }
         `}</style>
+        <div data-board-frame style={{ aspectRatio: '1 / 1', position: 'relative' }}>
       <motion.div
         data-board-center
         initial={{ opacity: 0, scale: 0.85, rotateX: 15 }}
@@ -373,13 +387,15 @@ export default function GameBoard() {
         </div>
 
         {/* ===== CSS Grid Board Layout ===== */}
-        {/* 11×11 grid: corners 1.5fr, edges 1fr each */}
-        {/* Row 1 = top, Row 11 = bottom; Col 1 = left, Col 11 = right */}
+        {/* 11×11 grid: corners 1.6fr, edges 1fr each.
+            CRITICAL: use minmax(0, 1fr) not 1fr — otherwise tile content
+            (text/icons) forces columns to grow beyond the container,
+            causing the grid to overflow and tiles to render off-board. */}
         <div
           className="absolute inset-1 grid rounded-lg overflow-hidden"
           style={{
-            gridTemplateColumns: '1.6fr repeat(9, 1fr) 1.6fr',
-            gridTemplateRows: '1.6fr repeat(9, 1fr) 1.6fr',
+            gridTemplateColumns: 'minmax(0, 1.6fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.6fr)',
+            gridTemplateRows: 'minmax(0, 1.6fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.6fr)',
           }}
         >
           {/* Render all 40 tiles */}
@@ -391,6 +407,9 @@ export default function GameBoard() {
                 gridColumn: pos.col,
                 position: 'relative',
                 zIndex: tile.type === 'corner' ? 1 : 2,
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'hidden',
               }}>
                 <TileView tile={tile} />
               </div>
@@ -518,7 +537,8 @@ export default function GameBoard() {
           />
         ))}
       </motion.div>
-      </div>{/* /centering wrapper */}
+        </div>{/* /data-board-frame */}
+      </div>{/* /flex centering wrapper */}
     </div>
   );
 }
