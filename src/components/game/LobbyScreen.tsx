@@ -167,20 +167,30 @@ export default function LobbyScreen() {
   return (
     <div
       className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-4"
-      style={{
-        background: 'linear-gradient(135deg, #020617 0%, #0a1628 25%, #0f2e1a 50%, #0a1628 75%, #020617 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'lobby-gradient 12s ease infinite',
-      }}
     >
-      {/* Background effects */}
-      <div className="absolute inset-0 opacity-15" style={{
+      {/* ── Video background hero (uploaded Malaysian election Monopoly clip) ── */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+        className="absolute inset-0 z-0 w-full h-full object-cover object-center"
+      >
+        <source src="/hero-bg.mp4" type="video/mp4" />
+      </video>
+
+      {/* Dark overlay for text contrast + theme gradient blend */}
+      <div className="absolute inset-0 z-[1] bg-gradient-to-br from-slate-950/85 via-[#0a1628]/80 to-emerald-950/85" />
+      <div className="absolute inset-0 z-[1] opacity-20" style={{
         backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)',
         backgroundSize: '40px 40px',
       }} />
-      <div className="absolute top-[20%] left-[15%] w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-[10%] right-[10%] w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl" />
-      <div className="absolute top-[60%] left-[60%] w-48 h-48 bg-blue-500/5 rounded-full blur-3xl" />
+      {/* Ambient glow blobs */}
+      <div className="absolute top-[20%] left-[15%] w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl z-[1]" />
+      <div className="absolute bottom-[10%] right-[10%] w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl z-[1]" />
+      <div className="absolute top-[60%] left-[60%] w-48 h-48 bg-blue-500/10 rounded-full blur-3xl z-[1]" />
 
       {/* Floating particles */}
       {[
@@ -193,7 +203,7 @@ export default function LobbyScreen() {
       ].map((p, i) => (
         <motion.div
           key={i}
-          className="absolute rounded-full pointer-events-none opacity-30"
+          className="absolute rounded-full pointer-events-none opacity-40 z-[2]"
           style={{
             left: p.x, top: p.y,
             width: p.size, height: p.size,
@@ -380,7 +390,7 @@ export default function LobbyScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.0 }}
-          className="mt-6 mb-4 w-full max-w-2xl mx-auto"
+          className="mt-6 mb-4 w-full max-w-2xl mx-auto z-10"
         >
           <button
             onClick={() => setShowRules(v => !v)}
@@ -433,7 +443,7 @@ export default function LobbyScreen() {
       </motion.div>
 
       {/* Version footer */}
-      <div className="absolute bottom-3 text-[9px] text-slate-600 tracking-wider">v1.0 — DENGKIL-UX</div>
+      <div className="absolute bottom-3 text-[9px] text-slate-400/80 tracking-wider z-10">v3.0 — DENGKIL-UX · Pilihan Raya Edition</div>
     </div>
   );
 }

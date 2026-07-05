@@ -604,3 +604,42 @@ Stage Summary:
 - Card state machine: UNOWNED (back up) → OWNED (flip to face + flag pole) → cawangan/markas houses.
 - Center redesigned: shrunken Parliament + Kad Nasib + Kad SPR card decks.
 - Malaysian political theme preserved (coalition badges, Jalur Gemilang card backs, party-colored houses/flags).
+
+---
+Task ID: 16
+Agent: Main Agent
+Task: Create a video-background landing page merged with the coalition chooser
+
+Work Log:
+- Uploaded video: Malaysian_election_Monopoly_board_202607052052.mp4 (2.8MB, 10s, 1280x720 H.264).
+- Copied to /public/hero-bg.mp4 — serves at HTTP 200, 2.8MB.
+- Researched the user's Next.js landing page suggestion (video background hero pattern from thatanjan repo + Xora section layout). Adapted the pattern to merge with the existing LobbyScreen coalition chooser rather than creating a separate page (so the video hero flows directly into the game).
+
+Changes implemented (LobbyScreen.tsx):
+- Replaced the static gradient background + animation with a full-viewport <video> element:
+  * autoPlay, muted, loop, playsInline, preload="metadata", aria-hidden
+  * absolute inset-0 z-0, object-cover object-center
+  * sources /hero-bg.mp4 (the uploaded Malaysian election Monopoly clip)
+- Added a dark gradient overlay (z-1) for text contrast: from-slate-950/85 via-[#0a1628]/80 to-emerald-950/85 — keeps the political theme while letting the video show through.
+- Kept the radial-dot pattern, ambient glow blobs, and floating particles (bumped to z-1/z-2 with higher opacity since they now layer over video).
+- Bumped z-index of all lobby content (header z-10, coalition cards z-10, rules z-10, footer z-10) so they sit above the video + overlay.
+- Updated version footer to "v3.0 — DENGKIL-UX · Pilihan Raya Edition".
+
+Merge approach: the video IS the lobby background. The existing coalition chooser (6 party cards), title (DEWAN RAKYAT + Jalur Gemilang flags), start button, rules, and footer all render on top of the video. Selecting a coalition and clicking "Mulakan Pilihan Raya!" starts the game as before — no separate landing page needed, the video enhances the existing entry point.
+
+Verification (Agent Browser + VLM):
+- Video serves at /hero-bg.mp4 (HTTP 200, 2.8MB). ✓
+- VLM: "video playing in the background (visible as a moving game board scene)" ✓
+- VLM: "DEWAN RAKYAT title prominently displayed, flanked by Jalur Gemilang flags" ✓
+- VLM: "all 6 coalition cards visible with their logos (PH, PN, BN, GPS, GRS, IND)" ✓
+- VLM: "text readable over the video — dark overlay + high-contrast colors" ✓
+- VLM: "Mulakan Pilihan Raya! start button present" ✓
+- VLM: "8/10 visual appeal — cohesive and visually striking" ✓
+- Game starts correctly from the landing page (coalition select → 3D game). ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Landing page now uses the uploaded Malaysian election Monopoly video as a full-viewport background hero.
+- Video merges seamlessly with the existing coalition chooser — no separate page, the video enhances the lobby.
+- Dark overlay + high-contrast text keep everything readable.
+- VLM-rated 8/10 visual appeal.
