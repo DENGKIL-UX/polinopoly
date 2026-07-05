@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/lib/game-store';
 import { BOARD_TILES, COLOR_GROUP_HEX, COALITIONS, type Tile, type ColorGroup } from '@/lib/game-data';
+import { CoalitionLogo } from '@/components/game/CoalitionLogo';
 
 // --- CSS Grid position mapping ---
 // 11×11 grid: corners at (1,1), (1,11), (11,1), (11,11)
@@ -220,13 +221,12 @@ function TileView({ tile }: { tile: Tile }) {
               key={p.id}
               animate={{ y: [0, -3, 0] }}
               transition={{ repeat: Infinity, duration: 1.5 + idx * 0.3, delay: idx * 0.15 }}
-              className="w-3.5 h-3.5 rounded-full border-2 border-white/80 shadow-lg flex items-center justify-center text-[7px]"
+              className="w-4 h-4 rounded-full border-2 border-white/80 shadow-lg flex items-center justify-center overflow-hidden bg-white"
               style={{
-                backgroundColor: COALITIONS[p.coalitionId]?.color,
                 boxShadow: `0 0 6px ${COALITIONS[p.coalitionId]?.color}60`,
               }}
             >
-              {p.avatarEmoji}
+              <CoalitionLogo coalitionId={p.coalitionId} size={14} circular alt={p.name} />
             </motion.div>
           ))}
         </div>
@@ -277,9 +277,9 @@ function ColorGroupLegend() {
               );
             })}
             {ownerPlayer && (
-              <span className="text-[5px] font-bold" style={{ color: COALITIONS[ownerPlayer.coalitionId]?.color }}>
-                {ownerPlayer.avatarEmoji}
-              </span>
+              <div className="w-2.5 h-2.5 rounded-full overflow-hidden bg-white border border-white/30">
+                <CoalitionLogo coalitionId={ownerPlayer.coalitionId} size={10} circular alt={ownerPlayer.name} />
+              </div>
             )}
           </div>
         );
@@ -418,20 +418,19 @@ export default function GameBoard() {
               {/* Decorative line */}
               <div className="w-16 md:w-24 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent my-1.5" />
 
-              {/* Coalition emblems */}
+              {/* Coalition logos */}
               <div className="flex items-center justify-center gap-1.5 md:gap-2">
                 {Object.values(COALITIONS).map((c, i) => (
                   <motion.div key={c.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 + i * 0.1 }}
-                    className="w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center text-[7px] md:text-[9px] shadow-md border border-white/10"
+                    className="w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center shadow-md border border-white/20 overflow-hidden bg-white/95"
                     style={{
-                      backgroundColor: `${c.color}90`,
                       boxShadow: `0 0 8px ${c.color}30`,
                     }}
                   >
-                    {c.emblem}
+                    <CoalitionLogo coalitionId={c.id} size={20} alt={`${c.fullName} logo`} />
                   </motion.div>
                 ))}
               </div>

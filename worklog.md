@@ -46,3 +46,36 @@ Stage Summary:
 - Polinopoly 2D clone successfully converted to a full 3D game.
 - 3D enhancements delivered: tumbling 3D dice, hopping token movement, camera focus rig, clickable/hoverable 3D tiles, contact shadows, environment lighting, ground plane, starfield.
 - Game is fully playable end-to-end in 3D with a 2D fallback toggle.
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Replace emoji emblems with official coalition logos + Jalur Gemilang flag
+
+Work Log:
+- Researched & downloaded official logos from Wikimedia Commons via the Commons API:
+  - PN: Logo_Perikatan_Nasional.svg
+  - BN: Barisan_Nasional.png (resized 500x336 -> 400x269)
+  - PH: Pakatan_Harapan_Logo.svg
+  - GPS: Logo_GPS.png (resized 5120x2880 -> 400x225, 4.7MB -> 39KB)
+  - GRS: Gabungan_Rakyat_Sabah_logo.svg
+  - Jalur Gemilang: Flag_of_Malaysia.svg
+  All saved to /public/logos/ and verified accessible (HTTP 200).
+- Added `logo: string` field to the Coalition interface in game-data.ts (with emoji kept as fallback).
+- Created reusable CoalitionLogo component (src/components/game/CoalitionLogo.tsx) that renders the official logo <img> with graceful emoji fallback on error.
+- Updated LobbyScreen: coalition cards now show official logos in circular white-backed badges; added two animated Jalur Gemilang flags flanking the title.
+- Updated GameDashboard: all 7 player-avatar spots (player cards, AI thinking bubble, tile owner, auction bidders, trade list, game-over standings) now use CoalitionLogo instead of avatarEmoji.
+- Updated 2D GameBoard: center coalition emblem row + on-tile player tokens + owner indicators now render real logos.
+- Updated 3D Board3D: added FlagMesh component (textured waving Jalur Gemilang on a gold pole) at two inner corners; wrapped in Suspense.
+- Updated 3D Token3D: tokens now display a billboarded coalition logo disc above each piece (TokenLogo component using useTexture + Billboard) instead of emoji text.
+
+Verification (Agent Browser):
+- Lobby: all 6 coalition logos + 2 Jalur Gemilang flags render (410KB screenshot). ✓
+- 3D game: tokens show billboarded logos, flags wave on board. ✓
+- 2D game: 20 logo images rendered across tiles/center/owner indicators. ✓
+- Dice roll + token movement with logos works. ✓
+- No console/runtime errors. Lint clean. All /logos/* return 200.
+
+Stage Summary:
+- Emoji placeholders replaced with real, researched official coalition logos and the national flag (Jalur Gemilang).
+- Logos appear consistently across lobby, 2D board, 3D board, 3D tokens, and all dashboard panels.

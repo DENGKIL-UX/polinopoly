@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { COALITIONS, type Coalition } from '@/lib/game-data';
 import { useGameStore } from '@/lib/game-store';
+import { CoalitionLogo } from '@/components/game/CoalitionLogo';
 import {
   Crown,
   Users,
@@ -103,10 +104,10 @@ function TiltedCoalitionCard({ coalition, index, selected, onSelect }: {
       >
         <CardHeader className="p-3 pb-1 text-center">
           <div
-            className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl shadow-inner"
-            style={{ backgroundColor: coalition.color }}
+            className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center shadow-inner overflow-hidden bg-white/95 border border-white/40"
+            style={{ boxShadow: `0 0 0 2px ${coalition.color}50, inset 0 0 8px ${coalition.color}20` }}
           >
-            {coalition.emblem}
+            <CoalitionLogo coalitionId={coalition.id} size={52} alt={`${coalition.fullName} logo`} />
           </div>
           <CardTitle className="text-sm font-bold" style={{ color: coalition.color }}>
             {coalition.name}
@@ -216,6 +217,16 @@ export default function LobbyScreen() {
           transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
           className="flex items-center justify-center gap-3 mb-3"
         >
+          {/* Jalur Gemilang — Malaysia national flag */}
+          <motion.img
+            src="/logos/flag.svg"
+            alt="Jalur Gemilang"
+            className="h-10 md:h-12 w-auto rounded-sm shadow-lg border border-white/20"
+            initial={{ rotate: -8, x: -6 }}
+            animate={{ rotate: [-8, -6, -8], x: [-6, -4, -6] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            draggable={false}
+          />
           <Crown className="h-10 w-10 text-yellow-400" />
           <h1 className="text-4xl md:text-6xl font-black tracking-tight">
             <span className="animate-shimmer">
@@ -223,6 +234,15 @@ export default function LobbyScreen() {
             </span>
           </h1>
           <Crown className="h-10 w-10 text-yellow-400" />
+          <motion.img
+            src="/logos/flag.svg"
+            alt="Jalur Gemilang"
+            className="h-10 md:h-12 w-auto rounded-sm shadow-lg border border-white/20"
+            initial={{ rotate: 8, x: 6 }}
+            animate={{ rotate: [8, 6, 8], x: [6, 4, 6] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            draggable={false}
+          />
         </motion.div>
         <motion.p
           initial={{ opacity: 0 }}

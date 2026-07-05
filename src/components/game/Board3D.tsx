@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, Suspense } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { Text, RoundedBox } from '@react-three/drei';
+import { Text, RoundedBox, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   BOARD_TILES,
@@ -462,6 +462,54 @@ function BoardBase() {
 }
 
 // ───────────────────────────────────────────────────────────────────
+// JALUR GEMILANG FLAG — rendered as a textured plane waving gently
+// ───────────────────────────────────────────────────────────────────
+
+function FlagMesh({ position }: { position: [number, number, number] }) {
+  const groupRef = useRef<THREE.Group>(null!);
+  const flagTex = useTexture('/logos/flag.svg', (tex) => {
+    (tex as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
+  });
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    // Gentle wave rotation
+    const t = clock.elapsedTime;
+    groupRef.current.rotation.z = Math.sin(t * 0.8) * 0.03;
+    groupRef.current.children.forEach((child, i) => {
+      if (child instanceof THREE.Mesh) {
+        child.rotation.y = Math.sin(t * 1.2 + i * 0.4) * 0.04;
+      }
+    });
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      {/* Flag pole */}
+      <mesh position={[-1.1, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 2.4, 12]} />
+        <meshStandardMaterial color="#b8860b" roughness={0.3} metalness={0.6} />
+      </mesh>
+      {/* Pole top finial */}
+      <mesh position={[-1.1, 1.25, 0]} castShadow>
+        <sphereGeometry args={[0.08, 16, 16]} />
+        <meshStandardMaterial color="#d4a843" roughness={0.2} metalness={0.7} />
+      </mesh>
+      {/* Flag plane */}
+      <mesh position={[0, 0.3, 0]} castShadow>
+        <planeGeometry args={[2.0, 1.2, 16, 8]} />
+        <meshStandardMaterial
+          map={flagTex}
+          roughness={0.5}
+          metalness={0.05}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
 // CENTRE DECORATION
 // ───────────────────────────────────────────────────────────────────
 
@@ -629,6 +677,12 @@ export default function Board3D() {
 
       {/* ── Centre decoration ── */}
       <CenterDecoration />
+
+      {/* ── Jalur Gemilang flags at two corners of the inner area ── */}
+      <Suspense fallback={null}>
+        <FlagMesh position={[-6.5, 1.2, -6.5]} />
+        <FlagMesh position={[6.5, 1.2, 6.5]} />
+      </Suspense>
 
       {/* ── All 40 tiles ── */}
       <group>

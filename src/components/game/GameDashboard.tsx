@@ -16,6 +16,7 @@ import {
   Banknote, ShieldDown, Shield, Gauge, Star, Handshake, Keyboard,
 } from 'lucide-react';
 import { soundManager, useSoundEnabled } from '@/lib/sound-effects';
+import { CoalitionLogo } from '@/components/game/CoalitionLogo';
 
 const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚄', '⚅'];
 
@@ -104,9 +105,9 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
         ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
         : 'border-slate-700/30 bg-slate-800/30'
     }`}>
-      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md border border-white/10"
-        style={{ backgroundColor: coalition.color, boxShadow: `0 0 8px ${coalition.color}30` }}>
-        {player.avatarEmoji}
+      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md border border-white/10 overflow-hidden bg-white"
+        style={{ boxShadow: `0 0 8px ${coalition.color}30` }}>
+        <CoalitionLogo coalitionId={player.coalitionId} size={26} circular alt={player.name} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -252,9 +253,8 @@ function AIQuoteBubble() {
               </div>
             ) : latest ? (
               <div className="flex items-start gap-2.5">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 shadow-md border border-white/10"
-                  style={{ backgroundColor: COALITIONS[latest.coalitionId]?.color }}>
-                  {latest.avatarEmoji}
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 shadow-md border border-white/10 overflow-hidden bg-white">
+                  <CoalitionLogo coalitionId={latest.coalitionId} size={20} circular alt={latest.playerName} />
                 </div>
                 <div>
                   <p className="text-[10px] font-bold mb-0.5" style={{ color: COALITIONS[latest.coalitionId]?.color }}>{latest.name}</p>
@@ -377,8 +377,8 @@ function TileDetail() {
             {ownerRealPlayer && (
               <div className="mt-2 pt-2 border-t border-slate-700/30 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-4 rounded-full flex items-center justify-center text-[8px]" style={{ backgroundColor: COALITIONS[ownerRealPlayer.coalitionId]?.color }}>
-                    {ownerRealPlayer.avatarEmoji}
+                  <div className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] overflow-hidden bg-white border border-white/10">
+                    <CoalitionLogo coalitionId={ownerRealPlayer.coalitionId} size={14} circular alt={ownerRealPlayer.name} />
                   </div>
                   <span className="text-[10px] font-bold" style={{ color: COALITIONS[ownerRealPlayer.coalitionId]?.color }}>{ownerRealPlayer.name}</span>
                 </div>
@@ -470,10 +470,9 @@ function AuctionPanel() {
           {highestBidderPlayer && (
             <div className="flex items-center gap-1.5">
               <div
-                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10"
-                style={{ backgroundColor: COALITIONS[highestBidderPlayer.coalitionId]?.color }}
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10 overflow-hidden bg-white"
               >
-                {highestBidderPlayer.avatarEmoji}
+                <CoalitionLogo coalitionId={highestBidderPlayer.coalitionId} size={14} circular alt={highestBidderPlayer.name} />
               </div>
               <span
                 className="text-[10px] font-semibold"
@@ -490,10 +489,9 @@ function AuctionPanel() {
           {currentBidder && (
             <div className="flex items-center gap-1">
               <div
-                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10"
-                style={{ backgroundColor: COALITIONS[currentBidder.coalitionId]?.color }}
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] border border-white/10 overflow-hidden bg-white"
               >
-                {currentBidder.avatarEmoji}
+                <CoalitionLogo coalitionId={currentBidder.coalitionId} size={14} circular alt={currentBidder.name} />
               </div>
               <span
                 className="font-bold"
@@ -689,10 +687,9 @@ function TradeButton() {
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-800/60 transition-colors text-left"
                     >
                       <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 border border-white/10"
-                        style={{ backgroundColor: coalition.color }}
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 border border-white/10 overflow-hidden bg-white"
                       >
-                        {p.avatarEmoji}
+                        <CoalitionLogo coalitionId={p.coalitionId} size={20} circular alt={p.name} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-bold truncate" style={{ color: coalition.color }}>{p.name}</p>
@@ -1545,8 +1542,8 @@ export default function GameDashboard() {
                             <div key={p.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10px] ${p.id === winner ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-slate-800/30'}`}>
                               <div className="flex items-center gap-2">
                                 <span className="text-amber-400/60 font-mono font-bold w-4">#{idx + 1}</span>
-                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px]" style={{ backgroundColor: COALITIONS[p.coalitionId]?.color }}>
-                                  {p.avatarEmoji}
+                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] overflow-hidden bg-white border border-white/10">
+                                  <CoalitionLogo coalitionId={p.coalitionId} size={16} circular alt={p.name} />
                                 </div>
                                 <span className="font-bold" style={{ color: COALITIONS[p.coalitionId]?.color }}>{p.name}</span>
                                 {p.isAI && <span className="text-slate-600 text-[8px]">AI</span>}

@@ -9,7 +9,8 @@ export interface Coalition {
   fullName: string;
   color: string;       // hex color for 3D meshes
   textColor: string;   // for overlays
-  emblem: string;      // emoji
+  emblem: string;      // emoji (fallback)
+  logo: string;        // path to official logo image in /public/logos
   slogan: string;
 }
 
@@ -21,6 +22,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#2563eb',   // blue
     textColor: '#ffffff',
     emblem: '🟦',
+    logo: '/logos/ph.svg',
     slogan: 'Hari ini untuk esok!',
   },
   PN: {
@@ -30,6 +32,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#16a34a',   // green
     textColor: '#ffffff',
     emblem: '🟩',
+    logo: '/logos/pn.svg',
     slogan: 'Islam dan Bangsa!',
   },
   BN: {
@@ -39,6 +42,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#ea580c',   // orange
     textColor: '#ffffff',
     emblem: '🟧',
+    logo: '/logos/bn.png',
     slogan: 'Bersatu, Teguh!',
   },
   GPS: {
@@ -48,6 +52,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#dc2626',   // red
     textColor: '#ffffff',
     emblem: '🟥',
+    logo: '/logos/gps.png',
     slogan: 'Sarawak First!',
   },
   GRS: {
@@ -57,6 +62,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#eab308',   // yellow
     textColor: '#000000',
     emblem: '🟨',
+    logo: '/logos/grs.svg',
     slogan: 'Sabah Maju Jaya!',
   },
   IND: {
@@ -66,6 +72,7 @@ export const COALITIONS: Record<string, Coalition> = {
     color: '#78716c',   // stone/gray
     textColor: '#ffffff',
     emblem: '⬜',
+    logo: '',            // no official logo for independents
     slogan: 'Rakyat Hakim!',
   },
 };

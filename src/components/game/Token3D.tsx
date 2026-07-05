@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Text, Sphere, Cylinder, RoundedBox } from '@react-three/drei';
+import { Text, Sphere, Cylinder, RoundedBox, Billboard, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { COALITIONS, getTilePosition } from '@/lib/game-data';
 import { useGameStore, type Player } from '@/lib/game-store';
@@ -89,6 +89,48 @@ function TokenShadow({ y = 0.16 }: { y?: number }) {
         depthWrite={false}
       />
     </mesh>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// TOKEN LOGO — billboarded coalition logo floating above the token
+// ───────────────────────────────────────────────────────────────────
+
+function TokenLogo({ coalitionId }: { coalitionId: string }) {
+  const coalition = COALITIONS[coalitionId];
+  const logoPath = coalition?.logo;
+
+  const texture = useTexture(logoPath || '/logo.svg', (tex) => {
+    (tex as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
+  });
+
+  if (!logoPath) {
+    // Independent — show emoji text
+    return (
+      <Text position={[0, 0.85, 0]} fontSize={0.3} anchorX="center" anchorY="middle">
+        {coalition?.emblem || '🎖️'}
+      </Text>
+    );
+  }
+
+  return (
+    <Billboard position={[0, 0.95, 0]}>
+      {/* White rounded backing disc */}
+      <mesh>
+        <circleGeometry args={[0.26, 32]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.4} metalness={0.05} />
+      </mesh>
+      {/* Logo texture */}
+      <mesh position={[0, 0, 0.001]}>
+        <circleGeometry args={[0.22, 32]} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          roughness={0.5}
+          metalness={0.05}
+        />
+      </mesh>
+    </Billboard>
   );
 }
 
@@ -271,15 +313,10 @@ function SingleToken({ player, isActive, indexOnTile }: SingleTokenProps) {
           />
         </Sphere>
 
-        {/* Player emoji label — billboarded */}
-        <Text
-          position={[0, 0.85, 0]}
-          fontSize={0.28}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {player.avatarEmoji || '🎖️'}
-        </Text>
+        {/* Coalition logo label — billboarded, always faces camera */}
+        <Suspense fallback={null}>
+          <TokenLogo coalitionId={player.coalitionId} />
+        </Suspense>
 
         {/* Active player indicator ring */}
         {isActive && (
