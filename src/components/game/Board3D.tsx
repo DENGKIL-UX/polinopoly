@@ -253,23 +253,24 @@ function EdgeTile({ tile }: { tile: Tile }) {
   const isSelected = selectedTileId === tile.id;
   const color = getTileColor(tile);
 
-  // Per-type extrusion height & material config
+  // Per-type material config. All tiles are FLAT (same thin height) like
+  // real Monopoly — the color bar on the outer edge provides the visual identity.
   const typeConfig = useMemo(() => {
     switch (tile.type) {
       case 'property':
-        return { height: TILE_H * 1.4, roughness: 0.25, metalness: 0.15, clearcoat: true };
+        return { height: TILE_H, roughness: 0.6, metalness: 0.1 };
       case 'highway':
-        return { height: TILE_H * 2.0, roughness: 0.2, metalness: 0.8, clearcoat: false };
+        return { height: TILE_H, roughness: 0.5, metalness: 0.3 };
       case 'media':
-        return { height: TILE_H * 1.3, roughness: 0.2, metalness: 0.5, clearcoat: false };
+        return { height: TILE_H, roughness: 0.5, metalness: 0.2 };
       case 'tax':
-        return { height: TILE_H * 1.6, roughness: 0.3, metalness: 0.9, clearcoat: false };
+        return { height: TILE_H, roughness: 0.5, metalness: 0.3 };
       case 'chest':
-        return { height: TILE_H * 1.2, roughness: 0.4, metalness: 0.1, clearcoat: false };
+        return { height: TILE_H, roughness: 0.6, metalness: 0.1 };
       case 'chance':
-        return { height: TILE_H * 1.2, roughness: 0.4, metalness: 0.1, clearcoat: false };
+        return { height: TILE_H, roughness: 0.6, metalness: 0.1 };
       default:
-        return { height: TILE_H, roughness: 0.35, metalness: 0.1, clearcoat: false };
+        return { height: TILE_H, roughness: 0.6, metalness: 0.1 };
     }
   }, [tile.type]);
 
@@ -311,40 +312,27 @@ function EdgeTile({ tile }: { tile: Tile }) {
   // Edge geometry helpers
   const { outX, outZ, isAlongX } = edgeInfo(tile.id);
 
-  // Property colour-strip positioning
+  // Property colour-strip — on the OUTER edge of the tile (classic Monopoly).
+  // outX/outZ point outward, so the strip sits at +outX*offset (outer edge).
   const showStrip = tile.type === 'property' && !!tile.colorGroup;
-  const stripOffX = -outX * (EDGE_D / 2 - 0.08);
-  const stripOffZ = -outZ * (EDGE_D / 2 - 0.08);
+  const stripDepth = EDGE_D * 0.28; // ~28% of tile depth (classic Monopoly ratio)
+  const stripOffX = outX * (EDGE_D / 2 - stripDepth / 2);
+  const stripOffZ = outZ * (EDGE_D / 2 - stripDepth / 2);
   const stripGeo: [number, number, number] = isAlongX
-    ? [EDGE_W - 0.15, 0.06, 0.16]
-    : [0.16, 0.06, EDGE_W - 0.15];
+    ? [EDGE_W - 0.1, 0.04, stripDepth]
+    : [stripDepth, 0.04, EDGE_W - 0.1];
 
-  // Text offsets (name at centre, sub towards centre, price towards edge)
+  // Text offsets — classic Monopoly layout:
+  // Color bar on OUTER edge, name in CENTER, price on INNER side (toward board center)
   const subOffX = -outX * 0.16;
   const subOffZ = -outZ * 0.16;
-  const priceOffX = outX * 0.25;
-  const priceOffZ = outZ * 0.25;
+  const priceOffX = -outX * 0.3;
+  const priceOffZ = -outZ * 0.3;
 
   const textY = tileH + 0.01;
 
-  // 3D miniature to place on the tile (toward center of board)
-  const miniature = useMemo(() => {
-    const mx = -outX * (EDGE_D / 2 - 0.2);
-    const mz = -outZ * (EDGE_D / 2 - 0.2);
-    switch (tile.type) {
-      case 'highway':
-        return <group position={[mx, tileH / 2, mz]}><TileTrain /></group>;
-      case 'tax':
-        return <group position={[mx, tileH / 2, mz]}><TileCoinStack /></group>;
-      case 'chest':
-      case 'chance':
-        return <group position={[mx, tileH / 2, mz]}><TileCardStack color={tile.type === 'chest' ? '#fbbf24' : '#3b82f6'} /></group>;
-      case 'media':
-        return <group position={[mx, tileH / 2, mz]}><TileMonitor /></group>;
-      default:
-        return null;
-    }
-  }, [tile.type, outX, outZ, tileH, tile.id]);
+  // 3D miniatures removed for classic Monopoly look — tiles are flat,
+  // the color bar on the outer edge provides visual identity.
 
   return (
     <group ref={groupRef} position={[pos.x, tileH / 2, pos.z]}>
@@ -367,9 +355,6 @@ function EdgeTile({ tile }: { tile: Tile }) {
           emissiveIntensity={isSelected ? 0.2 : hovered ? 0.12 : 0}
         />
       </RoundedBox>
-
-      {/* ── 3D miniature on top ── */}
-      {miniature}
 
       {/* ── Property colour strip ── */}
       {showStrip && (
@@ -479,24 +464,39 @@ function EdgeTile({ tile }: { tile: Tile }) {
         </group>
       )}
 
-      {/* ── Owner indicator sphere ── */}
+      {/* ── Owner flag pole (classic Monopoly ownership feedback) ──
+          A small flag on a pole at the inner corner of the tile,
+          colored with the owning coalition's color. */}
       {hasOwner && ownerColor && (
-        <mesh
+        <group
           position={[
-            (isAlongX ? EDGE_W / 2 - 0.22 : 0),
-            tileH + 0.09,
-            (isAlongX ? 0 : EDGE_W / 2 - 0.22),
+            -outX * (EDGE_D / 2 - 0.15),
+            tileH / 2,
+            -outZ * (EDGE_D / 2 - 0.15),
           ]}
-          castShadow
         >
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial
-            color={ownerColor}
-            emissive={ownerColor}
-            emissiveIntensity={0.3}
-            roughness={0.3}
-          />
-        </mesh>
+          {/* Pole */}
+          <mesh position={[0, 0.18, 0]} castShadow>
+            <cylinderGeometry args={[0.015, 0.015, 0.36, 8]} />
+            <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Flag (waving quad) */}
+          <mesh position={[0.06, 0.28, 0]} castShadow>
+            <planeGeometry args={[0.12, 0.08]} />
+            <meshStandardMaterial
+              color={ownerColor}
+              emissive={ownerColor}
+              emissiveIntensity={0.15}
+              roughness={0.4}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Pole top finial */}
+          <mesh position={[0, 0.37, 0]}>
+            <sphereGeometry args={[0.025, 12, 12]} />
+            <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.15} />
+          </mesh>
+        </group>
       )}
     </group>
   );

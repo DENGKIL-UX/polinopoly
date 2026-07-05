@@ -357,3 +357,61 @@ Stage Summary:
 - 3D lighting rebalanced: bright ambient + soft directional, no colored spots, minimal bloom.
 - Tile text enlarged + matte materials so text stays crisp.
 - Board now looks clean (not ugly) and text is readable without glare.
+
+---
+Task ID: 10
+Agent: Main Agent
+Task: Enhance board with classic Monopoly geometry — flat tiles, outer color bars, ownership flags, smaller Parliament
+
+Work Log:
+- Researched user's detailed 10-point Monopoly design analysis. Prioritized #1 (tile proportions), #9 (shrink center), #6 (ownership flags).
+- Identified root problem: tiles were extruded tall (1.4×-2.0× TILE_H) making them look like raised blocks, not flat Monopoly tiles. Color strip was on the center-facing side (wrong). 3D miniatures added clutter.
+
+Changes implemented:
+
+1. FLAT TILES (Board3D.tsx — #1 priority):
+   - All tile types now use the same thin height (TILE_H = 0.18) instead of 1.4×-2.0× extrusion.
+   - Removed per-type height variation; tiles are flat rectangles like real Monopoly.
+   - Matte materials (roughness 0.6, metalness 0.1) — no glossy glare.
+
+2. COLOR BAR ON OUTER EDGE (Board3D.tsx — #1 priority):
+   - Moved the property color strip from the center-facing side to the OUTER edge (outX/outZ direction) — classic Monopoly position.
+   - Enlarged to 28% of tile depth (stripDepth = EDGE_D * 0.28).
+   - This is the instant "Monopoly recognition" cue.
+
+3. CLASSIC TEXT LAYOUT (Board3D.tsx):
+   - Color bar on outer edge, name in center, price on INNER side (toward board center).
+   - Price moved from +outX (outer) to -outX (inner) — classic Monopoly layout.
+
+4. REMOVED 3D MINIATURES (Board3D.tsx):
+   - Removed TileTrain, TileCoinStack, TileCardStack, TileMonitor from tiles.
+   - Classic Monopoly tiles are clean flat rectangles — miniatures added clutter.
+
+5. SHRUNK PARLIAMENT (Parliament3D.tsx — #9 priority):
+   - Scale 1.0 → 0.45 — center is now a decorative monument, not a dominant structure.
+   - Board center has negative space like real Monopoly.
+
+6. OWNERSHIP FLAG POLES (Board3D.tsx — #6 priority):
+   - Replaced the owner indicator sphere with a classic flag-on-pole:
+     * Silver pole (cylinder, metalness 0.7)
+     * Coalition-colored flag (quad, DoubleSide, emissive)
+     * Gold finial on top (sphere, metalness 0.9)
+   - Positioned at the inner corner of the tile.
+   - Only appears on owned tiles — instant ownership feedback.
+
+Verification (Agent Browser + VLM):
+- VLM: "tiles appear flat (no tall extrusions)" ✓
+- VLM: "color bars visible on the outer edge of property tiles" ✓
+- VLM: "center Parliament is smaller/less dominant" ✓
+- VLM: "tile names and prices are readable" ✓
+- VLM: "flag on a pole visible on the purchased property" ✓
+- VLM: "board looks clean and Monopoly-like — 8/10" ✓
+- VLM: "text is readable, not washed out" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Tiles rebuilt as flat narrow rectangles with color bars on the outer edge — instant Monopoly recognition.
+- Center Parliament shrunk to 45% — correct spatial hierarchy.
+- Ownership flag poles added — classic Monopoly visual feedback.
+- 3D miniatures removed — cleaner classic look.
+- VLM-rated 8/10 Monopoly-like (up from 6/10).

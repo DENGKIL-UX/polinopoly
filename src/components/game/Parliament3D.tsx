@@ -51,7 +51,7 @@ export function Parliament3D() {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0.05, 0]}>
+    <group ref={groupRef} position={[0, 0.05, 0]} scale={0.45}>
       {/* ── Main platform base ── */}
       <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[3.2, 3.4, 0.1, 8]} />
