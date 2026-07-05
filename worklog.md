@@ -415,3 +415,51 @@ Stage Summary:
 - Ownership flag poles added — classic Monopoly visual feedback.
 - 3D miniatures removed — cleaner classic look.
 - VLM-rated 8/10 Monopoly-like (up from 6/10).
+
+---
+Task ID: 11
+Agent: Main Agent
+Task: Convert 40 tiles to flat 2D-style panels; classic Monopoly colors; readable text
+
+Work Log:
+- User feedback: tiles should be 2D (flat), easy to read, with classic Monopoly colors while keeping Malaysian political theme.
+
+Changes implemented:
+
+1. CLASSIC MONOPOLY COLOR PALETTE (game-data.ts):
+   - Updated COLOR_GROUP_HEX to authentic classic Monopoly hues (muted, not bright Tailwind):
+     brown #8b5a3c, lightblue #a8d8ea, pink #d4458f, orange #f0833a,
+     red #d62828, yellow #f5d020, green #1d8c4d, darkblue #1b4d8e.
+   - Coalition mapping preserved (IND/PH/PN/BN/GPS/GRS).
+
+2. FLAT 2D-STYLE TILES (Board3D.tsx EdgeTile):
+   - Replaced RoundedBox (3D extruded box) with a flat planeGeometry lying on the felt.
+   - Tile body is now a thin flat panel rotated [-PI/2, 0, pos.rotation] — like a printed Monopoly tile.
+   - Color strip converted to a flat plane on the outer edge (no more 3D box strip).
+   - textY changed from tileH+0.01 to 0.03 (flat on felt).
+   - Hover lift reduced (0.3 → 0.08) and tilt-toward-camera removed so tiles stay flat & readable.
+   - House indicators and flag poles repositioned to flat surface (y=0.02-0.06).
+
+3. FLAT CORNERS (Board3D.tsx CornerTile):
+   - Same flat plane treatment for all 4 corners (was extruded 2.2× TILE_H).
+   - Corner text repositioned to flat surface (y=0.04).
+   - Hover tilt removed; flat lift only.
+
+4. READABILITY:
+   - Tile name fontSize 0.34, price 0.42 (large, with white/amber outlines).
+   - Matte materials (roughness 0.65, metalness 0.05) — no glare.
+   - Flat panels eliminate perspective foreshortening from tall extrusion.
+
+Verification (Agent Browser + VLM):
+- VLM: "tiles are now flat 2D-style panels lying on the felt (no 3D raised boxes)" ✓
+- VLM: "color bars on outer edges use classic Monopoly colors (brown, light blue, pink, orange, red, yellow, green, dark blue)" ✓
+- VLM: "tile names and prices are readable (e.g. 'Jalan Ampang', 'RM1,500')" ✓
+- VLM: "board is clean and readable — not washed out, not ugly" ✓
+- VLM: "8/10 Monopoly-like + readable" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- 40 tiles converted from 3D extruded boxes to flat 2D-style panels on the felt.
+- Classic Monopoly color palette applied (muted authentic hues, coalition mapping preserved).
+- Text large and readable; flat panels eliminate foreshortening.
+- VLM-rated 8/10 for Monopoly-likeness + readability.

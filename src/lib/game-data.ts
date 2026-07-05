@@ -99,14 +99,14 @@ export type ColorGroup =
   | 'darkblue';  // Federal Power
 
 export const COLOR_GROUP_HEX: Record<ColorGroup, string> = {
-  brown: '#78716c',
-  lightblue: '#38bdf8',
-  pink: '#f472b6',
-  orange: '#fb923c',
-  red: '#ef4444',
-  yellow: '#facc15',
-  green: '#4ade80',
-  darkblue: '#3b82f6',
+  brown: '#8b5a3c',      // classic Monopoly brown (muted)
+  lightblue: '#a8d8ea',  // classic Monopoly light blue
+  pink: '#d4458f',       // classic Monopoly pink
+  orange: '#f0833a',     // classic Monopoly orange
+  red: '#d62828',        // classic Monopoly red
+  yellow: '#f5d020',     // classic Monopoly yellow
+  green: '#1d8c4d',      // classic Monopoly green
+  darkblue: '#1b4d8e',   // classic Monopoly dark blue
 };
 
 export const COLOR_GROUP_COALITION: Record<ColorGroup, string> = {

@@ -138,62 +138,49 @@ function CornerTile({ tile }: { tile: Tile }) {
     selectTile(isSelected ? null : tile.id);
   };
 
-  // Gentle emissive pulse + hover lift + tilt toward camera
-  useFrame(({ clock, camera }, delta) => {
+  // Gentle emissive pulse + flat hover lift (no tilt — tiles stay flat & readable)
+  useFrame(({ clock }, delta) => {
     if (!matRef.current) return;
     const t = clock.elapsedTime;
     const pulse = 0.12 + 0.08 * Math.sin(t * 1.5 + tile.id * 0.7);
-    matRef.current.emissiveIntensity = isSelected ? 0.5 : hovered ? 0.32 : pulse;
+    matRef.current.emissiveIntensity = isSelected ? 0.4 : hovered ? 0.28 : pulse;
     if (groupRef.current) {
-      const targetY = TILE_H / 2 + (hovered || isSelected ? 0.25 : 0);
+      const targetY = hovered || isSelected ? 0.08 : 0.02;
       groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
-      // Tilt toward camera on hover
-      if (hovered || isSelected) {
-        const dir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
-        const targetTiltX = dir.y * 0.15;
-        const targetTiltZ = -dir.x * 0.1;
-        groupRef.current.rotation.x += (targetTiltX - groupRef.current.rotation.x) * Math.min(delta * 5, 1);
-        groupRef.current.rotation.z += (targetTiltZ - groupRef.current.rotation.z) * Math.min(delta * 5, 1);
-      } else {
-        groupRef.current.rotation.x *= 1 - Math.min(delta * 5, 1);
-        groupRef.current.rotation.z *= 1 - Math.min(delta * 5, 1);
-      }
     }
   });
 
-  // Extruded height for corners
-  const cornerH = TILE_H * 2.2;
-
+  // Corners are flat panels too (matching the 2D-style edge tiles)
   return (
-    <group ref={groupRef} position={[pos.x, cornerH / 2, pos.z]}>
-      {/* Base mesh — extruded with bevel for premium feel */}
-      <RoundedBox
-        args={[CORNER_W, cornerH, CORNER_D]}
-        radius={0.1}
-        smoothness={5}
-        castShadow
+    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
+      {/* Base mesh — FLAT 2D-style panel like the edge tiles */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, pos.rotation]}
+        position={[0, 0, 0]}
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
+        <planeGeometry args={[CORNER_W, CORNER_D]} />
         {isShader ? (
           <primitive object={cornerMat} attach="material" />
         ) : (
           <meshStandardMaterial
             ref={matRef}
             color={TYPE_COLORS.corner}
-            roughness={0.3}
-            metalness={0.15}
+            roughness={0.4}
+            metalness={0.1}
             emissive="#f5e6c8"
             emissiveIntensity={0.12}
+            side={THREE.DoubleSide}
           />
         )}
-      </RoundedBox>
+      </mesh>
 
       {/* Icon */}
       <Text
-        position={[0, cornerH / 2 + 0.09, -0.5]}
+        position={[0, 0.04, -0.5]}
         fontSize={0.6}
         anchorX="center"
         anchorY="middle"
@@ -204,7 +191,7 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Name */}
       <Text
-        position={[0, cornerH / 2 + 0.01, 0.2]}
+        position={[0, 0.04, 0.2]}
         fontSize={0.3}
         color="#3d2817"
         anchorX="center"
@@ -220,7 +207,7 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Sub-label (Malay) */}
       <Text
-        position={[0, cornerH / 2 + 0.01, 0.62]}
+        position={[0, 0.04, 0.62]}
         fontSize={0.17}
         color="#6b4226"
         anchorX="center"
@@ -281,21 +268,11 @@ function EdgeTile({ tile }: { tile: Tile }) {
     selectTile(isSelected ? null : tile.id);
   };
 
-  // Hover / select lift + tilt toward camera
-  useFrame(({ camera }, delta) => {
+  // Hover / select — flat tiles lift slightly + emit glow (no big 3D pop)
+  useFrame((_, delta) => {
     if (!groupRef.current) return;
-    const targetY = tileH / 2 + (hovered || isSelected ? 0.3 : 0);
+    const targetY = hovered || isSelected ? 0.08 : 0.02;
     groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
-    if (hovered || isSelected) {
-      const dir = new THREE.Vector3().subVectors(camera.position, groupRef.current.position).normalize();
-      const targetTiltX = dir.y * 0.12;
-      const targetTiltZ = -dir.x * 0.08;
-      groupRef.current.rotation.x += (targetTiltX - groupRef.current.rotation.x) * Math.min(delta * 5, 1);
-      groupRef.current.rotation.z += (targetTiltZ - groupRef.current.rotation.z) * Math.min(delta * 5, 1);
-    } else {
-      groupRef.current.rotation.x *= 1 - Math.min(delta * 5, 1);
-      groupRef.current.rotation.z *= 1 - Math.min(delta * 5, 1);
-    }
   });
 
   const houseCount = tileState?.houses ?? 0;
@@ -329,44 +306,53 @@ function EdgeTile({ tile }: { tile: Tile }) {
   const priceOffX = -outX * 0.3;
   const priceOffZ = -outZ * 0.3;
 
-  const textY = tileH + 0.01;
+  const textY = 0.03; // flat on the felt, text hovers just above the surface
 
   // 3D miniatures removed for classic Monopoly look — tiles are flat,
   // the color bar on the outer edge provides visual identity.
 
   return (
-    <group ref={groupRef} position={[pos.x, tileH / 2, pos.z]}>
-      {/* ── Tile body — extruded with per-type material ── */}
-      <RoundedBox
-        args={[EDGE_W, tileH, EDGE_D]}
-        radius={0.05}
-        smoothness={4}
-        castShadow
+    <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
+      {/* ── Tile body — FLAT 2D-style panel lying on the felt ──
+          Like a printed Monopoly tile, not an extruded box. Thin plane
+          with a slight raise on hover/select for tactile feedback. */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, pos.rotation]}
+        position={[0, 0, 0]}
         receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
+        <planeGeometry args={[EDGE_W, EDGE_D]} />
         <meshStandardMaterial
           color={color}
-          roughness={Math.max(typeConfig.roughness, 0.6)}
-          metalness={Math.min(typeConfig.metalness, 0.3)}
+          roughness={0.65}
+          metalness={0.05}
           emissive={isSelected || hovered ? color : '#000000'}
-          emissiveIntensity={isSelected ? 0.2 : hovered ? 0.12 : 0}
+          emissiveIntensity={isSelected ? 0.18 : hovered ? 0.1 : 0}
+          side={THREE.DoubleSide}
         />
-      </RoundedBox>
+      </mesh>
 
-      {/* ── Property colour strip ── */}
+      {/* ── Tile border (thin gold outline like classic Monopoly) ── */}
+      <mesh rotation={[-Math.PI / 2, 0, pos.rotation]} position={[0, 0.001, 0]}>
+        <ringGeometry args={[Math.min(EDGE_W, EDGE_D) / 2 - 0.02, Math.min(EDGE_W, EDGE_D) / 2, 4]} />
+        <meshBasicMaterial color="#d4af37" transparent opacity={0} />
+      </mesh>
+
+      {/* ── Property colour strip — flat on the outer edge (classic Monopoly) ── */}
       {showStrip && (
         <mesh
-          position={[stripOffX, tileH / 2 + 0.03, stripOffZ]}
-          castShadow
+          rotation={[-Math.PI / 2, 0, pos.rotation]}
+          position={[stripOffX, 0.005, stripOffZ]}
+          receiveShadow
         >
-          <boxGeometry args={stripGeo} />
+          <planeGeometry args={isAlongX ? [EDGE_W - 0.1, stripDepth] : [stripDepth, EDGE_W - 0.1]} />
           <meshStandardMaterial
             color={COLOR_GROUP_HEX[tile.colorGroup!]}
-            roughness={0.25}
-            metalness={0.2}
+            roughness={0.5}
+            metalness={0.1}
           />
         </mesh>
       )}
@@ -426,7 +412,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         <group
           position={[
             -outX * 0.05,
-            tileH + 0.04,
+            0.06,
             -outZ * 0.05,
           ]}
         >
@@ -471,7 +457,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         <group
           position={[
             -outX * (EDGE_D / 2 - 0.15),
-            tileH / 2,
+            0.02,
             -outZ * (EDGE_D / 2 - 0.15),
           ]}
         >
