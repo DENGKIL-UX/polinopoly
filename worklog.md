@@ -314,3 +314,46 @@ Stage Summary:
 - GitHub main now has the full 3D Polinopoly game (default branch).
 - Both development lineages unified under one merge commit.
 - 3d-edition branch is fully merged into main (can be deleted as cleanup if desired).
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Revert classic Monopoly changes; fix 3D lighting so tile text is readable
+
+Work Log:
+- User feedback: classic Monopoly additions (white border, red trim, diamond logo) looked uglier; 3D lighting made tile text unreadable.
+- Reverted commit 90cdf55 (classic Monopoly aesthetics) via `git revert --no-edit`. Back to the pre-classic-look state (ea8c25a style).
+- VLM confirmed the lighting problems: bloom washout on bright tiles, harsh shadows, uneven illumination from colored spot lights + overhead point light.
+
+Lighting fixes (GameScene.tsx):
+- Ambient light: 0.42 -> 0.85 (much brighter base so shadows aren't harsh)
+- Key directional light: 1.15 -> 0.6 (softer, less glare)
+- Removed the overhead pointLight (was causing central hotspot/bloom)
+- Removed the two colored spotLights (amber + emerald) that caused color washout
+- Bloom: intensity 0.85 -> 0.35, luminanceThreshold 0.35 -> 0.7 (only brightest emissives glow, not tile text)
+- Vignette: darkness 0.65 -> 0.5 (less edge darkening)
+- Tone mapping exposure: 1.1 -> 0.95 (slightly less bright overall)
+
+Tile material fixes (Board3D.tsx):
+- roughness floored at 0.6 (matte, no glossy reflections)
+- metalness capped at 0.3 (no mirror-like glare)
+- emissive hover/select intensity halved (0.5/0.32 -> 0.2/0.12) to avoid washout on interaction
+
+Text size fixes (Board3D.tsx):
+- Tile name fontSize: 0.26 -> 0.34 (bigger)
+- Sub-label: 0.16 -> 0.2
+- Price: 0.32 -> 0.42 (much bigger)
+- All outlines thickened (0.018/0.012/0.018 -> 0.024/0.016/0.024) for contrast
+
+Verification (Agent Browser + VLM):
+- VLM: "lighting is balanced — not harsh, not dark" ✓
+- VLM: "no bloom or glare washing out text" ✓
+- VLM: "board looks clean and professional — no ugly elements" ✓
+- Nearest tiles readable when focused on ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Classic Monopoly additions reverted (back to the cleaner pre-classic look).
+- 3D lighting rebalanced: bright ambient + soft directional, no colored spots, minimal bloom.
+- Tile text enlarged + matte materials so text stays crisp.
+- Board now looks clean (not ugly) and text is readable without glare.

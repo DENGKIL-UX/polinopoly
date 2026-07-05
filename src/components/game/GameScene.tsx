@@ -127,11 +127,13 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
 
       <Stars radius={120} depth={60} count={2200} factor={4} fade speed={0.6} />
 
-      {/* Key + fill lighting */}
-      <ambientLight intensity={0.42} color="#fef3c7" />
+      {/* Key + fill lighting — soft and even so tile text stays readable.
+          High ambient + gentle directional; removed the harsh colored spot
+          lights and overhead point light that caused glare/bloom washout. */}
+      <ambientLight intensity={0.85} color="#fef3c7" />
       <directionalLight
         position={[16, 28, 14]}
-        intensity={1.15}
+        intensity={0.6}
         color="#fffaf0"
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -142,11 +144,7 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
         shadow-camera-bottom={-24}
         shadow-bias={-0.0008}
       />
-      <directionalLight position={[-14, 16, -10]} intensity={0.32} color="#dbeafe" />
-      <pointLight position={[0, 9, 0]} intensity={0.4} color="#fef9ef" distance={22} decay={2} />
-      {/* Coalition-coloured rim lights for drama */}
-      <spotLight position={[12, 6, 12]} angle={0.6} penumbra={1} intensity={0.5} color="#f59e0b" />
-      <spotLight position={[-12, 6, -12]} angle={0.6} penumbra={1} intensity={0.4} color="#10b981" />
+      <directionalLight position={[-14, 20, -10]} intensity={0.35} color="#dbeafe" />
 
       <Board3D />
       <Token3D />
@@ -170,19 +168,18 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
       <Environment preset="night" />
 
       {/* ── Post-processing: Bloom + Vignette + ACES tone mapping ──
-          Makes emissive elements (gold, neon, light beams, particle bursts)
-          glow cinematically; vignette draws the eye to the center.
-          SSAO removed (requires NormalPass which is heavy); ContactShadows
-          already provides ground contact depth. */}
+          Bloom kept subtle (low intensity, high threshold) so only the
+          brightest emissive elements (light beams, particle sparks) glow —
+          NOT the tile text/surfaces which must stay crisp and readable. */}
       <EffectComposer multisampling={4}>
         <Bloom
-          intensity={0.85}
-          luminanceThreshold={0.35}
-          luminanceSmoothing={0.4}
+          intensity={0.35}
+          luminanceThreshold={0.7}
+          luminanceSmoothing={0.3}
           mipmapBlur
-          radius={0.7}
+          radius={0.5}
         />
-        <Vignette eskil={false} offset={0.25} darkness={0.65} />
+        <Vignette eskil={false} offset={0.3} darkness={0.5} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       </EffectComposer>
     </>
@@ -228,7 +225,7 @@ export default function GameScene() {
           antialias: true,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
+          toneMappingExposure: 0.95,
         }}
         onPointerMissed={() => useGameStore.getState().selectTile(null)}
       >

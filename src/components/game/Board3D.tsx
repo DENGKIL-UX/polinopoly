@@ -361,10 +361,10 @@ function EdgeTile({ tile }: { tile: Tile }) {
       >
         <meshStandardMaterial
           color={color}
-          roughness={typeConfig.roughness}
-          metalness={typeConfig.metalness}
+          roughness={Math.max(typeConfig.roughness, 0.6)}
+          metalness={Math.min(typeConfig.metalness, 0.3)}
           emissive={isSelected || hovered ? color : '#000000'}
-          emissiveIntensity={isSelected ? 0.5 : hovered ? 0.32 : 0}
+          emissiveIntensity={isSelected ? 0.2 : hovered ? 0.12 : 0}
         />
       </RoundedBox>
 
@@ -389,14 +389,14 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {/* ── Tile name ── */}
       <Text
         position={[0, textY, 0]}
-        fontSize={0.26}
+        fontSize={0.34}
         color="#0f172a"
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 2, pos.rotation, 0]}
-        maxWidth={EDGE_W - 0.25}
+        maxWidth={EDGE_W - 0.2}
         textAlign="center"
-        outlineWidth={0.018}
+        outlineWidth={0.024}
         outlineColor="#ffffff"
       >
         {tile.name}
@@ -406,14 +406,14 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {SUB_LABELS[tile.id] && (
         <Text
           position={[subOffX, textY, subOffZ]}
-          fontSize={0.16}
+          fontSize={0.2}
           color="#334155"
           anchorX="center"
           anchorY="middle"
           rotation={[-Math.PI / 2, pos.rotation, 0]}
-          maxWidth={EDGE_W - 0.3}
+          maxWidth={EDGE_W - 0.25}
           textAlign="center"
-          outlineWidth={0.012}
+          outlineWidth={0.016}
           outlineColor="#ffffff"
         >
           {SUB_LABELS[tile.id]}
@@ -424,12 +424,12 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {tile.price != null && (
         <Text
           position={[priceOffX, textY - 0.004, priceOffZ]}
-          fontSize={0.32}
+          fontSize={0.42}
           color="#0f172a"
           anchorX="center"
           anchorY="middle"
           rotation={[-Math.PI / 2, pos.rotation, 0]}
-          outlineWidth={0.018}
+          outlineWidth={0.024}
           outlineColor="#fde68a"
         >
           {`RM${tile.price}`}
