@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/lib/game-store';
 import LobbyScreen from '@/components/game/LobbyScreen';
+import { NarrationPopup } from '@/components/game/NarrationPopup';
 import { Boxes, Grid3x3 } from 'lucide-react';
 
 // Dynamic imports to keep the initial bundle lean and avoid SSR issues with WebGL
@@ -121,7 +122,22 @@ export default function Home() {
 
         {/* The dashboard (dice, player cards, action buttons, log) floats on top of either view */}
         <GameDashboard />
+
+        {/* Political soap opera narration pop-ups during AI turns */}
+        <NarrationPopupWrapper />
       </div>
     </div>
+  );
+}
+
+/** Wrapper that reads narration state from the store and passes to the popup */
+function NarrationPopupWrapper() {
+  const narration = useGameStore((s) => s.currentNarration);
+  const aiThinking = useGameStore((s) => s.aiThinking);
+  return (
+    <NarrationPopup
+      narration={narration ? { id: narration.id, text: narration.text, category: narration.category } : null}
+      isVisible={!!narration && aiThinking}
+    />
   );
 }

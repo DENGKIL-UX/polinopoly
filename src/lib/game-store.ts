@@ -20,6 +20,7 @@ import {
   getCoalitionPersonality,
   type AIContext,
 } from './ai-engine';
+import { NARRATIONS } from './narrations';
 
 // --- Types ---
 export interface Player {
@@ -100,6 +101,9 @@ export interface GameState {
   aiThinking: boolean;
   showPortfolio: boolean;
 
+  // Narration (political soap opera pop-ups)
+  currentNarration: { id: number; text: string; category: string } | null;
+
   // Auction
   auctionState: AuctionState | null;
 
@@ -139,6 +143,8 @@ export interface GameState {
   selectTile: (tileId: number | null) => void;
   addLog: (entry: Omit<GameLogEntry, 'id' | 'turn'>) => void;
   setAIThinking: (thinking: boolean) => void;
+  triggerNarration: (category: string) => void;
+  clearNarration: () => void;
   aiTurn: () => Promise<void>;
   getMarketState: () => MarketState;
   buildHouse: (tileId: number) => void;
@@ -301,6 +307,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   winner: null,
   aiThinking: false,
   showPortfolio: false,
+  currentNarration: null,
   auctionState: null,
   mortgagedTiles: [],
   aiSpeed: 1,
@@ -478,6 +485,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         message: `💸 ${player.name} pays RM${amount} in ${tile.name}! (${tile.description})`,
         type: 'tax',
       });
+      if (player.isAI) get().triggerNarration('penalty');
       return;
     }
 
@@ -986,6 +994,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ aiThinking: thinking });
   },
 
+  triggerNarration: (category) => {
+    // Pick a random narration from the bank for the given category
+    const pool = NARRATIONS.filter((n) => n.category === category);
+    const fallback = NARRATIONS.filter((n) => n.category === 'general');
+    const arr = pool.length > 0 ? pool : fallback;
+    if (arr.length === 0) return;
+    const narration = arr[Math.floor(Math.random() * arr.length)];
+    set({ currentNarration: { id: narration.id, text: narration.text, category: narration.category } });
+    // Auto-clear after 4.5s
+    setTimeout(() => {
+      const current = get().currentNarration;
+      if (current && current.id === narration.id) {
+        set({ currentNarration: null });
+      }
+    }, 4500);
+  },
+
+  clearNarration: () => {
+    set({ currentNarration: null });
+  },
+
   aiTurn: async () => {
     const state = get();
     const speed = state.aiSpeed;
@@ -1022,10 +1051,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().setAIThinking(true);
     const personality = getCoalitionPersonality(player.coalitionId);
 
+    // ── Narration: AI thinking ──
+    get().triggerNarration('ai_thinking');
+
     // ── 1. JAIL DECISION (expert system) ──
     if (player.isInJail) {
       const ctx = buildAIContext(get(), currentPlayerId);
       const { payBail, reason } = decideJail(ctx);
+      get().triggerNarration('jail');
       get().addLog({
         playerId: currentPlayerId,
         playerName: player.name,
@@ -1072,8 +1105,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
 
       if (decision.shouldBuy) {
+        get().triggerNarration('buy');
         get().buyProperty();
       } else {
+        get().triggerNarration('skip');
         get().skipBuy();
       }
       await delay(400);
@@ -1088,6 +1123,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // ── 4. PAY RENT ──
     if (phase === 'paying_rent') {
+      get().triggerNarration('rent');
       get().payRent();
       await delay(400);
       await waitForPhase(['landed', 'playing', 'game_over', 'auction'], 4000);
@@ -1096,6 +1132,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // ── 5. DRAW CARD ──
     if (phase === 'card') {
+      get().triggerNarration('card');
       const card = get().currentCard;
       if (card) {
         get().applyCard(card);

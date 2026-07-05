@@ -833,3 +833,95 @@ Stage Summary:
 - All 3D tile outlines/backgrounds removed — cards are now just transparent text overlays.
 - Board image's own 40 boxes provide the visual tile structure.
 - 3D tile text aligned with the board image's boxes.
+
+---
+Task ID: 1-narrations
+Agent: Narrations Sub-Agent
+Task: Research Malaysian politics (2018–2025) and generate 1000-entry narration bank for "Pilihan Raya Monopoly"
+
+Work Log:
+- Read worklog.md to understand project context (3D Monopoly clone, Malaysian political satire board game).
+- Researched 15 topic clusters in Malaysian politics 2018–2025:
+  1. Sheraton Move (Feb 23–24, 2020) — PH collapse, Azmin Ali katak, Muhyiddin backdoor PM8
+  2. 1MDB scandal — Najib, Jho Low, Equanimity yacht ($250M), SRC International RM42M, RM2.6B "Saudi donation", Tanore Finance $681M, Aabar BVI fake ($3.5B siphoned), PetroSaudi JV, Goldman Sachs $3.9B settlement, Tim Leissner + Roger Ng, US DOJ kleptocracy $1B+ seizure, BSI/Falcon Bank shut down, Red Granite Pictures (Wolf of Wall Street), Riza Aziz DNAA
+  3. GE14 (May 9, 2018) — historic opposition win, Mahathir returns as PM7 at 92, Anwar pardoned May 16, 2018
+  4. GE15 (Nov 19, 2022) — hung parliament, PN green wave, Anwar PM10 (Nov 24, 2022), unity govt (PH+BN+GPS+GRS+Warisan+MUDA), confidence vote Dec 19, 2022 (148 votes)
+  5. Party hopping — anti-hopping law, Azmin Ali + 11 MPs katak, Bersatu split
+  6. PAS green wave — Kelantan/Terengganu/Kedah, Hadi Awang, Sanusi Noor (viral TikTok MB), RUU355, hudud
+  7. UMNO internal wars — Zahid vs Najib faction, Zahid 47 charges (Yayasan Akalbudi), DNAA Sept 4, 2023, UMNO general assembly
+  8. GPS kingmaker — Abang Johari, Sarawak 23 seats, MA63 rights, Fadillah Yusof DPM, Sarawak premier title
+  9. Sabah politics — Hajiji GRS, Musa Aman comeback, Shafie Apdal Warisan, Sabah crisis 2020
+  10. Royal interventions — Agong Sultan Abdullah (kingmaker Dec 2022), Agong Sultan Ibrahim (Jan 31, 2024), Conference of Rulers, Najib Pardons Board Jan 31, 2024 (halved sentence), addendum house-arrest ploy
+  11. MACC investigations — Latheefa Koya, Azam Baki shares scandal, raids on Najib residences (RM1.1B seized: 272 Birkins, 12,000 jewelry pieces, 114M cash in 26 currencies), Bersatu accounts frozen
+  12. Budget politics — Anwar confidence vote, MOU 2021 (Anwar-Ismail Sabri bipartisan), Madani budgets 2024/2025, Muhyiddin emergency Jan 2021 + Jana Wibawa RM5.7B
+  13. Race/religion/royalty (3R) — Sedition Act 1948, Sanusi sedition charge (Selangor sultan), RUU355, Article 153
+  14. Economy — ringgit slide to 4.80 (26-year low), GST 6% → SST, diesel subsidy cut June 10, 2024, PADU targeted subsidies, T15 threshold, EPF Account 3, chicken/egg shortage 2022-2023, Khazanah/FELDA/Tabung Haji/MAS bailouts, Anwar Madani economy (July 27, 2023 KLCC launch)
+  15. Satire memes — Najib "Malu Apa Bossku" / Bossku TikTok (3.5M followers), "Malaysia Bohong", "Cash is King", Muhyiddin "Abah" hoodie, Anwar "Madani" (critics rebrand "Mahal Dan Susah"), Khairy "Keluar Sekejap" podcast, Sanusi "tikus kerajaan"/"komplot" rhetoric, Mahathir chedet.cc blog, Anwar "PM in-waiting" 24-year wait
+
+- Created /home/z/my-project/src/lib/narrations.ts:
+  - Exports `Narration` interface (id, text, category) with strict 11-variant category union type
+  - Exports `NARRATIONS: Narration[]` array of 1000 entries
+  - Used TypeScript template literals (backticks) for all narration strings to avoid apostrophe/quote escaping issues
+  - Each entry: 1-3 sentences, Manglish/rojak mix (Malay-English code-switching), satirical soap-opera tone referencing real events
+
+- Category distribution (verified by Node script):
+  - ai_thinking: 150 (1–150) — AI contemplating move
+  - buy: 150 (151–300) — AI decides to buy property
+  - skip: 100 (301–400) — AI passes on buying
+  - penalty: 100 (401–500) — AI lands on tax/penalty tile
+  - jail: 100 (501–600) — AI goes to jail
+  - rent: 100 (601–700) — AI pays rent
+  - monopoly: 50 (701–750) — AI completes color set
+  - auction: 50 (751–800) — AI at auction
+  - card: 100 (801–900) — AI draws card
+  - pass_go: 50 (901–950) — AI passes GO
+  - general: 50 (951–1000) — General political drama
+  - Total: 1000 ✓
+
+- Verification (Node script /tmp/verify_narrations.mjs):
+  - Total entries parsed: 1000 ✓
+  - Duplicate IDs: 0 ✓
+  - Duplicate texts: 0 ✓ (after fixing 4 initial duplicates at IDs 246, 248, 876, 887 by replacing with new unique political references)
+  - All 11 category counts match expected ✓
+  - ID range: 1 to 1000 (sequential) ✓
+  - Text length: 29–98 chars, avg 56 chars ✓
+  - TypeScript type-check (npx tsc --noEmit --skipLibCheck): no errors ✓
+
+- File size: 1,084 lines, ~76 KB
+
+Stage Summary:
+- 1000-entry political satire narration bank created at /home/z/my-project/src/lib/narrations.ts
+- All entries unique, properly categorized across 11 game-event types, fully type-safe
+- Ready to be imported by ai-engine.ts or game-store.ts for AI narration display
+- Sample usage: `import { NARRATIONS, Narration } from '@/lib/narrations';` then filter by category for game-event-appropriate narration
+
+---
+Task ID: 23
+Agent: Main Agent
+Task: Create 1000 political narration pop-ups (Malaysian political soap opera)
+
+Work Log:
+- Sub-agent researched Malaysian politics (2018-2025): Sheraton Move, 1MDB, GE14/GE15, party hopping, PAS green wave, UMNO civil war, GPS kingmaker, Sabah chaos, royal interventions, MACC, budget politics, 3R issues, economy, memes.
+- Generated 1000-entry narration bank at src/lib/narrations.ts (11 categories: ai_thinking, buy, skip, penalty, jail, rent, monopoly, auction, card, pass_go, general).
+- Created narration system hook (src/lib/narration-system.ts) with getRandomNarration() and useNarration().
+- Created NarrationPopup component (src/components/game/NarrationPopup.tsx) — soap opera style dialog with:
+  * Semi-transparent dark background with colored border per category
+  * Coalition player icon + category label (STRATEGI, PEMERANGAN, SKANDAL, TAHANAN, etc.)
+  * Italic narration text in quotes
+  * Animated "thinking" dots + "AI sedang berfikir..." label
+  * Framer Motion entrance/exit animations
+- Wired into game-store.ts:
+  * Added currentNarration state + triggerNarration/clearNarration actions
+  * Trigger narrations at: AI thinking start, jail decision, buy/skip decision, rent payment, card draw, tax penalty
+  * Auto-clear after 4.5s
+- Added NarrationPopup to page.tsx via NarrationPopupWrapper (reads store state)
+
+Verification (Agent Browser + VLM):
+- VLM: "semi-transparent dialog box with green border near the top — italic text: 'Beli! Macam Mahathir beli anti-Najib campaign — former ally gone.' Labeled PEMERANGAN with PN player identifier" ✓
+- Narrations trigger at correct game events (buy, skip, jail, rent, card, penalty, AI thinking) ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- 1000 Malaysian political satire narrations created, categorized by game event.
+- Pop-up appears during AI turns as a soap opera dialog with the AI player's coalition identity.
+- Narrations reference real Malaysian political events (Sheraton Move, 1MDB, GE15, party hopping, etc.).
