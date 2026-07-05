@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useThree, useFrame, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Environment, Stars, ContactShadows, Float } from '@react-three/drei';
+import { OrbitControls, Stars, ContactShadows, Float } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
@@ -165,7 +165,9 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
 
       <CameraRig controlsRef={controlsRef} />
 
-      <Environment preset="night" />
+      {/* Environment preset removed — was fetching dikhololo_night_1k.hdr from
+          CDN which fails offline. Using hemisphere light for ambient fill instead. */}
+      <hemisphereLight args={['#fef3c7', '#1a3d2a', 0.4]} />
 
       {/* ── Post-processing: Bloom + Vignette + ACES tone mapping ──
           Bloom kept subtle (low intensity, high threshold) so only the
