@@ -30,25 +30,20 @@ function CameraRig({ controlsRef }: { controlsRef: React.RefObject<any> }) {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    // Determine the desired focus point
-    let target: THREE.Vector3 | null = null;
+    // Default: keep the board centered so all 40 tiles stay visible & readable.
+    // Only pull focus toward a tile when the user explicitly selects one.
+    let target: THREE.Vector3;
 
     if (selectedTileId !== null) {
       const tp = getTilePosition(selectedTileId, BOARD_SIZE);
       target = focusVec.set(tp.x, 0, tp.z);
     } else {
-      const activeId = turnOrder[currentTurnIndex];
-      const activePlayer = activeId ? players.find((p) => p.id === activeId) : null;
-      if (activePlayer && !activePlayer.isBankrupt) {
-        const tp = getTilePosition(activePlayer.position, BOARD_SIZE);
-        target = focusVec.set(tp.x, 0, tp.z);
-      }
+      // Stay centered on the board
+      target = focusVec.set(0, 0, 0);
     }
 
-    if (target) {
-      controls.target.lerp(target, Math.min(delta * 2.2, 1));
-      controls.update();
-    }
+    controls.target.lerp(target, Math.min(delta * 2.5, 1));
+    controls.update();
   });
 
   return null;
@@ -133,16 +128,16 @@ function SceneContent({ controlsRef }: { controlsRef: React.RefObject<any> }) {
       {/* Key + fill lighting */}
       <ambientLight intensity={0.42} color="#fef3c7" />
       <directionalLight
-        position={[16, 24, 14]}
+        position={[16, 28, 14]}
         intensity={1.15}
         color="#fffaf0"
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={70}
-        shadow-camera-left={-18}
-        shadow-camera-right={18}
-        shadow-camera-top={18}
-        shadow-camera-bottom={-18}
+        shadow-camera-far={80}
+        shadow-camera-left={-24}
+        shadow-camera-right={24}
+        shadow-camera-top={24}
+        shadow-camera-bottom={-24}
         shadow-bias={-0.0008}
       />
       <directionalLight position={[-14, 16, -10]} intensity={0.32} color="#dbeafe" />
@@ -188,8 +183,9 @@ export default function GameScene() {
 
   const camera = useMemo(
     () => ({
-      position: (isMobile ? [24, 26, 24] : [20, 24, 20]) as [number, number, number],
-      fov: isMobile ? 52 : 46,
+      // Nearly top-down so flat tile text isn't foreshortened and stays readable
+      position: (isMobile ? [16, 34, 16] : [13, 33, 13]) as [number, number, number],
+      fov: isMobile ? 52 : 42,
       near: 0.1,
       far: 220,
     }),
@@ -216,12 +212,11 @@ export default function GameScene() {
         <OrbitControls
           ref={controlsRef}
           enablePan={false}
-          minPolarAngle={0.25}
-          maxPolarAngle={Math.PI / 2.15}
-          minDistance={13}
-          maxDistance={42}
-          autoRotate
-          autoRotateSpeed={0.35}
+          minPolarAngle={0.2}
+          maxPolarAngle={Math.PI / 2.4}
+          minDistance={16}
+          maxDistance={48}
+          autoRotate={false}
           enableDamping
           dampingFactor={0.08}
           makeDefault

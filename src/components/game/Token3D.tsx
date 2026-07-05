@@ -142,9 +142,10 @@ interface SingleTokenProps {
   player: Player;
   isActive: boolean;
   indexOnTile: number;
+  offset: [number, number];
 }
 
-function SingleToken({ player, isActive, indexOnTile }: SingleTokenProps) {
+function SingleToken({ player, isActive, indexOnTile, offset }: SingleTokenProps) {
   const groupRef = useRef<THREE.Group>(null!);
   const shadowRef = useRef<THREE.Group>(null!);
   const bodyMatRef = useRef<THREE.MeshStandardMaterial>(null!);
@@ -205,8 +206,9 @@ function SingleToken({ player, isActive, indexOnTile }: SingleTokenProps) {
         const p = hopProgress.current; // 0..1
         const fromPos = getTilePosition(currentTile, BOARD_SIZE);
         const toPos = getTilePosition(nextTile, BOARD_SIZE);
-        const x = fromPos.x + (toPos.x - fromPos.x) * p;
-        const z = fromPos.z + (toPos.z - fromPos.z) * p;
+        // World position = interpolated tile centre + this token's stacking offset
+        const x = fromPos.x + (toPos.x - fromPos.x) * p + offset[0];
+        const z = fromPos.z + (toPos.z - fromPos.z) * p + offset[1];
         hopY = Math.sin(p * Math.PI) * HOP_HEIGHT;
         groupRef.current.position.x = x;
         groupRef.current.position.z = z;
@@ -225,10 +227,12 @@ function SingleToken({ player, isActive, indexOnTile }: SingleTokenProps) {
     }
 
     if (path.length === 0) {
-      // Idle — sit on the rendered tile
+      // Idle — sit on the rendered tile (world position = tile centre + offset)
       const pos = getTilePosition(renderedTile.current, BOARD_SIZE);
-      groupRef.current.position.x += (pos.x - groupRef.current.position.x) * Math.min(delta * 10, 1);
-      groupRef.current.position.z += (pos.z - groupRef.current.position.z) * Math.min(delta * 10, 1);
+      const targetX = pos.x + offset[0];
+      const targetZ = pos.z + offset[1];
+      groupRef.current.position.x += (targetX - groupRef.current.position.x) * Math.min(delta * 10, 1);
+      groupRef.current.position.z += (targetZ - groupRef.current.position.z) * Math.min(delta * 10, 1);
       currentTile = renderedTile.current;
     }
 
@@ -387,15 +391,17 @@ export default function Token3D() {
           const indexOnTile = idx === -1 ? 0 : idx;
           const offset = TILE_OFFSETS[indexOnTile] ?? [0, 0];
           const isActive = player.id === activePlayerId;
-          const tilePos = getTilePosition(player.position, BOARD_SIZE);
 
+          // SingleToken owns its full world position (tile centre + offset);
+          // the parent group stays at the origin to avoid double-translation.
           return (
-            <group
+            <SingleToken
               key={player.id}
-              position={[tilePos.x + offset[0], 0, tilePos.z + offset[1]]}
-            >
-              <SingleToken player={player} isActive={isActive} indexOnTile={indexOnTile} />
-            </group>
+              player={player}
+              isActive={isActive}
+              indexOnTile={indexOnTile}
+              offset={offset}
+            />
           );
         })}
     </group>

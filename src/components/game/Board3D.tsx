@@ -17,22 +17,23 @@ import { useGameStore } from '@/lib/game-store';
 // CONSTANTS
 // ───────────────────────────────────────────────────────────────────
 
-const BOARD_SIZE = 20;
+const BOARD_SIZE = 20;        // tile-loop span (corner-to-corner)
 const HALF = BOARD_SIZE / 2;
+const FELT_MARGIN = 3.2;      // extra felt around the tile loop so tiles & tokens stay ON the board
 
-const TILE_H = 0.15; // tile thickness
-const CORNER_W = 2.0;
-const CORNER_D = 2.0;
-const EDGE_W = 1.7; // width along the edge
-const EDGE_D = 0.85; // depth perpendicular to edge (towards center)
+const TILE_H = 0.18; // tile thickness
+const CORNER_W = 2.3;
+const CORNER_D = 2.3;
+const EDGE_W = 1.9; // width along the edge
+const EDGE_D = 1.1; // depth perpendicular to edge (towards center)
 
 const FELT_COLOR = '#1a472a';
 const FELT_INNER = '#153d22';
 const WOOD_COLOR = '#3d2817';
 const WOOD_ACCENT = '#5c3d21';
 
-const FRAME_W = 1.0;
-const FRAME_H = 0.45;
+const FRAME_W = 1.2;
+const FRAME_H = 0.5;
 
 // Tile type → base colour
 const TYPE_COLORS: Record<string, string> = {
@@ -150,8 +151,8 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Icon */}
       <Text
-        position={[0, TILE_H + 0.09, -0.38]}
-        fontSize={0.5}
+        position={[0, TILE_H + 0.09, -0.5]}
+        fontSize={0.6}
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 2, pos.rotation, 0]}
@@ -161,28 +162,32 @@ function CornerTile({ tile }: { tile: Tile }) {
 
       {/* Name */}
       <Text
-        position={[0, TILE_H + 0.01, 0.15]}
-        fontSize={0.22}
+        position={[0, TILE_H + 0.01, 0.2]}
+        fontSize={0.3}
         color="#3d2817"
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 2, pos.rotation, 0]}
-        maxWidth={1.7}
+        maxWidth={2.0}
         textAlign="center"
+        outlineWidth={0.012}
+        outlineColor="#ffffff"
       >
         {tile.name}
       </Text>
 
       {/* Sub-label (Malay) */}
       <Text
-        position={[0, TILE_H + 0.01, 0.5]}
-        fontSize={0.13}
+        position={[0, TILE_H + 0.01, 0.62]}
+        fontSize={0.17}
         color="#6b4226"
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 2, pos.rotation, 0]}
-        maxWidth={1.7}
+        maxWidth={2.0}
         textAlign="center"
+        outlineWidth={0.01}
+        outlineColor="#ffffff"
       >
         {SUB_LABELS[tile.id] ?? ''}
       </Text>
@@ -286,13 +291,15 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {/* ── Tile name ── */}
       <Text
         position={[0, textY, 0]}
-        fontSize={0.14}
-        color="#1a1a2e"
+        fontSize={0.26}
+        color="#0f172a"
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 2, pos.rotation, 0]}
-        maxWidth={EDGE_W - 0.2}
+        maxWidth={EDGE_W - 0.25}
         textAlign="center"
+        outlineWidth={0.018}
+        outlineColor="#ffffff"
       >
         {tile.name}
       </Text>
@@ -301,13 +308,15 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {SUB_LABELS[tile.id] && (
         <Text
           position={[subOffX, textY, subOffZ]}
-          fontSize={0.09}
-          color="#6b7280"
+          fontSize={0.16}
+          color="#334155"
           anchorX="center"
           anchorY="middle"
           rotation={[-Math.PI / 2, pos.rotation, 0]}
-          maxWidth={EDGE_W - 0.25}
+          maxWidth={EDGE_W - 0.3}
           textAlign="center"
+          outlineWidth={0.012}
+          outlineColor="#ffffff"
         >
           {SUB_LABELS[tile.id]}
         </Text>
@@ -317,11 +326,13 @@ function EdgeTile({ tile }: { tile: Tile }) {
       {tile.price != null && (
         <Text
           position={[priceOffX, textY - 0.004, priceOffZ]}
-          fontSize={0.17}
-          color="#1e293b"
+          fontSize={0.32}
+          color="#0f172a"
           anchorX="center"
           anchorY="middle"
           rotation={[-Math.PI / 2, pos.rotation, 0]}
+          outlineWidth={0.018}
+          outlineColor="#fde68a"
         >
           {`RM${tile.price}`}
         </Text>
@@ -398,14 +409,15 @@ function EdgeTile({ tile }: { tile: Tile }) {
 // ───────────────────────────────────────────────────────────────────
 
 function BoardBase() {
-  const outer = BOARD_SIZE + FRAME_W * 2 + 0.2;
-  const frameEdge = HALF + FRAME_W / 2 + 0.1;
+  const feltSize = BOARD_SIZE + FELT_MARGIN * 2;   // tile loop + margin on both sides
+  const outer = feltSize + FRAME_W * 2 + 0.4;
+  const frameEdge = feltSize / 2 + FRAME_W / 2 + 0.1;
 
   return (
     <group>
-      {/* ── Green felt playing surface ── */}
+      {/* ── Green felt playing surface (large enough to contain all tiles & tokens) ── */}
       <mesh position={[0, -0.1, 0]} receiveShadow>
-        <boxGeometry args={[BOARD_SIZE + 0.4, 0.2, BOARD_SIZE + 0.4]} />
+        <boxGeometry args={[feltSize, 0.2, feltSize]} />
         <meshStandardMaterial
           color={FELT_COLOR}
           roughness={0.92}

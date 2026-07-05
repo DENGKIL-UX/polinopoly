@@ -79,3 +79,48 @@ Verification (Agent Browser):
 Stage Summary:
 - Emoji placeholders replaced with real, researched official coalition logos and the national flag (Jalur Gemilang).
 - Logos appear consistently across lobby, 2D board, 3D board, 3D tokens, and all dashboard panels.
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix tokens moving outside the 3D board, enlarge board, disable rotation, make tile text readable
+
+Work Log:
+- Analyzed user screenshot with VLM: confirmed (1) text labels unreadable, (2) board ~40-50% of viewport, (3) tiles/tokens hanging off the felt edge.
+- Root-caused the "token outside board" bug: SingleToken's inner groupRef was being set to ABSOLUTE tile coords (pos.x, pos.z) while nested inside a parent group already translated to [tilePos + offset]. Result: world position = 2*tilePos + offset → tokens rendered ~2× off the board.
+- Research applied (itaylayzer/Monopoly board-scaling + elena-pan/Unity-Monopoly crisp-text/camera practices): enlarge playing surface, top-down camera, bigger outlined text.
+
+Fixes:
+1. Token3D.tsx — Fixed double-translation bug:
+   - Removed the parent group's [tilePos+offset] translation (now origin).
+   - SingleToken now owns its full world position: idle lerps to (tilePos + offset), hop path interpolates (fromPos→toPos + offset). Offset passed as a prop.
+   - Tokens now sit exactly on their tiles and hop along the board edge, never off-board.
+2. Board3D.tsx — Enlarged board so tiles & tokens stay ON the felt:
+   - Added FELT_MARGIN = 3.2; felt now BOARD_SIZE + 6.4 = 26.4 wide (was 20.4), giving a 3.2-unit margin around the 20-wide tile loop.
+   - Tiles enlarged: EDGE_W 1.7→1.9, EDGE_D 0.85→1.1, CORNER 2.0→2.3, TILE_H 0.15→0.18.
+   - Frame enlarged: FRAME_W 1.0→1.2, FRAME_H 0.45→0.5; shadow bounds ±18→±24.
+3. Board3D.tsx — Made tile text readable:
+   - Tile name fontSize 0.14→0.26 with white outline (0.018).
+   - Sub-label 0.09→0.16 with outline.
+   - Price 0.17→0.32 with amber outline.
+   - Corner name 0.22→0.30, icon 0.5→0.6, sub 0.13→0.17, all with outlines.
+4. GameScene.tsx — Camera & rotation:
+   - autoRotate: true → false (user: "no need to rotate").
+   - Camera position [20,24,20]→[13,33,13]: nearly top-down (polar ~21°) so flat tile text isn't foreshortened.
+   - fov 46→42, zoom limits tightened (16–48).
+   - CameraRig: now keeps target centered on (0,0,0) by default so all 40 tiles stay visible; only pulls focus when a tile is explicitly selected.
+
+Verification (Agent Browser + VLM):
+- Lobby → start game → 3D board renders. ✓
+- VLM: "player tokens are on the green board (no floating off edges)". ✓
+- VLM: "text labels on board tiles are readable" (RM prices legible), readability 7/10 (was "not readable"). ✓
+- VLM: "board is large in the viewport". ✓
+- VLM: "view is more top-down (looking down at the board)". ✓
+- Dice roll: tokens stay ON the board throughout the hop animation. ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Token-outside-board bug fixed (double-translation root cause).
+- Board enlarged with felt margin so all tiles/tokens sit on the playing surface.
+- Auto-rotate disabled; static top-down readable camera.
+- Tile text (names, prices, sub-labels) now readable via bigger fonts + outlines + top-down angle.
