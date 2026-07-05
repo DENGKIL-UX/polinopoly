@@ -1069,7 +1069,7 @@ function PropertyPortfolio() {
 
   return (
     <>
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 pointer-events-auto">
+      <div className="absolute bottom-20 right-3 z-30 flex flex-col items-end gap-2 pointer-events-auto">
         <motion.button
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
           onClick={() => {
