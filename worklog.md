@@ -768,3 +768,29 @@ Stage Summary:
 - Green board area filled with the new uploaded Malaysian political Monopoly image.
 - All 40 card tiles are now transparent/see-through — the board artwork shows through them.
 - Tile text (names, prices, rent tables) remains readable via semi-transparent canvas textures.
+
+---
+Task ID: 21
+Agent: Main Agent
+Task: Remove shadow outlines from transparent tiles
+
+Work Log:
+- User reported visible shadow outlines of the 40 tiles despite transparency.
+- Root cause: card meshes had castShadow + receiveShadow, producing visible shadow outlines on the board surface even though the card materials were transparent.
+
+Fix (Board3D.tsx — both CornerTile and EdgeTile):
+- Removed castShadow and receiveShadow from card base box meshes.
+- Removed receiveShadow from card face plane meshes.
+- Reduced card box base opacity from 0.15 → 0.05 (nearly invisible edge box).
+- Kept face plane opacity at 0.85 (text still readable).
+
+Verification (Agent Browser + VLM):
+- VLM: "no visible shadow outlines or dark edges around the 40 tiles" ✓
+- VLM: "board artwork clearly visible through transparent tiles without shadow obscuring" ✓
+- VLM: "text on tiles still fully readable — sharp and unobstructed" ✓
+- VLM: "clean and polished — tiles blend seamlessly into the background artwork" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Shadow outlines removed from all 40 transparent tiles.
+- Board artwork now shows through cleanly with no shadow artifacts.

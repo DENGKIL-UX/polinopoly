@@ -206,27 +206,24 @@ function CornerTile({ tile }: { tile: Tile }) {
 
   return (
     <group ref={groupRef} position={[pos.x, 0.02, pos.z]}>
-      {/* Card base (thin box for thickness) */}
+      {/* Card base (thin box for thickness) — no shadows so no outline visible */}
       <mesh
         rotation={[0, 0, pos.rotation]}
         position={[0, CARD_THICKNESS / 2, 0]}
-        castShadow
-        receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CORNER_W, CARD_THICKNESS, CORNER_D]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.15} depthWrite={false} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.05} depthWrite={false} />
       </mesh>
       {/* Card face texture (semi-transparent so board image shows through) */}
       <mesh
         rotation={[-Math.PI / 2, 0, pos.rotation]}
         position={[0, CARD_THICKNESS + 0.002, 0]}
-        receiveShadow
       >
         <planeGeometry args={[CORNER_W, CORNER_D]} />
-        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.9} depthWrite={false} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.85} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -371,23 +368,20 @@ function EdgeTile({ tile }: { tile: Tile }) {
       <mesh
         rotation={[0, 0, pos.rotation]}
         position={[0, CARD_THICKNESS / 2, 0]}
-        castShadow
-        receiveShadow
         onClick={handleClick}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CARD_LENGTH, CARD_THICKNESS, CARD_WIDTH]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.15} depthWrite={false} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.05} depthWrite={false} />
       </mesh>
       {/* ── Card face texture (semi-transparent so board image shows through) ── */}
       <mesh
         rotation={[-Math.PI / 2, 0, pos.rotation]}
         position={[0, CARD_THICKNESS + 0.002, 0]}
-        receiveShadow
       >
         <planeGeometry args={[CARD_LENGTH, CARD_WIDTH]} />
-        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.9} depthWrite={false} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.85} depthWrite={false} />
       </mesh>
 
       {/* ── Owner flag pole (rises when owned) ── */}
