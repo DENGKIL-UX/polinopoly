@@ -735,3 +735,36 @@ Verification (Agent Browser + VLM):
 Stage Summary:
 - The green board area is now filled with the uploaded Malaysian political Monopoly board image.
 - The uploaded art (SPR building, ballot boxes, state names, election imagery) replaces the plain green felt.
+
+---
+Task ID: 20
+Agent: Main Agent
+Task: Fill green area with new uploaded board image + make 40 cards transparent/see-through
+
+Work Log:
+- User uploaded a new board image (Monopoly_board_Malaysian_politic…_2K_202607052210.jpeg, 2.3MB, 2048x2048).
+- VLM confirmed: Malaysian political Monopoly board with Parliament building, ballot boxes, state names, diamond center — suitable for board surface.
+- Copied to /public/board-surface.jpg (optimized to 606KB), replacing the previous board image.
+
+Transparency changes (CardTexture.ts):
+- generateCardFaceTexture: replaced dark '#0a0a0a' base fill with clearRect (transparent canvas).
+- Art panel: replaced dark '#1a1a2e' fill with semi-transparent group-color gradient (groupHex+'30' → groupHex+'10').
+- Text boxes: replaced '#2a2a3e' with 'rgba(20,20,35,0.65)' (65% opacity).
+- generateCardBackTexture: replaced dark '#0a0a1a' base with clearRect; Jalur Gemilang stripes now semi-transparent (rgba 0.5/0.4); dark overlay reduced from 0.72 to 0.35.
+
+Material changes (Board3D.tsx):
+- Card box base: added transparent opacity={0.15} depthWrite={false} (was opaque dark).
+- Card face plane: added transparent opacity={0.9} depthWrite={false} (was fully opaque).
+- Applied to both EdgeTile and CornerTile.
+
+Verification (Agent Browser + VLM):
+- VLM: "40 perimeter tiles are transparent/see-through" ✓
+- VLM: "Malaysian political board image (building, diamond pattern, colors) visible through the tiles" ✓
+- VLM: "text on tiles remains readable, though slightly muted by transparency" ✓
+- VLM: "semi-transparent — board artwork shows through while tile text/colors remain legible" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- Green board area filled with the new uploaded Malaysian political Monopoly image.
+- All 40 card tiles are now transparent/see-through — the board artwork shows through them.
+- Tile text (names, prices, rent tables) remains readable via semi-transparent canvas textures.

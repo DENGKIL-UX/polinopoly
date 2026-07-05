@@ -217,16 +217,16 @@ function CornerTile({ tile }: { tile: Tile }) {
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CORNER_W, CARD_THICKNESS, CORNER_D]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.15} depthWrite={false} />
       </mesh>
-      {/* Card face texture (flat plane on top) */}
+      {/* Card face texture (semi-transparent so board image shows through) */}
       <mesh
         rotation={[-Math.PI / 2, 0, pos.rotation]}
         position={[0, CARD_THICKNESS + 0.002, 0]}
         receiveShadow
       >
         <planeGeometry args={[CORNER_W, CORNER_D]} />
-        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.9} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -378,16 +378,16 @@ function EdgeTile({ tile }: { tile: Tile }) {
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >
         <boxGeometry args={[CARD_LENGTH, CARD_THICKNESS, CARD_WIDTH]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.5} metalness={0.1} transparent opacity={0.15} depthWrite={false} />
       </mesh>
-      {/* ── Card face texture (flat plane on top of the box) ── */}
+      {/* ── Card face texture (semi-transparent so board image shows through) ── */}
       <mesh
         rotation={[-Math.PI / 2, 0, pos.rotation]}
         position={[0, CARD_THICKNESS + 0.002, 0]}
         receiveShadow
       >
         <planeGeometry args={[CARD_LENGTH, CARD_WIDTH]} />
-        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} />
+        <meshBasicMaterial map={faceTexture} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.9} depthWrite={false} />
       </mesh>
 
       {/* ── Owner flag pole (rises when owned) ── */}

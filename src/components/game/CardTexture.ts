@@ -72,9 +72,9 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
   const rarity = rarityForTile(tile);
   const rarityColor = RARITY_COLORS[rarity];
 
-  // 1. Dark base
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, w, h);
+  // 1. Transparent base (clearRect ensures canvas is transparent — the board
+  // image underneath shows through the card)
+  ctx.clearRect(0, 0, w, h);
 
   // 2. Frame border in color-group color
   const frameW = 24;
@@ -90,15 +90,12 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
     ctx.shadowBlur = 0;
   }
 
-  // 3. Art panel (top 58%)
+  // 3. Art panel — semi-transparent so board image shows through
   const artMargin = 40;
   const artH = Math.floor(h * 0.42);
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(artMargin, artMargin, w - artMargin * 2, artH);
   const grad = ctx.createLinearGradient(0, artMargin, 0, artMargin + artH);
-  grad.addColorStop(0, groupHex + '40');
-  grad.addColorStop(0.5, '#1a1a2e');
-  grad.addColorStop(1, '#0a0a0a');
+  grad.addColorStop(0, groupHex + '30');
+  grad.addColorStop(1, groupHex + '10');
   ctx.fillStyle = grad;
   ctx.fillRect(artMargin, artMargin, w - artMargin * 2, artH);
 
@@ -145,7 +142,7 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
   // 7. Text box (rent table for properties)
   const textBoxY = typeBarY + 96;
   if (tile.type === 'property' && tile.rent) {
-    ctx.fillStyle = '#2a2a3e';
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(artMargin, textBoxY, w - artMargin * 2, 200);
     const labels = ['Kosong', '1 Cawangan', '2 Cawangan', '3 Cawangan', '4 Cawangan', 'Markas'];
     ctx.font = '15px sans-serif';
@@ -159,7 +156,7 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
       ctx.fillText(`RM${rent}`, w - artMargin - 20, ry);
     });
   } else if (tile.type === 'highway') {
-    ctx.fillStyle = '#2a2a3e';
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(artMargin, textBoxY, w - artMargin * 2, 100);
     ctx.fillStyle = '#ccc';
     ctx.font = '16px sans-serif';
@@ -167,14 +164,14 @@ export function generateCardFaceTexture(tile: Tile): THREE.CanvasTexture {
     ctx.fillText('Sewa bergantung pada bilangan', artMargin + 20, textBoxY + 32);
     ctx.fillText('infrastruktur yang dimiliki.', artMargin + 20, textBoxY + 58);
   } else if (tile.type === 'media') {
-    ctx.fillStyle = '#2a2a3e';
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(artMargin, textBoxY, w - artMargin * 2, 100);
     ctx.fillStyle = '#ccc';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('Sewa = 4x / 10x ganda dadu', artMargin + 20, textBoxY + 32);
   } else if (tile.description) {
-    ctx.fillStyle = '#2a2a3e';
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(artMargin, textBoxY, w - artMargin * 2, 80);
     ctx.fillStyle = '#ccc';
     ctx.font = '14px sans-serif';
@@ -237,19 +234,19 @@ export function generateCardBackTexture(): THREE.CanvasTexture {
   const w = canvas.width;
   const h = canvas.height;
 
-  ctx.fillStyle = '#0a0a1a';
-  ctx.fillRect(0, 0, w, h);
+  // Transparent base — board image shows through the card back
+  ctx.clearRect(0, 0, w, h);
 
-  // Jalur Gemilang stripes (14 alternating red/white + blue canton area)
+  // Jalur Gemilang stripes (semi-transparent so board shows through)
   const stripeH = h / 14;
-  const stripeColors = ['#cc0000', '#ffffff'];
+  const stripeColors = ['rgba(204,0,0,0.5)', 'rgba(255,255,255,0.4)'];
   for (let i = 0; i < 14; i++) {
     ctx.fillStyle = stripeColors[i % 2];
     ctx.fillRect(0, i * stripeH, w, stripeH);
   }
 
-  // Dark overlay so it's not too bright
-  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  // Light overlay for contrast
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fillRect(0, 0, w, h);
 
   // Gold border
