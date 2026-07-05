@@ -389,7 +389,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         get().addLog({
           playerId: cp.id,
           playerName: cp.name,
-          message: `🎲 Tiga kali doubles! ${cp.name} dihantar ke Tahanan SPR! (3 consecutive doubles = jail)`,
+          message: `🎲 Tiga kali doubles! ${cp.name} dihantar ke Tahanan SPRM! (3 consecutive doubles = jail)`,
           type: 'jail',
         });
       }
@@ -961,7 +961,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           playerName: player.name,
           message: forcedOut
             ? `⏰ ${player.name} serves full sentence! Pays RM50 and is released.`
-            : `Dice: ${d1},${d2} — No doubles. ${player.name} remains in Tahanan SPR. (Turn ${newJailTurns}/3)`,
+            : `Dice: ${d1},${d2} — No doubles. ${player.name} remains in Tahanan SPRM. (Turn ${newJailTurns}/3)`,
           type: 'jail',
         });
       }

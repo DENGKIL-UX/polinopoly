@@ -73,7 +73,7 @@ function HowToPlayButton() {
                 <p>🎲 <b className="text-slate-200">Baling Dadu</b> — Roll dice to move around the board.</p>
                 <p>🏛️ <b className="text-slate-200">Beli Hartanah</b> — Buy unowned properties to collect rent.</p>
                 <p>🏠 <b className="text-slate-200">Bina Rumah</b> — Own a full color set? Build houses for 2× rent!</p>
-                <p>⛓️ <b className="text-slate-200">Tahanan SPR</b> — Land on TAHANAN or roll 3 doubles = jail.</p>
+                <p>⛓️ <b className="text-slate-200">Tahanan SPRM</b> — Land on TAHANAN or roll 3 doubles = jail.</p>
                 <p>📜⚡ <b className="text-slate-200">Kad</b> — Jawatan Menteri & Krisis Nasional cards change your fate.</p>
                 <p>🏆 <b className="text-slate-200">Menang</b> — Last coalition standing wins Dewan Rakyat!</p>
                 <p className="text-slate-500 pt-1 border-t border-slate-700/30">AI controls 5 other coalitions automatically.</p>
@@ -1509,7 +1509,7 @@ export default function GameDashboard() {
               className="max-w-xs mx-auto">
               <Card className="bg-orange-950/80 border-orange-500/30 shadow-2xl backdrop-blur-sm">
                 <CardContent className="p-3.5 space-y-2.5 text-center">
-                  <p className="text-xs font-bold text-orange-300">⛓️ Tahanan SPR</p>
+                  <p className="text-xs font-bold text-orange-300">⛓️ Tahanan SPRM</p>
                   <p className="text-[10px] text-slate-400">Turn {currentPlayer.jailTurns}/3 sebelum dibebaskan</p>
                   <div className="flex gap-2">
                     <Button onClick={() => { soundManager.playEndTurn(); handleJailDecision(true); }} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold h-9">

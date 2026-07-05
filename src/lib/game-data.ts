@@ -152,7 +152,7 @@ export const BOARD_TILES: Tile[] = [
   { id: 9, name: 'DAP', type: 'property', colorGroup: 'lightblue', coalition: 'PH', price: 120, rent: [8, 40, 100, 300, 450, 600], housePrice: 50, mortgageValue: 60, description: 'Democratic Action Party' },
 
   // ---- RIGHT COLUMN (bottom to top) ----
-  { id: 10, name: 'Tahanan SPR', type: 'corner', description: 'Jail — Just visiting, or serving time for corruption?' },
+  { id: 10, name: 'Tahanan SPRM', type: 'corner', description: 'Jail — Just visiting, or serving time for corruption?' },
   { id: 11, name: 'Gerakan', type: 'property', colorGroup: 'pink', coalition: 'PN', price: 140, rent: [10, 50, 150, 450, 625, 750], housePrice: 100, mortgageValue: 70, description: 'Parti Gerakan Rakyat Malaysia' },
   { id: 12, name: 'RTM', type: 'media', price: 150, rent: [20, 48, 120, 360], description: 'Radio Televisyen Malaysia — State media monopoly' },
   { id: 13, name: 'Bersatu', type: 'property', colorGroup: 'pink', coalition: 'PN', price: 140, rent: [10, 50, 150, 450, 625, 750], housePrice: 100, mortgageValue: 70, description: 'Parti Pribumi Bersatu Malaysia' },
@@ -176,7 +176,7 @@ export const BOARD_TILES: Tile[] = [
   { id: 29, name: 'PBS', type: 'property', colorGroup: 'yellow', coalition: 'GRS', price: 280, rent: [24, 120, 360, 850, 1025, 1200], housePrice: 150, mortgageValue: 140, description: 'Parti Bersatu Sabah' },
 
   // ---- LEFT COLUMN (top to bottom) ----
-  { id: 30, name: 'Disyorkan ke SPR', type: 'corner', description: 'Go to Jail! — SPR recommends investigation!' },
+  { id: 30, name: 'Disyorkan ke SPRM', type: 'corner', description: 'Go to Jail! — SPRM recommends investigation!' },
   { id: 31, name: 'PN Pahang', type: 'property', colorGroup: 'green', coalition: 'PN', price: 300, rent: [26, 130, 390, 900, 1100, 1275], housePrice: 200, mortgageValue: 150, description: 'Pahang PN stronghold' },
   { id: 32, name: 'PAS Terengganu', type: 'property', colorGroup: 'green', coalition: 'PN', price: 300, rent: [26, 130, 390, 900, 1100, 1275], housePrice: 200, mortgageValue: 150, description: 'Terengganu PAS fortress' },
   { id: 33, name: 'Jawatan Menteri', type: 'chest', description: 'Community Chest — Draw a card!' },
@@ -222,7 +222,7 @@ export const JAWATAN_MENTERI_CARDS: GameCard[] = [
     effect: { type: 'money', value: 100 },
   },
   {
-    id: 'jm6', title: 'MACC Investigation', description: 'MACC freezes your accounts! Go directly to Tahanan SPR.',
+    id: 'jm6', title: 'MACC Investigation', description: 'MACC freezes your accounts! Go directly to Tahanan SPRM.',
     effect: { type: 'jail', value: 0 },
   },
   {
@@ -243,7 +243,7 @@ export const JAWATAN_MENTERI_CARDS: GameCard[] = [
   },
   { id: 'jm11', title: 'BR1M Handout', description: 'Government announces BR1M aid! Collect RM150 from the Treasury.', effect: { type: 'money', value: 150 } },
   { id: 'jm12', title: 'PAC Hearing', description: 'Public Accounts Committee summons you! Pay RM75 in legal fees.', effect: { type: 'money', value: -75 } },
-  { id: 'jm13', title: 'Election Petition', description: 'Your seat is challenged! Go directly to Tahanan SPR.', effect: { type: 'jail', value: 0 } },
+  { id: 'jm13', title: 'Election Petition', description: 'Your seat is challenged! Go directly to Tahanan SPRM.', effect: { type: 'jail', value: 0 } },
   { id: 'jm14', title: 'Tabung Haji Dividend', description: 'Tabung Haji declares bonus! Collect RM100 from every player.', effect: { type: 'collect_all', value: 100 } },
   { id: 'jm15', title: 'Political Donation', description: 'Anonymous donor contributes RM200 to your campaign!', effect: { type: 'money', value: 200 } },
 ];
@@ -266,7 +266,7 @@ export const KRISIS_NASIONAL_CARDS: GameCard[] = [
     effect: { type: 'money', value: 150 },
   },
   {
-    id: 'kn5', title: 'No-Confidence Motion', description: 'Back to Tahanan SPR — political crisis!',
+    id: 'kn5', title: 'No-Confidence Motion', description: 'Back to Tahanan SPRM — political crisis!',
     effect: { type: 'jail', value: 0 },
   },
   {

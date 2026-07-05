@@ -414,7 +414,7 @@ export default function LobbyScreen() {
                   <CardContent className="p-4 text-[11px] text-slate-400 space-y-2 leading-relaxed">
                     <p><b className="text-amber-300">Objektif:</b> Jadilah gabungan terakhir yang berdiri! Beli hartanah, kutip sewa, dan bankrapkan lawan anda.</p>
                     <p><b className="text-amber-300">Objective:</b> Be the last coalition standing! Buy properties, collect rent, and bankrupt your opponents.</p>
-                    <p><b className="text-amber-300">Dadu:</b> Baling dua dadu untuk bergerak. Doubles = giliran lagi. 3 doubles berturut = Tahanan SPR!</p>
+                    <p><b className="text-amber-300">Dadu:</b> Baling dua dadu untuk bergerak. Doubles = giliran lagi. 3 doubles berturut = Tahanan SPRM!</p>
                     <p><b className="text-amber-300">Dice:</b> Roll two dice to move. Doubles = extra turn. 3 doubles in a row = SPR Jail!</p>
                     <p><b className="text-amber-300">Hartanah:</b> Miliki set warna penuh untuk bina rumah dan naikkan sewa.</p>
                     <p><b className="text-amber-300">Properties:</b> Own a full color set to build houses and increase rent.</p>
