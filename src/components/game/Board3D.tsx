@@ -114,22 +114,26 @@ function edgeInfo(id: number): {
  * from OUTSIDE the board (classic Monopoly convention). Each side's text
  * lies flat on the felt and faces outward, so you read it standing outside.
  *
+ * Key insight: the X-axis rotation determines which way the text faces up.
+ *   -PI/2 makes the text face down (into the felt) → appears upside down
+ *   +PI/2 makes the text face up (toward camera) → reads correctly
+ * Then the Y-axis rotation orients the text along the correct edge direction.
+ *
  * Layout (standard Monopoly orientation, GO at bottom-right):
- *   Bottom row (1-9):   text reads left-to-right facing south (rotation 0)
- *   Left col (11-19):   text reads bottom-to-top facing east
- *   Top row (21-29):    text reads left-to-right facing north (UPSIDE relative
- *                        to bottom — i.e. rotate 180° so it's readable from top)
- *   Right col (31-39):  text reads top-to-bottom facing west
+ *   Bottom row (1-9):   faces the bottom viewer (south)
+ *   Left col (11-19):   faces the left viewer (west)
+ *   Top row (21-29):    faces the top viewer (north) — rotated 180° from bottom
+ *   Right col (31-39):  faces the right viewer (east)
  */
 function textRotationForTile(id: number): [number, number, number] {
-  // Bottom row: faces the bottom viewer — standard
-  if (id >= 1 && id <= 9) return [-Math.PI / 2, 0, 0];
-  // Left column: rotate so text faces left viewer
-  if (id >= 11 && id <= 19) return [-Math.PI / 2, Math.PI / 2, 0];
-  // Top row: flip 180° so it reads from the top (not upside down)
-  if (id >= 21 && id <= 29) return [-Math.PI / 2, Math.PI, 0];
-  // Right column: faces right viewer
-  return [-Math.PI / 2, -Math.PI / 2, 0]; // 31-39
+  // Bottom row: faces south (bottom viewer), text reads left-to-right
+  if (id >= 1 && id <= 9) return [Math.PI / 2, 0, Math.PI];
+  // Left column: faces west (left viewer)
+  if (id >= 11 && id <= 19) return [Math.PI / 2, 0, Math.PI / 2];
+  // Top row: faces north (top viewer) — no flip needed, reads left-to-right from top
+  if (id >= 21 && id <= 29) return [Math.PI / 2, 0, 0];
+  // Right column: faces east (right viewer)
+  return [Math.PI / 2, 0, -Math.PI / 2]; // 31-39
 }
 
 // ───────────────────────────────────────────────────────────────────

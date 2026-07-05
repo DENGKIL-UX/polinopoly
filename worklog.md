@@ -494,3 +494,31 @@ Stage Summary:
 - All 40 tiles' text now reads correctly from outside the board (classic Monopoly convention).
 - Top row no longer upside down; left/right columns no longer mirrored.
 - VLM-rated 9/10 text orientation correctness.
+
+---
+Task ID: 13
+Agent: Main Agent
+Task: Fix remaining inverted text — bottom row was still upside down
+
+Work Log:
+- User reported text STILL inverted. VLM confirmed: bottom row (tiles 1-9) text was rotated 180° (upside down), e.g. "B1aiiws0" instead of readable text.
+- Root cause: my previous fix used X-rotation -PI/2 which orients text face-DOWN (into the felt). For the bottom row, the text faced away from the viewer → appeared upside down.
+- Fix: switched to +PI/2 X-rotation (text faces UP toward camera) and moved the directional orientation to the Z-axis:
+  * Bottom row (1-9):   [PI/2, 0, PI]       — faces south, reads left-to-right
+  * Left col (11-19):   [PI/2, 0, PI/2]     — faces west
+  * Top row (21-29):    [PI/2, 0, 0]        — faces north
+  * Right col (31-39):  [PI/2, 0, -PI/2]    — faces east
+
+Verification (Agent Browser + VLM):
+- VLM: "bottom row text readable (not upside down)" ✓
+- VLM: "top row text readable" ✓
+- VLM: "left column readable (not mirrored)" ✓
+- VLM: "right column readable (not mirrored)" ✓
+- VLM: can read RM prices — RM1,500, RM2,000, RM2,500, RM3,000, RM3,500, RM4,000 ✓
+- VLM: "9/10 text orientation" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- All 40 tiles' text now reads correctly from outside the board on ALL 4 sides.
+- Bottom row (the previously broken side) now reads correctly.
+- VLM-rated 9/10.
