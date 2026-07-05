@@ -109,6 +109,29 @@ function edgeInfo(id: number): {
   return { outX: 1, outZ: 0, isAlongX: false }; // 31-39
 }
 
+/**
+ * Returns the Euler rotation for flat text that reads correctly when viewed
+ * from OUTSIDE the board (classic Monopoly convention). Each side's text
+ * lies flat on the felt and faces outward, so you read it standing outside.
+ *
+ * Layout (standard Monopoly orientation, GO at bottom-right):
+ *   Bottom row (1-9):   text reads left-to-right facing south (rotation 0)
+ *   Left col (11-19):   text reads bottom-to-top facing east
+ *   Top row (21-29):    text reads left-to-right facing north (UPSIDE relative
+ *                        to bottom — i.e. rotate 180° so it's readable from top)
+ *   Right col (31-39):  text reads top-to-bottom facing west
+ */
+function textRotationForTile(id: number): [number, number, number] {
+  // Bottom row: faces the bottom viewer — standard
+  if (id >= 1 && id <= 9) return [-Math.PI / 2, 0, 0];
+  // Left column: rotate so text faces left viewer
+  if (id >= 11 && id <= 19) return [-Math.PI / 2, Math.PI / 2, 0];
+  // Top row: flip 180° so it reads from the top (not upside down)
+  if (id >= 21 && id <= 29) return [-Math.PI / 2, Math.PI, 0];
+  // Right column: faces right viewer
+  return [-Math.PI / 2, -Math.PI / 2, 0]; // 31-39
+}
+
 // ───────────────────────────────────────────────────────────────────
 // CORNER TILE  (animated glow)
 // ───────────────────────────────────────────────────────────────────
@@ -184,7 +207,7 @@ function CornerTile({ tile }: { tile: Tile }) {
         fontSize={0.6}
         anchorX="center"
         anchorY="middle"
-        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        rotation={textRotationForTile(tile.id)}
       >
         {CORNER_ICONS[tile.id] ?? ''}
       </Text>
@@ -196,7 +219,7 @@ function CornerTile({ tile }: { tile: Tile }) {
         color="#3d2817"
         anchorX="center"
         anchorY="middle"
-        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        rotation={textRotationForTile(tile.id)}
         maxWidth={2.0}
         textAlign="center"
         outlineWidth={0.012}
@@ -212,7 +235,7 @@ function CornerTile({ tile }: { tile: Tile }) {
         color="#6b4226"
         anchorX="center"
         anchorY="middle"
-        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        rotation={textRotationForTile(tile.id)}
         maxWidth={2.0}
         textAlign="center"
         outlineWidth={0.01}
@@ -364,7 +387,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
         color="#0f172a"
         anchorX="center"
         anchorY="middle"
-        rotation={[-Math.PI / 2, pos.rotation, 0]}
+        rotation={textRotationForTile(tile.id)}
         maxWidth={EDGE_W - 0.2}
         textAlign="center"
         outlineWidth={0.024}
@@ -381,7 +404,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
           color="#334155"
           anchorX="center"
           anchorY="middle"
-          rotation={[-Math.PI / 2, pos.rotation, 0]}
+          rotation={textRotationForTile(tile.id)}
           maxWidth={EDGE_W - 0.25}
           textAlign="center"
           outlineWidth={0.016}
@@ -399,7 +422,7 @@ function EdgeTile({ tile }: { tile: Tile }) {
           color="#0f172a"
           anchorX="center"
           anchorY="middle"
-          rotation={[-Math.PI / 2, pos.rotation, 0]}
+          rotation={textRotationForTile(tile.id)}
           outlineWidth={0.024}
           outlineColor="#fde68a"
         >

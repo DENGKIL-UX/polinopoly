@@ -463,3 +463,34 @@ Stage Summary:
 - Classic Monopoly color palette applied (muted authentic hues, coalition mapping preserved).
 - Text large and readable; flat panels eliminate foreshortening.
 - VLM-rated 8/10 for Monopoly-likeness + readability.
+
+---
+Task ID: 12
+Agent: Main Agent
+Task: Fix inverted 3D text on tiles (top row upside down, left/right mirrored)
+
+Work Log:
+- User reported text on some 3D tiles is inverted (cannot be read).
+- VLM confirmed: top row text upside down, left column mirrored, right column mirrored. Root cause: text rotation `[-Math.PI/2, pos.rotation, 0]` applied the tile's facing rotation (pos.rotation) which is correct for the tile MESH but inverts the TEXT when viewed from outside the board on 3 of the 4 sides.
+- Classic Monopoly convention: text on all 4 sides reads from OUTSIDE the board (you stand outside and read inward). Each side needs a different rotation.
+
+Fix (Board3D.tsx):
+- Added textRotationForTile(id) helper that returns the correct Euler rotation per side:
+  * Bottom row (1-9):   [-PI/2, 0, 0]        — reads left-to-right facing south
+  * Left col (11-19):   [-PI/2, PI/2, 0]     — faces east (left viewer)
+  * Top row (21-29):    [-PI/2, PI, 0]       — flip 180° so readable from top
+  * Right col (31-39):  [-PI/2, -PI/2, 0]    — faces west (right viewer)
+- Applied to all 7 text elements: corner icon/name/sub-label, edge tile name/sub-label/price.
+
+Verification (Agent Browser + VLM):
+- VLM: "top row text readable (not upside down)" ✓
+- VLM: "left column readable (not mirrored)" ✓
+- VLM: "right column readable (not mirrored)" ✓
+- VLM: "bottom row readable" ✓
+- VLM: "all 4 sides readable from outside the board — 9/10" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- All 40 tiles' text now reads correctly from outside the board (classic Monopoly convention).
+- Top row no longer upside down; left/right columns no longer mirrored.
+- VLM-rated 9/10 text orientation correctness.
