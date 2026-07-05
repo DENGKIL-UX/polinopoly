@@ -953,3 +953,68 @@ Verification (Agent Browser + VLM):
 Stage Summary:
 - IND replaced with "Create Your Own Party" — players design their own political party.
 - Custom name, slogan, color, and uploaded logo all work as the player's coalition identity in-game.
+
+---
+Task ID: 25
+Agent: Main Agent
+Task: QA audit + UI polish + feature enhancements
+
+## Current Project Status Assessment
+
+The Pilihan Raya Monopoly 3D game is feature-complete and stable:
+- ✅ 3D board with trading-card tiles, transparent overlay on uploaded board image
+- ✅ 2D CSS-grid board fallback
+- ✅ Expert-system AI with coalition personalities (buy/build/jail/auction decisions)
+- ✅ 1000 political narration pop-ups (soap opera drama during AI turns)
+- ✅ "Create Your Own Party" (custom name, slogan, color, logo upload)
+- ✅ Party HQ buildings with coalition flags on owned tiles
+- ✅ 3D dice (both in-scene and HUD), token hop animation
+- ✅ Video background hero page with hero music + game music (independent toggles)
+- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+- ✅ Lint clean, no hydration errors, no runtime errors
+
+## QA Results
+- Lobby: loads correctly, all 6 coalition cards + CREATE PARTY visible, hero music toggle at bottom-right ✓
+- Game start: PH selected → game starts → 3D board renders ✓
+- Dice roll: 3D dice tumble, buy/pass buttons appear ✓
+- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+- 2D/3D toggle: switches cleanly, no errors ✓
+- Music: both hero and game music toggle independently ✓
+- No console errors, no hydration mismatches, no runtime crashes ✓
+
+## Completed Modifications This Round
+
+1. **Hansard Log improved:**
+   - Text size 9px → 10px (more readable)
+   - Log height 36 → 44 (shows more entries)
+   - Entry count 30 → 40 (longer history)
+   - Added hover highlight on log entries
+   - Added color-coded borders for jail (red) and card (purple) events
+   - Added dark-scroll class for custom scrollbar
+   - Header icon 2.5 → 3 (slightly larger)
+
+2. **Player cards improved:**
+   - Property count now shows "props" label (was just a number)
+   - Added 🔑 icon for players with Get Out of Jail Free card
+   - Added title tooltips on property count
+
+3. **Game-over screen enhanced:**
+   - Added "Hero Page" button (returns to lobby without page reload)
+   - Existing "Pilihan Raya Baru" button still reloads for fresh game
+
+## VLM Assessment
+- UI polish: 6/10 → 7/10 (improved log readability, player card labels, game-over options)
+
+## Unresolved Issues / Risks
+1. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+2. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+3. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+4. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+5. **Mobile layout:** sidebars stack on mobile but the 3D board may be too small on phone screens
+
+## Priority Recommendations for Next Phase
+1. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+2. Implement cannon-es physics dice for more realistic rolling
+3. Add title deed card flip animation on property purchase
+4. Fine-tune board image alignment across viewport sizes
+5. Add sound effects for tile landing, property purchase, and narration pop-ups

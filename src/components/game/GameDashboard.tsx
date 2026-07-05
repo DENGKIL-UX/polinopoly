@@ -157,9 +157,10 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
           {player.isAI && <Badge variant="outline" className="text-[7px] px-1 py-0 h-3.5 border-slate-600 text-slate-500">AI</Badge>}
           {player.isInJail && <Badge className="text-[7px] px-1 py-0 h-3.5 bg-red-600">JAIL</Badge>}
         </div>
-        <div className="flex items-center gap-2.5 text-[9px] text-slate-400 mt-0.5">
+        <div className="flex items-center gap-2 text-[9px] text-slate-400 mt-0.5">
           <span className="flex items-center gap-0.5"><Wallet className="h-2.5 w-2.5" /><span className="font-semibold text-slate-300">RM{player.money.toLocaleString()}</span></span>
-          <span className="flex items-center gap-0.5"><Building2 className="h-2.5 w-2.5" />{player.properties.length}</span>
+          <span className="flex items-center gap-0.5" title="Properties owned"><Building2 className="h-2.5 w-2.5" />{player.properties.length} props</span>
+          {player.hasGetOutOfJailFree && <span className="text-amber-400" title="Get Out of Jail Free">🔑</span>}
         </div>
       </div>
       {isCurrentTurn && (
@@ -253,16 +254,16 @@ function GameLogPanel() {
   return (
     <Card className="bg-slate-950/80 border-slate-700/20 backdrop-blur-md">
       <CardHeader className="p-2 pb-1">
-        <CardTitle className="text-[9px] font-bold text-amber-400/70 flex items-center gap-1 tracking-wide uppercase">
-          <Landmark className="h-2.5 w-2.5" />Hansard Log
+        <CardTitle className="text-[10px] font-bold text-amber-400/80 flex items-center gap-1 tracking-wide uppercase">
+          <Landmark className="h-3 w-3" />Hansard Log
         </CardTitle>
       </CardHeader>
       <CardContent className="p-1 pt-0">
-        <div ref={ref} className="h-36 overflow-y-auto space-y-0.5 pr-1">
-          {gameLog.slice(-30).reverse().map(e => (
-            <div key={e.id} className="text-[9px] leading-relaxed text-slate-400 border-l-2 pl-2 py-0.5"
-              style={{ borderColor: e.type === 'ai_quote' ? 'rgba(234,179,8,0.3)' : e.type === 'buy' ? 'rgba(74,222,128,0.3)' : e.type === 'rent' ? 'rgba(248,113,113,0.3)' : 'rgba(100,116,139,0.2)' }}>
-              <span className="text-slate-600 mr-1 font-mono">T{e.turn}</span>{e.message}
+        <div ref={ref} className="h-44 overflow-y-auto space-y-0.5 pr-1 dark-scroll">
+          {gameLog.slice(-40).reverse().map(e => (
+            <div key={e.id} className="text-[10px] leading-relaxed text-slate-300 border-l-2 pl-2 py-0.5 transition-colors hover:bg-slate-800/30 rounded-r"
+              style={{ borderColor: e.type === 'ai_quote' ? 'rgba(234,179,8,0.4)' : e.type === 'buy' ? 'rgba(74,222,128,0.4)' : e.type === 'rent' ? 'rgba(248,113,113,0.4)' : e.type === 'jail' ? 'rgba(220,38,38,0.4)' : e.type === 'card' ? 'rgba(168,85,247,0.4)' : 'rgba(100,116,139,0.3)' }}>
+              <span className="text-slate-500 mr-1 font-mono text-[9px]">T{e.turn}</span>{e.message}
             </div>
           ))}
         </div>
@@ -1620,6 +1621,7 @@ export default function GameDashboard() {
 
                   <div className="flex gap-2">
                     <Button onClick={() => { soundManager.playGameOver(); window.location.reload(); }} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
+                    <Button onClick={() => { useGameStore.setState({ phase: 'lobby' }); }} variant="outline" className="flex-1 border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800">Hero Page</Button>
                   </div>
                   {/* Achievements summary in game over */}
                   <div className="border-t border-yellow-500/10 pt-2 mt-1">
