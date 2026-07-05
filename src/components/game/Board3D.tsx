@@ -110,30 +110,24 @@ function edgeInfo(id: number): {
 }
 
 /**
- * Returns the Euler rotation for flat text that reads correctly when viewed
- * from OUTSIDE the board (classic Monopoly convention). Each side's text
- * lies flat on the felt and faces outward, so you read it standing outside.
+ * Returns the Euler rotation for flat text on the board.
  *
- * Key insight: the X-axis rotation determines which way the text faces up.
- *   -PI/2 makes the text face down (into the felt) → appears upside down
- *   +PI/2 makes the text face up (toward camera) → reads correctly
- * Then the Y-axis rotation orients the text along the correct edge direction.
+ * Classic Monopoly orients text outward on each of the 4 sides (4 players
+ * sit around the board). But this is a DIGITAL game with ONE camera at the
+ * southeast diagonal — orienting text 4 different ways means 2 sides are
+ * always upside down to the camera.
  *
- * Layout (standard Monopoly orientation, GO at bottom-right):
- *   Bottom row (1-9):   faces the bottom viewer (south)
- *   Left col (11-19):   faces the left viewer (west)
- *   Top row (21-29):    faces the top viewer (north) — rotated 180° from bottom
- *   Right col (31-39):  faces the right viewer (east)
+ * Solution: ALL tile text faces the SAME direction (top points north / -Z),
+ * so it reads correctly from the camera looking down from the south. This
+ * is the standard approach for digital board game adaptations.
+ *
+ *   -PI/2 X-rotation: lays the text flat on the felt, facing up.
+ *   Y=0: top of text points -Z (north, away from south camera) → reads
+ *        left-to-right, top-away, like reading a book on a table.
  */
-function textRotationForTile(id: number): [number, number, number] {
-  // Bottom row: faces south (bottom viewer), text reads left-to-right
-  if (id >= 1 && id <= 9) return [Math.PI / 2, 0, Math.PI];
-  // Left column: faces west (left viewer)
-  if (id >= 11 && id <= 19) return [Math.PI / 2, 0, Math.PI / 2];
-  // Top row: faces north (top viewer) — no flip needed, reads left-to-right from top
-  if (id >= 21 && id <= 29) return [Math.PI / 2, 0, 0];
-  // Right column: faces east (right viewer)
-  return [Math.PI / 2, 0, -Math.PI / 2]; // 31-39
+function textRotationForTile(_id: number): [number, number, number] {
+  // All tiles use the same rotation — readable from the single camera.
+  return [-Math.PI / 2, 0, 0];
 }
 
 // ───────────────────────────────────────────────────────────────────

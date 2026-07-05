@@ -522,3 +522,33 @@ Stage Summary:
 - All 40 tiles' text now reads correctly from outside the board on ALL 4 sides.
 - Bottom row (the previously broken side) now reads correctly.
 - VLM-rated 9/10.
+
+---
+Task ID: 14
+Agent: Main Agent
+Task: Fix all-inverted text — unify text direction for single-camera view
+
+Work Log:
+- User reported ALL text inverted again. Root cause identified: I was trying to orient text "outward" for each of the 4 sides (classic Monopoly 4-player convention), but with a SINGLE fixed camera at the southeast diagonal, only 2 sides can ever read correctly — the other 2 are always upside down. Each attempt to fix one side broke another.
+- Solution: For a DIGITAL game with one camera, ALL tile text must face the SAME direction (toward the camera), not 4 different outward directions. This is the standard approach for digital board game adaptations.
+
+Fix (Board3D.tsx):
+- Simplified textRotationForTile() to return [-Math.PI/2, 0, 0] for ALL tiles.
+  * -PI/2 X-rotation: lays text flat on the felt, facing up.
+  * Y=0: top of text points north (-Z, away from south camera).
+  * Result: all text reads left-to-right with top-away, like reading a book on a table from the south side.
+- Removed the per-side Y-rotation logic that was causing 2 sides to always be inverted.
+
+Verification (Agent Browser + VLM):
+- VLM: "bottom edge readable" ✓
+- VLM: "top edge readable" ✓
+- VLM: "left edge readable" ✓
+- VLM: "right edge readable" ✓
+- VLM: can read RM prices — RM1,500, RM1,200, RM1,000, RM900, RM750, RM600, RM500, RM400, RM300, RM200 ✓
+- VLM: "8/10 text readability" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- All 40 tiles' text now faces the same direction (toward the camera) — all 4 sides readable simultaneously.
+- Abandoned the classic 4-direction outward orientation (impossible with a single camera).
+- VLM-rated 8/10 readability.
