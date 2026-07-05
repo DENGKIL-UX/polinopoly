@@ -684,3 +684,28 @@ Stage Summary:
 - 3D dice enlarged and repositioned — clearly visible as physical 3D objects.
 - Card faces now render colorful canvas textures (was black) — property names, RM prices, rent tables all readable.
 - Cards look like trading cards: thick box base + glossy textured face on top.
+
+---
+Task ID: 18
+Agent: Main Agent
+Task: Fix the flat dice above Baling Dadu button — make them real 3D dice
+
+Work Log:
+- User clarified: the dice ABOVE the "Baling Dadu!" button (in the GameDashboard UI) were flat 2D unicode symbols (⚀⚁⚂⚃⚄⚅), not 3D dice. The VLM confirmed: "flat 2D placeholder or icon representations rather than actual 3D dice."
+- The 3D Dice3D in the Three.js scene (center of board) was already fixed, but the user was referring to the HUD dice above the roll button.
+
+Fix (GameDashboard.tsx DiceDisplay component):
+- Replaced the flat unicode die (DICE_FACES[value]) with a CSS 3D dice face:
+  * White rounded-cube face with linear-gradient (145deg white→slate) + inset highlights + drop shadow for a physical 3D look.
+  * Black pip dots positioned via PIP_LAYOUT (percentage coordinates per die value 1-6) with radial-gradient (dark center) + inset shadow for depth.
+  * Rolling animation: 3D rotateX + rotateY tumbling (0→720°) + scale bounce, using Framer Motion with preserve-3d transformStyle.
+  * Perspective container (200px) so the 3D rotation has depth.
+- Added PIP_LAYOUT constant with proper pip positions for values 1-6.
+
+Verification (Agent Browser + VLM):
+- VLM: "3D-looking dice above the Baling Dadu button — physical 3D dice, not flat icons. Pip dots clearly visible. White rounded-cube shaped with black pip dots." ✓
+- VLM: "dice exhibit 3D tumbling — rotation and perspective, dynamic movement" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- The dice above the "Baling Dadu!" button are now real 3D-looking dice with pip dots and tumbling animation (was flat unicode symbols).

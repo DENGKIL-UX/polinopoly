@@ -20,6 +20,16 @@ import { CoalitionLogo } from '@/components/game/CoalitionLogo';
 
 const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚄', '⚅'];
 
+// Pip positions on a die face (percentage x, y for each pip)
+const PIP_LAYOUT: Record<number, [number, number][]> = {
+  1: [[50, 50]],
+  2: [[28, 28], [72, 72]],
+  3: [[25, 25], [50, 50], [75, 75]],
+  4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+  5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
+  6: [[28, 22], [72, 22], [28, 50], [72, 50], [28, 78], [72, 78]],
+};
+
 /* ─── Sound Toggle ─── */
 function SoundToggleButton() {
   const [enabled, toggle] = useSoundEnabled();
@@ -82,14 +92,46 @@ function HowToPlayButton() {
 /* ─── Dice ─── */
 function DiceDisplay({ value, rolling }: { value: number | null; rolling: boolean }) {
   return (
-    <div className="relative">
-      <div className="absolute inset-0 rounded-xl bg-yellow-400/15 blur-md pointer-events-none" />
+    <div className="relative" style={{ perspective: '200px' }}>
+      <div className="absolute inset-0 rounded-lg bg-yellow-400/15 blur-md pointer-events-none" />
       <motion.div
-        animate={rolling ? { rotate: [0, 360, 720], scale: [1, 1.2, 0.9, 1] } : { scale: 1 }}
+        animate={rolling ? { rotateX: [0, 180, 360, 540, 720], rotateY: [0, 90, 180, 270, 360], scale: [1, 1.15, 0.95, 1.1, 1] } : { rotateX: 0, rotateY: 0, scale: 1 }}
         transition={rolling ? { duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}
-        className="relative w-11 h-11 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-white to-slate-100 shadow-xl shadow-black/20 flex items-center justify-center text-xl md:text-2xl border border-slate-200"
+        style={{ transformStyle: 'preserve-3d' }}
+        className="relative w-12 h-12 md:w-14 md:h-14 rounded-lg shadow-xl shadow-black/40"
       >
-        {value ? DICE_FACES[value] : '⚀'}
+        {/* 3D dice face — CSS 3D cube with pip dots */}
+        <div
+          className="absolute inset-0 rounded-lg flex flex-wrap items-center justify-center content-center gap-[2px] p-1.5"
+          style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #e2e8f0 50%, #cbd5e1 100%)',
+            border: '1.5px solid #94a3b8',
+            boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.8), inset 0 -2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          {value ? PIP_LAYOUT[value].map((pos, i) => (
+            <span
+              key={i}
+              className="absolute w-2 h-2 md:w-2.5 md:h-2.5 rounded-full"
+              style={{
+                left: `calc(${pos[0]}% - 4px)`,
+                top: `calc(${pos[1]}% - 4px)`,
+                background: 'radial-gradient(circle at 30% 30%, #1e1b2e, #000)',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              }}
+            />
+          )) : (
+            <span
+              className="absolute w-2.5 h-2.5 rounded-full"
+              style={{
+                left: 'calc(50% - 5px)',
+                top: 'calc(50% - 5px)',
+                background: 'radial-gradient(circle at 30% 30%, #1e1b2e, #000)',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              }}
+            />
+          )}
+        </div>
       </motion.div>
     </div>
   );
