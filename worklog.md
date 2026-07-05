@@ -709,3 +709,29 @@ Verification (Agent Browser + VLM):
 
 Stage Summary:
 - The dice above the "Baling Dadu!" button are now real 3D-looking dice with pip dots and tumbling animation (was flat unicode symbols).
+
+---
+Task ID: 19
+Agent: Main Agent
+Task: Fill the green board area with the uploaded Malaysian political Monopoly board image
+
+Work Log:
+- User uploaded a full Malaysian political Monopoly board image (Monopoly_board_Malaysian_politic…_2K_202607052148.jpeg, 2048×2048, 2.7MB).
+- VLM confirmed: the image is a themed Monopoly board with Malaysian election imagery (SPR building, ballot boxes, state names, political symbols) — suitable as a board surface texture.
+- Optimized the image to 683KB (quality 85) and copied to /public/board-surface.jpg — serves at HTTP 200.
+
+Changes (Board3D.tsx BoardBase):
+- Loaded the uploaded image as a texture via useTexture('/board-surface.jpg').
+- Added a flat plane (planeGeometry, feltSize × feltSize) on top of the felt box, rotated -π/2 to lie flat, with meshBasicMaterial + the board texture (toneMapped=false so it shows at full brightness).
+- Removed the old "Inner felt accent" (darker center patch) — the uploaded image replaces it.
+- Wrapped BoardBase in <Suspense> since useTexture suspends.
+
+Verification (Agent Browser + VLM):
+- Image serves at /board-surface.jpg (HTTP 200, 683KB). ✓
+- VLM: "center/inside of the board is now showing the uploaded Malaysian political Monopoly board image — SPR building, ballot boxes, state names, political symbols" ✓
+- VLM: "no longer a plain green felt — colorful, detailed illustration fills the playing surface" ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- The green board area is now filled with the uploaded Malaysian political Monopoly board image.
+- The uploaded art (SPR building, ballot boxes, state names, election imagery) replaces the plain green felt.

@@ -464,9 +464,16 @@ function BoardBase() {
   const outer = feltSize + FRAME_W * 2 + 0.4;
   const frameEdge = feltSize / 2 + FRAME_W / 2 + 0.1;
 
+  // Load the uploaded Malaysian political Monopoly board image as a texture
+  const boardTexture = useTexture('/board-surface.jpg', (tex) => {
+    (tex as THREE.Texture).colorSpace = THREE.SRGBColorSpace;
+  });
+
   return (
     <group>
-      {/* ── Green felt playing surface (large enough to contain all tiles & tokens) ── */}
+      {/* ── Board surface with uploaded Malaysian political Monopoly image ──
+          The image fills the entire felt area (tile loop + margin).
+          The box sides + bottom keep the dark felt color. */}
       <mesh position={[0, -0.1, 0]} receiveShadow>
         <boxGeometry args={[feltSize, 0.2, feltSize]} />
         <meshStandardMaterial
@@ -475,11 +482,10 @@ function BoardBase() {
           metalness={0}
         />
       </mesh>
-
-      {/* Inner felt accent (slightly darker centre patch) */}
-      <mesh position={[0, 0.001, 0]} receiveShadow>
-        <boxGeometry args={[BOARD_SIZE - 2, 0.003, BOARD_SIZE - 2]} />
-        <meshStandardMaterial color={FELT_INNER} roughness={0.95} />
+      {/* Board image on top of the felt — shows the full Malaysian political board art */}
+      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[feltSize, feltSize]} />
+        <meshBasicMaterial map={boardTexture} toneMapped={false} />
       </mesh>
 
       {/* ── Wood frame — four bars ── */}
@@ -894,8 +900,10 @@ export default function Board3D() {
 
   return (
     <group ref={boardRef} position={[0, 0, 0]}>
-      {/* ── Board base (felt + wood frame) ── */}
-      <BoardBase />
+      {/* ── Board base (felt + wood frame + uploaded surface image) ── */}
+      <Suspense fallback={null}>
+        <BoardBase />
+      </Suspense>
 
       {/* ── 3D Parliament building (shrunken to 25% — decorative token) ── */}
       <Suspense fallback={null}>
