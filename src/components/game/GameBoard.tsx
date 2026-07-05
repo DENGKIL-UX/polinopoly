@@ -310,12 +310,34 @@ export default function GameBoard() {
       <div className="absolute bottom-[15%] right-[15%] w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
       <div className="absolute top-[50%] right-[30%] w-32 h-32 bg-blue-500/5 rounded-full blur-3xl" />
 
+      {/* Centering wrapper — keeps the board centered & sized to fit between sidebars.
+          Framer Motion's transform would override translate(-50%,-50%), so we separate
+          the centering (this static wrapper) from the animation (inner motion.div). */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          // Mobile: leave room for top dice bar (~4rem) and bottom action bar (~8rem)
+          width: 'min(92vw, 70vh)',
+          height: 'min(92vw, 70vh)',
+        }}
+      >
+        <style>{`
+          @media (min-width: 768px) {
+            [data-board-center] {
+              width: min(70vh, calc(100vw - 32rem)) !important;
+              height: min(70vh, calc(100vw - 32rem)) !important;
+            }
+          }
+        `}</style>
       <motion.div
+        data-board-center
         initial={{ opacity: 0, scale: 0.85, rotateX: 15 }}
         animate={{ opacity: 1, scale: 1, rotateX: 0 }}
         transition={{ duration: 1, ease: 'easeOut' }}
-        className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 w-[min(82vh,92vw)] h-[min(82vh,92vw)] md:w-[min(78vh,70vw)] md:h-[min(78vh,70vw)]"
-        style={{ transform: 'translate(-50%, -50%)' }}
+        style={{ width: '100%', height: '100%', position: 'relative' }}
       >
         {/* Outer glow ring */}
         <div className="absolute -inset-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-transparent to-emerald-500/10 blur-sm" />
@@ -496,6 +518,7 @@ export default function GameBoard() {
           />
         ))}
       </motion.div>
+      </div>{/* /centering wrapper */}
     </div>
   );
 }

@@ -168,3 +168,29 @@ Stage Summary:
 - Chess-like expert-system AI engine added: 8-rule buy decisions, greedy-ROI house building, positional evaluation, jail strategy, auction bidding — all with coalition personalities for surprising plays.
 - AI decisions are explainable: each move logs the rule factors and a score (e.g. "Buy (completes-monopoly, high-roi, score 92)").
 - Game now plays continuously: human rolls → all 5 AI players auto-take turns → returns to human. No stalls.
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix 2D board dimensions so all 40 boxes/tiles are visible
+
+Work Log:
+- Analyzed user screenshot with VLM: 2D board was heavily cropped — only left column partially visible, right column and corners cut off, board off-center.
+- Root cause: GameBoard.tsx sized the board with `w-[min(82vh,92vw)]` (the SMALLER of vh/vw), but on a wide desktop screen 92vw ≈ 1177px while the available space between the dashboard sidebars (left w-44=176px + right w-52=208px) is only ~880px. The board overflowed behind the sidebars, clipping the left/right columns. Also positioned at top-[46%] (not centered) and Framer Motion's transform overrode the translate(-50%,-50%), shifting the board right.
+
+Fixes (GameBoard.tsx):
+- Separated centering from animation: wrapped the motion.div in a static centering div with `position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)` so Framer Motion's scale/rotateX can't break the centering.
+- Desktop sizing via media query: `width: min(70vh, calc(100vw - 32rem))` — reserves 32rem (512px) for the two sidebars + margins, capped by 70vh for top/bottom bars. Board now fits cleanly between sidebars.
+- Mobile sizing: `min(92vw, 70vh)` — leaves room for the top dice bar and bottom action bar.
+- Board is now vertically centered (top:50%) instead of top:46%.
+
+Verification (Agent Browser + VLM):
+- Desktop 1280×860: board measures 602×602, left=236 right=838 — fits between left sidebar (ends 180) and right sidebar (starts 1068) with clear margins. VLM confirms: "all 4 corners visible, 9 tiles per side, clean unclipped square, centered between sidebars." ✓
+- Grid has all 41 children (40 tiles + center area). ✓
+- Mobile 390×844: board 359px wide, fits viewport width. ✓
+- No console/runtime errors. Lint clean.
+
+Stage Summary:
+- 2D board now properly sized and centered: all 40 tiles (9 per side + 4 corners) fully visible on desktop, not clipped by sidebars.
+- Centering bug fixed (Framer Motion transform no longer overrides translate(-50%,-50%)).
+- Responsive: desktop reserves sidebar space via calc(); mobile reserves top/bottom bar space.
