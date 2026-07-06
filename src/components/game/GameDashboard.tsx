@@ -140,13 +140,34 @@ function DiceDisplay({ value, rolling }: { value: number | null; rolling: boolea
 /* ─── Player Card ─── */
 function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: boolean }) {
   const coalition = COALITIONS[player.coalitionId];
+  const tiles = useGameStore(s => s.tiles);
   if (player.isBankrupt) return null;
+
+  // Calculate net worth (cash + property values + house investments)
+  const propertyValue = player.properties.reduce((sum, tid) => {
+    const tile = BOARD_TILES[tid];
+    const state = tiles[tid];
+    const houseVal = (state?.houses ?? 0) * (tile?.housePrice ?? 0);
+    return sum + (tile?.price ?? 0) + houseVal;
+  }, 0);
+  const netWorth = player.money + propertyValue;
+
   return (
-    <div className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
+    <div className={`relative overflow-hidden flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
       isCurrentTurn
         ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
         : 'border-slate-700/30 bg-slate-800/30'
     }`}>
+      {/* Wealth bar at the bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-700/40">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ backgroundColor: coalition.color }}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, (netWorth / 4000) * 100)}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </div>
       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md border border-white/10 overflow-hidden bg-white"
         style={{ boxShadow: `0 0 8px ${coalition.color}30` }}>
         <CoalitionLogo coalitionId={player.coalitionId} size={26} circular alt={player.name} />
@@ -159,7 +180,7 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
         </div>
         <div className="flex items-center gap-2 text-[9px] text-slate-400 mt-0.5">
           <span className="flex items-center gap-0.5"><Wallet className="h-2.5 w-2.5" /><span className="font-semibold text-slate-300">RM{player.money.toLocaleString()}</span></span>
-          <span className="flex items-center gap-0.5" title="Properties owned"><Building2 className="h-2.5 w-2.5" />{player.properties.length} props</span>
+          <span className="flex items-center gap-0.5" title={`Net worth: RM${netWorth.toLocaleString()}`}><Building2 className="h-2.5 w-2.5" />{player.properties.length} props</span>
           {player.hasGetOutOfJailFree && <span className="text-amber-400" title="Get Out of Jail Free">🔑</span>}
         </div>
       </div>
@@ -169,6 +190,66 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
         </motion.div>
       )}
     </div>
+  );
+}
+
+/* ─── Turn Announcement Banner ─── */
+function TurnBanner() {
+  const players = useGameStore(s => s.players);
+  const turnOrder = useGameStore(s => s.turnOrder);
+  const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
+  const phase = useGameStore(s => s.phase);
+  const turnCount = useGameStore(s => s.turnCount);
+  const [showBanner, setShowBanner] = useState(false);
+  const [bannerText, setBannerText] = useState('');
+  const [bannerColor, setBannerColor] = useState('#fbbf24');
+  const prevPlayerId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const currentPlayerId = turnOrder[currentTurnIndex];
+    if (currentPlayerId && currentPlayerId !== prevPlayerId.current) {
+      const player = players.find(p => p.id === currentPlayerId);
+      if (player) {
+        const coalition = COALITIONS[player.coalitionId];
+        const text = player.isAI ? `${player.name} sedang berfikir...` : `Giliran ${player.name}!`;
+        const color = coalition?.color || '#fbbf24';
+        queueMicrotask(() => {
+          setBannerText(text);
+          setBannerColor(color);
+          setShowBanner(true);
+        });
+        const timer = setTimeout(() => queueMicrotask(() => setShowBanner(false)), 2500);
+        prevPlayerId.current = currentPlayerId;
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentTurnIndex, turnOrder, players]);
+
+  if (!showBanner || phase === 'lobby' || phase === 'game_over') return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -30, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="absolute top-[20%] left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+      >
+        <div
+          className="px-6 py-2.5 rounded-full backdrop-blur-md shadow-2xl border-2"
+          style={{
+            borderColor: bannerColor,
+            background: `linear-gradient(135deg, rgba(10,10,30,0.92) 0%, rgba(20,20,50,0.88) 100%)`,
+            boxShadow: `0 0 25px ${bannerColor}30, 0 4px 20px rgba(0,0,0,0.5)`,
+          }}
+        >
+          <p className="text-sm font-bold tracking-wide" style={{ color: bannerColor }}>
+            {bannerText}
+          </p>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -1662,6 +1743,7 @@ export default function GameDashboard() {
       <AIQuoteBubble />
       <TileDetail />
       <PropertyPortfolio />
+      <TurnBanner />
       <AchievementToast />
     </div>
   );
