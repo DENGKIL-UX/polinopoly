@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
 
     const data = await res.json();
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch {
+    // SECURITY: Don't expose internal error messages to clients
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

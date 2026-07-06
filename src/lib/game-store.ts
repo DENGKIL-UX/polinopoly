@@ -1720,7 +1720,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (typeof window === 'undefined') return false;
       const raw = localStorage.getItem('dewan-rakyat-save');
       if (!raw) return false;
+      // SECURITY: Validate JSON structure before parsing to prevent prototype pollution
       const saveData = JSON.parse(raw);
+      // SECURITY: Validate expected fields exist and have correct types
+      if (typeof saveData !== 'object' || saveData === null) return false;
+      if (saveData.phase && typeof saveData.phase !== 'string') return false;
+      if (saveData.players && !Array.isArray(saveData.players)) return false;
+      if (saveData.tiles && !Array.isArray(saveData.tiles)) return false;
+      if (saveData.turnOrder && !Array.isArray(saveData.turnOrder)) return false;
+      if (saveData.currentTurnIndex !== undefined && typeof saveData.currentTurnIndex !== 'number') return false;
 
       set({
         phase: saveData.phase || 'lobby',

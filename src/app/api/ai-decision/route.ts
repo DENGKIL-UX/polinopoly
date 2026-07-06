@@ -83,8 +83,8 @@ Should ${coalitionName} BUY or IGNORE this property? Respond with JSON only.`;
     }
 
     return NextResponse.json(result);
-  } catch (error) {
-    console.error('AI Decision error:', error);
+  } catch {
+    // SECURITY: Don't log or expose internal error details
     return NextResponse.json({
       action: 'IGNORE',
       quote: 'AI system down lah, technical difficulty!',
