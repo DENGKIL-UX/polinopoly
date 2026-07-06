@@ -207,12 +207,17 @@ function calculateRent(tile: Tile, owner: Player, marketState: MarketState, mort
   const houses = tile.houses || 0;
   const baseRent = tile.rent[Math.min(houses, tile.rent.length - 1)] || tile.rent[0];
   
-  // Check if owner has full color group
+  // Check if owner has full color group — monopoly doubles rent (classic Monopoly)
   if (tile.colorGroup) {
     const colorGroupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
     const ownsAll = colorGroupTiles.every(t => owner.properties.includes(t.id));
     if (ownsAll) {
-      return Math.round(baseRent * 2 * marketState.inflationMultiplier);
+      // Monopoly bonus: 2x base rent when no houses, 1.5x when houses (houses already multiply)
+      if (houses === 0) {
+        return Math.round(baseRent * 2 * marketState.inflationMultiplier);
+      } else {
+        return Math.round(baseRent * 1.5 * marketState.inflationMultiplier);
+      }
     }
   }
 
@@ -1194,7 +1199,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const liveTile = get().tiles[tileId];
         const currentAI = get().players.find(p => p.id === currentPlayerId);
         if (!currentAI || !tile.housePrice) break;
-        if (currentAI.money - tile.housePrice < 200) break;
+        if (currentAI.money - tile.housePrice < 80) break;
         const newHouses = (liveTile?.houses ?? 0) + 1;
         set(s => ({
           players: s.players.map(p =>
@@ -1783,8 +1788,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newCpo = Math.max(2000, Math.min(6000, state.marketState.cpoPrice + cpoChange * 50));
     const newRinggit = Math.max(3.5, Math.min(5.5, state.marketState.ringgitUsd + ringgitChange));
 
-    // Inflation: driven by KLCI and CPO
-    const inflationMultiplier = 0.85 + (newKlci - 1400) / 2000 + (newCpo - 3500) / 20000;
+    // Inflation: increases over time to accelerate game (rent gets more expensive)
+    const turnInflation = 1 + (state.turnCount * 0.005); // +0.5% per turn
+    const marketInflation = 0.85 + (newKlci - 1400) / 2000 + (newCpo - 3500) / 20000;
+    const inflationMultiplier = Math.max(marketInflation, turnInflation);
     const federalRentBonus = 1.0 + (newRinggit - 4.47) * 0.3;
 
     set({

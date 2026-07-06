@@ -117,7 +117,8 @@ export function decideBuy(ctx: AIContext, tile: Tile): BuyDecision {
 
   // Rule 1: Never buy if it would leave us without a cash buffer
   // Buffer scales with game stage (early game = more risk allowed)
-  const minBuffer = ctx.turnCount < 5 ? 100 : ctx.turnCount < 15 ? 200 : 300;
+  // Lower buy buffer so AI buys more aggressively (was 100/200/300)
+  const minBuffer = ctx.turnCount < 5 ? 50 : ctx.turnCount < 15 ? 100 : 150;
   if (cashAfter < minBuffer) {
     return { shouldBuy: false, reason: `Keep RM${minBuffer} buffer` };
   }
@@ -234,7 +235,10 @@ export function decideBuild(ctx: AIContext): number[] {
   const me = ctx.player;
   const builds: number[] = [];
   const personality = getCoalitionPersonality(me.coalitionId);
-  const minBuffer = ctx.turnCount < 10 ? 200 : 300;
+  // Lower buffer so AI builds more aggressively (was 200-300)
+  const minBuffer = ctx.turnCount < 10 ? 80 : 150;
+  // Track virtual money separately (don't mutate ctx.player)
+  let virtualMoney = me.money;
 
   // Find all completed color groups
   const colorGroups = new Set<ColorGroup>();
@@ -256,7 +260,7 @@ export function decideBuild(ctx: AIContext): number[] {
       if (houses >= 5) continue; // already hotel
       if (ctx.mortgagedTiles.includes(t.id)) continue;
       if (!t.housePrice) continue;
-      if (me.money - t.housePrice < minBuffer) continue;
+      if (virtualMoney - t.housePrice < minBuffer) continue;
 
       // Priority: even-build across the group (Monopoly rule), but prefer
       // cheaper tiles first for faster ROI. Boost high-rent groups.
@@ -279,7 +283,7 @@ export function decideBuild(ctx: AIContext): number[] {
 
   // Even-build rule: don't let any tile get more than 1 ahead of others in its group
   for (const { tile } of buildableTiles) {
-    if (me.money - (tile.housePrice ?? 0) < minBuffer) break;
+    if (virtualMoney - (tile.housePrice ?? 0) < minBuffer) break;
     const liveTile = ctx.tiles[tile.id];
     const myHouses = liveTile?.houses ?? 0;
     // Check other tiles in same group aren't more than 1 house behind
@@ -291,7 +295,7 @@ export function decideBuild(ctx: AIContext): number[] {
 
     builds.push(tile.id);
     // Deduct virtually for the next iteration's buffer check
-    me.money -= tile.housePrice ?? 0;
+    virtualMoney -= tile.housePrice ?? 0;
   }
 
   return builds;
