@@ -135,6 +135,16 @@ export interface GameState {
   // Show in-game wealth chart (toggle)
   showWealthChart: boolean;
 
+  // House/hotel supply limits (classic Monopoly: 32 houses, 12 hotels)
+  housesAvailable: number;
+  hotelsAvailable: number;
+
+  // Free Parking "Rakyat Fund" jackpot — accumulates taxes & fines, won on landing tile 20
+  centerPot: number;
+
+  // Income tax choice pending — when player lands on tile 4, they choose 10% or RM200
+  pendingTaxChoice: { tileId: number; playerId: string } | null;
+
   // Actions
   startGame: (coalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => void;
   rollDice: () => void;
@@ -179,6 +189,9 @@ export interface GameState {
   aiTradeResponse: () => void;
   toggleWealthChart: () => void;
   recordNetWorth: () => void;
+  handleBankruptcy: (bankruptPlayerId: string, creditorId?: string) => void;
+  resolveTaxChoice: (useFlat: boolean) => void;
+  checkAutoWin: () => boolean;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -330,6 +343,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   tradeState: null,
   netWorthHistory: [],
   showWealthChart: false,
+  housesAvailable: 32,
+  hotelsAvailable: 12,
+  centerPot: 0,
+  pendingTaxChoice: null,
 
   startGame: (playerCoalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => {
     // If custom party, register it in COALITIONS at runtime
@@ -401,6 +418,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         turn: 1,
         netWorths: Object.fromEntries(allPlayers.map(p => [p.id, p.money])),
       }],
+      housesAvailable: 32,
+      hotelsAvailable: 12,
+      centerPot: 0,
+      pendingTaxChoice: null,
     });
   },
 
@@ -505,22 +526,42 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Tax tiles
     if (tile.type === 'tax') {
+      // Tile 4 (Cukai SST/GST): offer choice of 10% net worth OR flat RM200
+      // Tile 38 (Luxury Tax): fixed RM100
+      if (tile.id === 4 && !player.isAI) {
+        // Human player — show choice UI
+        set({ pendingTaxChoice: { tileId: tile.id, playerId: currentPlayerId } });
+        return;
+      }
+      // AI or Luxury Tax — auto-pay flat amount
       const amount = tile.id === 4 ? 200 : 100;
       const newMoney = player.money - amount;
-      const isBankrupt = newMoney < 0;
       set(state => ({
         players: state.players.map(p =>
-          p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt } : p
+          p.id === currentPlayerId ? { ...p, money: newMoney } : p
         ),
-        phase: isBankrupt ? 'game_over' : 'landed',
+        centerPot: state.centerPot + amount,
       }));
       get().addLog({
         playerId: currentPlayerId,
         playerName: player.name,
-        message: `💸 ${player.name} pays RM${amount} in ${tile.name}! (${tile.description})`,
+        message: `💸 ${player.name} pays RM${amount} in ${tile.name}! (Added to Rakyat Fund)`,
         type: 'tax',
       });
       if (player.isAI) get().triggerNarration('penalty');
+
+      // Check bankruptcy
+      if (newMoney < 0) {
+        get().handleBankruptcy(currentPlayerId);
+        const activePlayers = get().players.filter(p => !p.isBankrupt);
+        if (activePlayers.length <= 1) {
+          set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+          return;
+        }
+      }
+      // Check auto-win
+      if (get().checkAutoWin()) return;
+      set({ phase: 'landed' });
       return;
     }
 
@@ -587,7 +628,37 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Corner or other
+    // Corner tiles: Free Parking (id 20) = collect Rakyat Fund jackpot
+    if (tile.id === 20) {
+      const pot = state.centerPot;
+      if (pot > 0) {
+        set(state => ({
+          players: state.players.map(p =>
+            p.id === currentPlayerId ? { ...p, money: p.money + pot } : p
+          ),
+          centerPot: 0,
+        }));
+        get().addLog({
+          playerId: currentPlayerId,
+          playerName: player.name,
+          message: `👑 ${player.name} landed on Istana Negara and collected RM${pot} from the Rakyat Fund!`,
+          type: 'system',
+        });
+      } else {
+        get().addLog({
+          playerId: currentPlayerId,
+          playerName: player.name,
+          message: `👑 ${player.name} visited Istana Negara. The Rakyat Fund is empty.`,
+          type: 'move',
+        });
+      }
+      // Check auto-win after collecting pot
+      if (get().checkAutoWin()) return;
+      set({ phase: 'landed' });
+      return;
+    }
+
+    // Other corner tiles (GO landing, Jail visiting, Go-to-Jail already handled)
     set({ phase: 'landed' });
   },
 
@@ -642,6 +713,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // Achievement: banker — money check happens in endTurn
+
+    // Check auto-win (supermajority: 20+ properties)
+    get().checkAutoWin();
   },
 
   skipBuy: () => {
@@ -672,17 +746,38 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!payer || !payee) return;
 
     const payerNew = payer.money - amount;
-    const payeeNew = payee.money + amount;
 
-    set(state => ({
-      players: state.players.map(p => {
-        if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 };
-        if (p.id === to) return { ...p, money: payeeNew };
-        return p;
-      }),
-      currentRentPayment: null,
-      phase: payerNew < 0 ? 'game_over' : 'landed',
-    }));
+    if (payerNew < 0) {
+      // Payer cannot afford rent → bankruptcy to creditor (payee)
+      // Per Monopoly rules: creditor receives ALL of payer's assets (properties + cash + GOOJF card)
+      // Payee gets the full rent amount (capped at what payer could pay via asset liquidation)
+      set(s => ({
+        players: s.players.map(p => {
+          if (p.id === from) return { ...p, money: payerNew }; // temporarily negative; handleBankruptcy will zero it
+          if (p.id === to) return { ...p, money: p.money + payer.money }; // payee gets whatever cash payer had
+          return p;
+        }),
+        currentRentPayment: null,
+      }));
+      get().handleBankruptcy(from, to);
+      // handleBankruptcy sets game_over if only 1 player left
+      if (get().phase !== 'game_over') {
+        // Check auto-win (creditor may have inherited enough properties)
+        if (get().checkAutoWin()) return;
+        set({ phase: 'landed' });
+      }
+    } else {
+      // Normal rent payment
+      set(state => ({
+        players: state.players.map(p => {
+          if (p.id === from) return { ...p, money: payerNew };
+          if (p.id === to) return { ...p, money: p.money + amount };
+          return p;
+        }),
+        currentRentPayment: null,
+        phase: 'landed',
+      }));
+    }
 
     // Achievement: high_roller — player pays > RM500 rent in a single payment
     if (from === 'player' && amount > 500) {
@@ -732,11 +827,22 @@ export const useGameStore = create<GameState>((set, get) => ({
         const newMoney = player.money + effect.value;
         set(state => ({
           players: state.players.map(p =>
-            p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt: newMoney < 0 } : p
+            p.id === currentPlayerId ? { ...p, money: newMoney } : p
           ),
           currentCard: null,
-          phase: newMoney < 0 ? 'game_over' : 'landed',
+          phase: 'landed',
         }));
+        // Check bankruptcy (to Bank — no creditor for card-driven money loss)
+        if (newMoney < 0) {
+          get().handleBankruptcy(currentPlayerId);
+          const activePlayers = get().players.filter(p => !p.isBankrupt);
+          if (activePlayers.length <= 1) {
+            set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+            return;
+          }
+        }
+        // Check auto-win
+        if (get().checkAutoWin()) return;
         break;
       }
       case 'move': {
@@ -771,7 +877,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       case 'go_to': {
         const targetPos = effect.value ?? effect.tileId ?? 0;
-        const passedGo = player.position > targetPos;
+        // FIX: Only grant pass-Go bonus if the card explicitly sends player to GO (tile 0)
+        // or if moving backwards past tile 0 to a low tile number.
+        // The old heuristic `player.position > targetPos` was a false positive —
+        // e.g., moving from tile 25 to tile 5 (forward, not crossing GO) incorrectly granted RM200.
+        // Correct check: did the path cross tile 0? That only happens if targetPos === 0
+        // (card says "go to GO") OR if targetPos is ahead and we wrapped (impossible with go_to).
+        const passedGo = targetPos === 0 && player.position !== 0;
         set(state => ({
           players: state.players.map(p =>
             p.id === currentPlayerId
@@ -844,28 +956,26 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Check all players for bankruptcy after pay_all / collect_all
     if (effect.type === 'collect_all' || effect.type === 'pay_all') {
       const postState = get();
-      const anyBankrupt = postState.players.some(p => p.money < 0 && !p.isBankrupt);
-      if (anyBankrupt) {
-        set(state => ({
-          players: state.players.map(p =>
-            p.money < 0 ? { ...p, isBankrupt: true } : p
-          ),
-        }));
-        // Check game over
-        const activePlayers = get().players.filter(p => !p.isBankrupt);
-        if (activePlayers.length <= 1) {
-          set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
-          return;
-        }
+      const bankruptPlayers = postState.players.filter(p => p.money < 0 && !p.isBankrupt);
+      // For pay_all: the current player pays everyone else. If any other player goes negative,
+      //   they bankrupt to the current player (creditor).
+      // For collect_all: the current player collects from everyone else. If current player goes negative
+      //   (shouldn't happen — they're gaining). If any other player goes negative, they bankrupt to current player.
+      for (const bp of bankruptPlayers) {
+        const creditorId = bp.id === currentPlayerId ? undefined : currentPlayerId;
+        get().handleBankruptcy(bp.id, creditorId);
       }
+      const activePlayers = get().players.filter(p => !p.isBankrupt);
+      if (activePlayers.length <= 1) {
+        set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+        return;
+      }
+      // Check auto-win
+      if (get().checkAutoWin()) return;
     }
 
-    // Check for bankruptcy
-    const newState = get();
-    const updatedPlayer = newState.players.find(p => p.id === currentPlayerId);
-    if (updatedPlayer && updatedPlayer.money < 0) {
-      set({ phase: 'game_over' });
-    }
+    // Note: money-effect bankruptcy on the current player is already handled
+    // in the 'money' case above with handleBankruptcy + winner check.
   },
 
   endTurn: () => {
@@ -916,6 +1026,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (humanPlayer && humanPlayer.money >= 3000) {
       get().unlockAchievement('banker');
     }
+
+    // Check auto-win (supermajority: 20+ properties)
+    if (get().checkAutoWin()) return;
 
     // Record net worth snapshot for the wealth chart
     get().recordNetWorth();
@@ -1217,28 +1330,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       const buildTiles = decideBuild(ctx);
       for (const tileId of buildTiles) {
         const tile = BOARD_TILES[tileId];
-        const liveTile = get().tiles[tileId];
         const currentAI = get().players.find(p => p.id === currentPlayerId);
         if (!currentAI || !tile.housePrice) break;
-        if (currentAI.money - tile.housePrice < 80) break;
-        const newHouses = (liveTile?.houses ?? 0) + 1;
-        set(s => ({
-          players: s.players.map(p =>
-            p.id === currentPlayerId ? { ...p, money: p.money - (tile.housePrice ?? 0) } : p,
-          ),
-          tiles: s.tiles.map(t =>
-            t.id === tileId ? { ...t, houses: newHouses } : t,
-          ),
-        }));
-        get().addLog({
-          playerId: currentPlayerId,
-          playerName: currentAI.name,
-          message: newHouses === 5
-            ? `🏨 ${currentAI.name} builds HOTEL on ${tile.name}! (${personality.description})`
-            : `🏠 ${currentAI.name} builds house on ${tile.name} (${newHouses}/4)`,
-          type: 'buy',
-        });
-        await delay(250);
+        // Use late-game buffer (150) after turn 10, else 80 — matches decideBuild
+        const minBuffer = ctx.turnCount < 10 ? 80 : 150;
+        if (currentAI.money - tile.housePrice < minBuffer) break;
+        // Delegate to buildHouse which now enforces even-build, supply limits, and ownership.
+        // buildHouse uses tile.owner (not hardcoded 'player'), so AI can build.
+        const beforeHouses = get().tiles[tileId]?.houses ?? 0;
+        get().buildHouse(tileId);
+        const afterHouses = get().tiles[tileId]?.houses ?? 0;
+        // Only log + delay if a house was actually built
+        if (afterHouses > beforeHouses) {
+          get().addLog({
+            playerId: currentPlayerId,
+            playerName: currentAI.name,
+            message: afterHouses === 5
+              ? `🏨 ${currentAI.name} builds HOTEL on ${tile.name}! (${personality.description})`
+              : `🏠 ${currentAI.name} builds house on ${tile.name} (${afterHouses}/4)`,
+            type: 'buy',
+          });
+          await delay(250);
+        }
       }
     }
 
@@ -1259,9 +1372,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   buildHouse: (tileId: number) => {
     const state = get();
     const tile = state.tiles.find(t => t.id === tileId);
-    const player = state.players.find(p => p.id === 'player');
-    if (!tile || !player || tile.owner !== 'player') return;
-    if (tile.type !== 'property' || !tile.housePrice) return;
+    if (!tile || tile.type !== 'property' || !tile.housePrice) return;
+    // Use the tile's owner (supports both human and AI) instead of hardcoding 'player'
+    const ownerId = tile.owner;
+    if (!ownerId) return;
+    const player = state.players.find(p => p.id === ownerId);
+    if (!player) return;
+
     if ((tile.houses || 0) >= 5) return;
 
     // Cannot build on mortgaged properties
@@ -1273,21 +1390,67 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Must own full color group to build
     if (tile.colorGroup) {
       const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
-      const ownsAll = groupTiles.every(t => t.owner === 'player');
+      const ownsAll = groupTiles.every(t => t.owner === ownerId);
       if (!ownsAll) return;
+
+      // ENFORCE EVEN-BUILD: houses in a color group must differ by at most 1.
+      // Per official Monopoly rules, you cannot build on a property that already has
+      // more houses than the least-developed property in its group.
+      const groupStateTiles = groupTiles.map(gt => state.tiles.find(st => st.id === gt.id));
+      const minHousesInGroup = Math.min(...groupStateTiles.map(t => t?.houses ?? 0));
+      if ((tile.houses ?? 0) > minHousesInGroup) {
+        get().addLog({
+          playerId: ownerId,
+          playerName: player.name,
+          message: `⚠️ Cannot build on ${tile.name} — must build evenly. Build on the least-developed property in ${tile.colorGroup} first.`,
+          type: 'system',
+        });
+        return;
+      }
+    }
+
+    // ENFORCE HOUSE/HOTEL SUPPLY LIMIT (classic Monopoly: 32 houses, 12 hotels)
+    const isUpgradingToHotel = (tile.houses ?? 0) === 4; // 4 houses → 5 (hotel)
+    if (isUpgradingToHotel) {
+      if (state.hotelsAvailable <= 0) {
+        get().addLog({
+          playerId: ownerId,
+          playerName: player.name,
+          message: `⚠️ No hotels available! The Bank has run out of hotels (limit: 12).`,
+          type: 'system',
+        });
+        return;
+      }
+    } else {
+      if (state.housesAvailable <= 0) {
+        get().addLog({
+          playerId: ownerId,
+          playerName: player.name,
+          message: `⚠️ No houses available! The Bank has run out of houses (limit: 32).`,
+          type: 'system',
+        });
+        return;
+      }
     }
 
     const newHouses = (tile.houses || 0) + 1;
+    // Update supply: building a hotel (5th house) consumes 1 hotel and returns 4 houses to supply
+    const supplyDelta = isUpgradingToHotel
+      ? { houses: state.housesAvailable + 4, hotels: state.hotelsAvailable - 1 }
+      : { houses: state.housesAvailable - 1, hotels: state.hotelsAvailable };
+
     set(state => ({
       players: state.players.map(p =>
-        p.id === 'player' ? { ...p, money: p.money - cost } : p
+        p.id === ownerId ? { ...p, money: p.money - cost } : p
       ),
       tiles: state.tiles.map(t =>
         t.id === tileId ? { ...t, houses: newHouses } : t
       ),
+      housesAvailable: supplyDelta.houses,
+      hotelsAvailable: supplyDelta.hotels,
     }));
     get().addLog({
-      playerId: 'player',
+      playerId: ownerId,
       playerName: player.name,
       message: newHouses === 5
         ? `🏨 Built a HOTEL on ${tile.name}! (RM${cost})`
@@ -1304,8 +1467,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   sellProperty: (tileId: number) => {
     const state = get();
     const tile = state.tiles.find(t => t.id === tileId);
-    const player = state.players.find(p => p.id === 'player');
-    if (!tile || !player || tile.owner !== 'player') return;
+    if (!tile) return;
+    const ownerId = tile.owner;
+    if (!ownerId) return;
+    const player = state.players.find(p => p.id === ownerId);
+    if (!player) return;
 
     // If mortgaged, sell price is reduced (only get mortgage value, not 80% of price)
     const isMortgaged = state.mortgagedTiles.includes(tileId);
@@ -1314,9 +1480,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       : Math.round((tile.mortgageValue || tile.price || 0) * 0.8);
     const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);
 
+    // Restore house/hotel supply from liquidated buildings
+    let housesRestored = 0;
+    let hotelsRestored = 0;
+    if ((tile.houses ?? 0) === 5) hotelsRestored += 1;
+    else if ((tile.houses ?? 0) > 0) housesRestored += tile.houses ?? 0;
+
     set(state => ({
       players: state.players.map(p =>
-        p.id === 'player'
+        p.id === ownerId
           ? { ...p, money: p.money + sellPrice + houseRefund, properties: p.properties.filter(pid => pid !== tileId) }
           : p
       ),
@@ -1324,9 +1496,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t
       ),
       mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+      housesAvailable: state.housesAvailable + housesRestored,
+      hotelsAvailable: state.hotelsAvailable + hotelsRestored,
     }));
     get().addLog({
-      playerId: 'player',
+      playerId: ownerId,
       playerName: player.name,
       message: `📉 Sold ${tile.name} for RM${sellPrice + houseRefund}`,
       type: 'buy',
@@ -1730,6 +1904,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         achievements: state.achievements,
         stats: state.stats,
         netWorthHistory: state.netWorthHistory,
+        housesAvailable: state.housesAvailable,
+        hotelsAvailable: state.hotelsAvailable,
+        centerPot: state.centerPot,
       };
       localStorage.setItem('dewan-rakyat-save', JSON.stringify(saveData));
     } catch {
@@ -1778,6 +1955,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         achievements: saveData.achievements || INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
         stats: saveData.stats || { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
         netWorthHistory: Array.isArray(saveData.netWorthHistory) ? saveData.netWorthHistory : [],
+        housesAvailable: typeof saveData.housesAvailable === 'number' ? saveData.housesAvailable : 32,
+        hotelsAvailable: typeof saveData.hotelsAvailable === 'number' ? saveData.hotelsAvailable : 12,
+        centerPot: typeof saveData.centerPot === 'number' ? saveData.centerPot : 0,
+        pendingTaxChoice: null,
       });
       return true;
     } catch {
@@ -2074,4 +2255,204 @@ export const useGameStore = create<GameState>((set, get) => ({
       netWorthHistory: [...s.netWorthHistory, { turn, netWorths }].slice(-60),
     }));
   },
+
+  // ─── Bankruptcy handler ─────────────────────────────────────────────────
+  // Transfers all assets from the bankrupt player to the creditor (if any)
+  // or returns them to the Bank (unowned). Mortgaged properties stay
+  // mortgaged when transferred to a creditor; the new owner must pay 10%
+  // interest immediately or unmortgage. Houses are liquidated at half price
+  // and the cash goes to the creditor (or Bank, effectively lost).
+  handleBankruptcy: (bankruptPlayerId: string, creditorId?: string) => {
+    const state = get();
+    const bankrupt = state.players.find(p => p.id === bankruptPlayerId);
+    if (!bankrupt || bankrupt.isBankrupt) return;
+
+    const creditor = creditorId ? state.players.find(p => p.id === creditorId) : null;
+
+    // 1. Liquidate all houses on the bankrupt player's properties.
+    //    Refund half of housePrice per house. Cash goes to creditor (or vanishes to Bank).
+    let liquidationCash = 0;
+    const tilesAfterLiquidation = state.tiles.map(t => {
+      if (t.owner === bankruptPlayerId && (t.houses ?? 0) > 0) {
+        const refund = (t.houses ?? 0) * Math.round((t.housePrice ?? 0) * 0.5);
+        liquidationCash += refund;
+        // Return houses/hotels to the bank supply
+        if (t.houses === 5) {
+          // hotel -> back to 4 houses worth of supply
+        }
+        return { ...t, houses: 0 };
+      }
+      return t;
+    });
+
+    // Restore house/hotel supply from liquidated buildings
+    let housesRestored = 0;
+    let hotelsRestored = 0;
+    state.tiles.forEach(t => {
+      if (t.owner === bankruptPlayerId) {
+        if ((t.houses ?? 0) === 5) hotelsRestored += 1;
+        else if ((t.houses ?? 0) > 0) housesRestored += t.houses ?? 0;
+      }
+    });
+
+    // 2. Transfer properties (and cash) to creditor, or release to Bank
+    const tilesAfterTransfer = tilesAfterLiquidation.map(t => {
+      if (t.owner === bankruptPlayerId) {
+        if (creditor) {
+          return { ...t, owner: creditorId };
+        }
+        // Return to bank: clear owner, keep mortgage status so it can be auctioned later
+        return { ...t, owner: undefined };
+      }
+      return t;
+    });
+
+    // 3. Mortgaged properties: if transferred to creditor, creditor must pay 10% interest
+    //    (per official Monopoly rules). We auto-deduct; if creditor can't afford, property
+    //    stays mortgaged with no immediate penalty (simplified).
+    let creditorInterestCost = 0;
+    if (creditor) {
+      state.mortgagedTiles.forEach(tid => {
+        const t = state.tiles.find(x => x.id === tid);
+        if (t && t.owner === bankruptPlayerId) {
+          creditorInterestCost += Math.round((t.mortgageValue ?? 0) * 0.1);
+        }
+      });
+    }
+
+    // 4. Update players
+    const playersUpdated = state.players.map(p => {
+      if (p.id === bankruptPlayerId) {
+        return { ...p, isBankrupt: true, money: 0, properties: [], isInJail: false, jailTurns: 0, hasGetOutOfJailFree: false };
+      }
+      if (creditor && p.id === creditor.id) {
+        const inheritedProps = state.tiles
+          .filter(t => t.owner === bankruptPlayerId)
+          .map(t => t.id);
+        const totalCash = p.money + liquidationCash + Math.max(0, bankrupt.money) - creditorInterestCost;
+        return {
+          ...p,
+          money: totalCash,
+          properties: [...p.properties, ...inheritedProps],
+          hasGetOutOfJailFree: p.hasGetOutOfJailFree || bankrupt.hasGetOutOfJailFree,
+        };
+      }
+      return p;
+    });
+
+    // 5. Mortgaged tiles: if returned to Bank, clear mortgage (bank-owned = unmortgaged)
+    let mortgagedTilesUpdated = state.mortgagedTiles;
+    if (!creditor) {
+      const bankruptTileIds = state.tiles.filter(t => t.owner === bankruptPlayerId).map(t => t.id);
+      mortgagedTilesUpdated = state.mortgagedTiles.filter(id => !bankruptTileIds.includes(id));
+    }
+
+    set({
+      players: playersUpdated,
+      tiles: tilesAfterTransfer,
+      mortgagedTiles: mortgagedTilesUpdated,
+      housesAvailable: state.housesAvailable + housesRestored,
+      hotelsAvailable: state.hotelsAvailable + hotelsRestored,
+    });
+
+    // 6. Log
+    const bankruptName = bankrupt.name;
+    if (creditor) {
+      get().addLog({
+        playerId: creditor.id,
+        playerName: creditor.name,
+        message: `💀 ${bankruptName} went bankrupt! All assets transferred to ${creditor.name}${creditorInterestCost > 0 ? ` (10% mortgage interest: RM${creditorInterestCost})` : ''}.`,
+        type: 'system',
+      });
+    } else {
+      get().addLog({
+        playerId: 'system',
+        playerName: 'System',
+        message: `💀 ${bankruptName} went bankrupt to the Bank! All properties returned to the Bank.`,
+        type: 'system',
+      });
+    }
+
+    // 7. Check game over / auto-win
+    const activePlayers = get().players.filter(p => !p.isBankrupt);
+    if (activePlayers.length <= 1) {
+      set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+      return;
+    }
+  },
+
+  // ─── Income Tax Choice (10% of net worth OR flat RM200) ─────────────────
+  resolveTaxChoice: (useFlat: boolean) => {
+    const state = get();
+    if (!state.pendingTaxChoice) return;
+    const { tileId, playerId } = state.pendingTaxChoice;
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    // Net worth = cash + property values + house values
+    const propValue = player.properties.reduce((sum, tid) => {
+      const tile = state.tiles.find(t => t.id === tid);
+      const houses = tile?.houses ?? 0;
+      return sum + (tile?.price ?? 0) + houses * (tile?.housePrice ?? 0);
+    }, 0);
+    const netWorth = player.money + propValue;
+    const tenPercent = Math.round(netWorth * 0.1);
+    const amount = useFlat ? 200 : tenPercent;
+
+    const newMoney = player.money - amount;
+    set(s => ({
+      players: s.players.map(p =>
+        p.id === playerId ? { ...p, money: newMoney } : p
+      ),
+      centerPot: s.centerPot + amount,
+      pendingTaxChoice: null,
+    }));
+
+    const choiceLabel = useFlat ? 'RM200 flat' : `10% (RM${tenPercent})`;
+    get().addLog({
+      playerId,
+      playerName: player.name,
+      message: `💸 ${player.name} pays ${choiceLabel} in Cukai SST/GST! (Net worth was RM${netWorth})`,
+      type: 'tax',
+    });
+
+    // Check bankruptcy after tax payment
+    if (newMoney < 0) {
+      get().handleBankruptcy(playerId);
+      const activePlayers = get().players.filter(p => !p.isBankrupt);
+      if (activePlayers.length <= 1) {
+        set({ phase: 'game_over', winner: activePlayers[0]?.id || null });
+        return;
+      }
+    }
+
+    // Proceed to landed phase
+    set({ phase: 'landed' });
+  },
+
+  // ─── Auto-Win Check: "Supermajority" — own 20+ of 28 buyable properties ──
+  // Mirrors the Malaysian Parliament simple-majority concept (112 of 222 seats).
+  // With 28 buyable properties, 20 = ~71% = "supermajority".
+  checkAutoWin: () => {
+    const state = get();
+    for (const p of state.players) {
+      if (p.isBankrupt) continue;
+      if (p.properties.length >= 20) {
+        get().addLog({
+          playerId: p.id,
+          playerName: p.name,
+          message: `🏆 ${p.name} wins by SUPERMAJORITY! Owns ${p.properties.length}/28 seats — Dewan Rakyat dissolved!`,
+          type: 'system',
+        });
+        set({ phase: 'game_over', winner: p.id });
+        return true;
+      }
+    }
+    return false;
+  },
 }));
+
+// Expose store on window for debugging/testing (agent-browser can call actions directly)
+if (typeof window !== 'undefined') {
+  (window as unknown as { __gameStore?: typeof useGameStore }).__gameStore = useGameStore;
+}

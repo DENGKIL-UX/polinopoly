@@ -276,6 +276,9 @@ function TurnBanner() {
 function MarketTicker() {
   const [ticks, setTicks] = useState({ klci: 1587.3, klciChange: -0.8, cpoPrice: 3950, cpoChange: 2.3, ringgitUsd: 4.47, ringgitChange: -0.2, inflation: 1.0 });
   const [tickKey, setTickKey] = useState(0);
+  const centerPot = useGameStore(s => s.centerPot);
+  const housesAvailable = useGameStore(s => s.housesAvailable);
+  const hotelsAvailable = useGameStore(s => s.hotelsAvailable);
   useEffect(() => {
     const iv = setInterval(() => {
       setTicks(p => ({
@@ -342,6 +345,27 @@ function MarketTicker() {
           </motion.span>
         </motion.span>
       ))}
+      {/* Rakyat Fund (Free Parking jackpot) */}
+      <span className="flex items-center gap-1 flex-shrink-0 border-l border-slate-700/40 pl-3">
+        <span className="text-amber-500">👑</span>
+        <span className="text-slate-500 font-medium">RAKYAT</span>
+        <motion.span
+          key={`pot-${centerPot}`}
+          initial={{ scale: 1.3, color: '#fbbf24' }}
+          animate={{ scale: 1, color: '#e2e8f0' }}
+          transition={{ duration: 0.4 }}
+          className="font-bold"
+        >
+          RM{centerPot}
+        </motion.span>
+      </span>
+      {/* House/Hotel supply */}
+      <span className="hidden sm:flex items-center gap-1 flex-shrink-0">
+        <span className="text-green-500">🏠</span>
+        <span className="text-slate-500">{housesAvailable}</span>
+        <span className="text-red-500 ml-1">🏨</span>
+        <span className="text-slate-500">{hotelsAvailable}</span>
+      </span>
     </div>
   );
 }
@@ -1644,6 +1668,8 @@ export default function GameDashboard() {
   const togglePortfolio = useGameStore(s => s.togglePortfolio);
   const selectTile = useGameStore(s => s.selectTile);
   const rejectTrade = useGameStore(s => s.rejectTrade);
+  const pendingTaxChoice = useGameStore(s => s.pendingTaxChoice);
+  const resolveTaxChoice = useGameStore(s => s.resolveTaxChoice);
   const [, toggleSound] = useSoundEnabled();
 
   /* ─── Keyboard Shortcuts ─── */
@@ -1681,10 +1707,19 @@ export default function GameDashboard() {
           toggleSound();
         }
       }
+      // Tax choice: 1 = 10% net worth, 2 = flat RM200
+      if (e.key === '1' && pendingTaxChoice) {
+        soundManager.playEndTurn();
+        resolveTaxChoice(false);
+      }
+      if (e.key === '2' && pendingTaxChoice) {
+        soundManager.playEndTurn();
+        resolveTaxChoice(true);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, isPlayerTurn, rollDice, buyProperty, skipBuy, tradeState?.isActive, showPortfolio, selectedTileId, togglePortfolio, selectTile, rejectTrade, toggleSound]);
+  }, [phase, isPlayerTurn, rollDice, buyProperty, skipBuy, tradeState?.isActive, showPortfolio, selectedTileId, togglePortfolio, selectTile, rejectTrade, toggleSound, pendingTaxChoice, resolveTaxChoice]);
 
   return (
     <div className="absolute inset-0 pointer-events-none z-20 flex flex-col">
@@ -1886,6 +1921,70 @@ export default function GameDashboard() {
                 className="px-6 py-2.5 border-yellow-500/40 text-yellow-300 hover:bg-yellow-900/30 hover:text-yellow-200 text-xs font-bold transition-colors animate-end-turn-pulse">
                 Akhir Giliran <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
+            </motion.div>
+          )}
+
+          {/* Income Tax Choice — 10% of net worth OR flat RM200 */}
+          {pendingTaxChoice && pendingTaxChoice.playerId === 'player' && (
+            <motion.div key="tax-choice" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="max-w-sm mx-auto w-full">
+              <Card className="bg-amber-950/80 border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+                <CardContent className="p-4 space-y-3">
+                  <div className="text-center">
+                    <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: 2 }}>
+                      <AlertTriangle className="h-7 w-7 text-amber-400 mx-auto" />
+                    </motion.div>
+                    <p className="text-xs font-black text-amber-300 mt-1">Cukai SST/GST — Pilih Bayaran</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Income Tax — choose your payment</p>
+                  </div>
+                  {(() => {
+                    const playerObj = players.find(p => p.id === 'player');
+                    if (!playerObj) return null;
+                    const propValue = playerObj.properties.reduce((sum, tid) => {
+                      const t = BOARD_TILES[tid];
+                      const ts = useGameStore.getState().tiles[tid];
+                      return sum + (t?.price ?? 0) + (ts?.houses ?? 0) * (t?.housePrice ?? 0);
+                    }, 0);
+                    const netWorth = playerObj.money + propValue;
+                    const tenPercent = Math.round(netWorth * 0.1);
+                    const flat = 200;
+                    const useTen = tenPercent < flat;
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => { soundManager.playEndTurn(); resolveTaxChoice(false); }}
+                            className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                              useTen
+                                ? 'bg-emerald-600/20 border-emerald-500/50 hover:bg-emerald-600/30'
+                                : 'bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40'
+                            }`}>
+                            <p className="text-[9px] text-slate-400 uppercase tracking-wider">10% Net Worth</p>
+                            <p className="text-base font-black text-amber-300">RM{tenPercent}</p>
+                            <p className="text-[8px] text-slate-500">NW: RM{netWorth.toLocaleString()}</p>
+                            {useTen && <p className="text-[8px] text-emerald-400 mt-0.5">✓ Cheaper</p>}
+                          </button>
+                          <button
+                            onClick={() => { soundManager.playEndTurn(); resolveTaxChoice(true); }}
+                            className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                              !useTen
+                                ? 'bg-emerald-600/20 border-emerald-500/50 hover:bg-emerald-600/30'
+                                : 'bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40'
+                            }`}>
+                            <p className="text-[9px] text-slate-400 uppercase tracking-wider">Flat Rate</p>
+                            <p className="text-base font-black text-amber-300">RM{flat}</p>
+                            <p className="text-[8px] text-slate-500">Fixed amount</p>
+                            {!useTen && <p className="text-[8px] text-emerald-400 mt-0.5">✓ Cheaper</p>}
+                          </button>
+                        </div>
+                        <p className="text-[8px] text-slate-500 text-center">
+                          💡 Tip: 10% is cheaper when your net worth is under RM2,000
+                        </p>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
             </motion.div>
           )}
 
