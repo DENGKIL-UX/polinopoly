@@ -138,9 +138,20 @@ function TileView({ tile }: { tile: Tile }) {
       {!isSideTile && (
         <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 px-[2px] ${hasColorStrip ? 'mt-[25%] h-[75%]' : ''}`}>
           <span className={isCorner ? 'text-lg sm:text-xl leading-none drop-shadow' : 'text-[9px] sm:text-xs leading-none'}>{icon}</span>
-          <span className={`font-extrabold text-center leading-tight truncate w-full ${
-            isCorner ? 'text-[8px] sm:text-[10px] text-amber-900' : 'text-[7px] sm:text-[9px] text-slate-900'
-          }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)' }}>
+          <span
+            className={`font-extrabold text-center leading-[1.05] w-full px-0.5 ${
+              isCorner ? 'text-[8px] sm:text-[10px] text-amber-900' : 'text-[7px] sm:text-[9px] text-slate-900'
+            }`}
+            style={{
+              textShadow: '0 0 2px rgba(255,255,255,0.3)',
+              wordBreak: 'break-word',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+            title={tile.name}
+          >
             {isCorner ? getCornerLabel(tile) : tile.name}
           </span>
           {tile.price && !isCorner && (
@@ -156,9 +167,20 @@ function TileView({ tile }: { tile: Tile }) {
       {isSideTile && (
         <div className={`relative w-full h-full flex flex-col items-center justify-center gap-0 py-[2px] ${hasColorStrip ? 'ml-[25%] w-[75%]' : ''}`}>
           <span className="text-[9px] sm:text-xs leading-none">{icon}</span>
-          <span className={`font-extrabold text-center leading-tight ${
-            'text-[7px] sm:text-[9px] text-slate-900'
-          }`} style={{ textShadow: '0 0 2px rgba(255,255,255,0.3)', writingMode: orientation === 'left' ? 'vertical-rl' : 'vertical-lr' }}>
+          <span
+            className="font-extrabold text-center leading-[1.05] text-[7px] sm:text-[9px] text-slate-900"
+            style={{
+              textShadow: '0 0 2px rgba(255,255,255,0.3)',
+              writingMode: orientation === 'left' ? 'vertical-rl' : 'vertical-lr',
+              textOrientation: 'mixed',
+              wordBreak: 'break-word',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+            title={tile.name}
+          >
             {tile.name}
           </span>
           {tile.price && (

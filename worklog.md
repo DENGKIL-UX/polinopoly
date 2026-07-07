@@ -1085,3 +1085,108 @@ The Pilihan Raya Monopoly 3D game is fully stable and deployed to Cloudflare Wor
 3. Implement cannon-es physics dice
 4. Add title deed card flip animation on property purchase
 5. Fine-tune board image alignment across viewport sizes
+
+---
+Task ID: 27
+Agent: Main Agent
+Task: QA audit + bug fixes + new features (game settings, wealth chart, styling improvements)
+
+## Current Project Status Assessment
+
+The Pilihan Raya Monopoly 3D game is feature-complete and stable on commit `3bf3f4b`. All core systems work:
+- ✅ 3D/2D board with transparent trading-card tiles
+- ✅ Expert-system AI with coalition personalities + 1000 narrations
+- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+- ✅ Party HQ buildings with coalition flags on owned tiles
+- ✅ Video background hero page + hero music + game music (independent toggles)
+- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+- ✅ Achievements system (9 achievements), Trade system, Save/Load, Mortgage system
+- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+- ✅ Lint clean, no hydration errors, no runtime errors
+
+## QA Results (agent-browser + VLM)
+
+### Bugs Found & Fixed
+
+1. **Dual pop-up overlap (HIGH)** — VLM identified "two overlapping pop-ups for Amanah property" creating clutter.
+   - **Root cause:** `handleLanding` set `selectedTileId` when entering 'buying' phase, which triggered BOTH the `TileDetail` panel (top-center) AND the buying panel (bottom-center) to show the same property info.
+   - **Fix:** Removed `selectedTileId: tile.id` from the `set({ phase: 'buying' })` call in `game-store.ts`. The buying panel already shows full property details; setting `selectedTileId` was redundant.
+   - **Verification:** VLM confirmed "There are no overlapping duplicate panels" after fix.
+
+2. **Trade auto-rejects before player proposes (HIGH)** — Clicking "Trade with BN" immediately showed "BN rejected the trade offer!" without letting the player configure an offer.
+   - **Root cause:** `initiateTrade` auto-called `aiTradeResponse()` after 1500ms, evaluating an empty trade offer (0 properties, 0 cash) which the AI heuristic always rejected.
+   - **Fix:** Removed the `setTimeout(() => get().aiTradeResponse(), 1500)` call from `initiateTrade`. The AI now only evaluates when the human clicks "Propose Trade" (via `TradePanel.handlePropose`).
+   - **Verification:** Trade panel opens correctly, no auto-reject, player can configure offer.
+
+### Styling Improvements
+
+3. **Wealth bar visibility (MEDIUM)** — Wealth bar was h-0.5 (0.5px), hard to see in screenshots.
+   - **Fix:** Increased to h-1.5 (1.5px), added linear gradient (coalition color), added box-shadow glow, added shimmering sweep animation, added tick marks every RM1000, added "NW: RMxxx" net worth label below player info.
+
+4. **2D board text truncation (MEDIUM)** — VLM noted property labels were truncated (e.g., "Kri...", "Am...").
+   - **Fix:** Replaced `truncate` with 2-line clamp (`-webkit-line-clamp: 2`), added `wordBreak: break-word`, added `title={tile.name}` for hover tooltip, added `textOrientation: mixed` for vertical side-tiles.
+
+### New Features Added
+
+5. **Game Settings Panel (NEW)** — Added a settings button (gear icon) in the top-right controls.
+   - Sound Effects toggle (animated switch)
+   - Volume slider (0-100%, synced with soundManager singleton)
+   - AI Speed buttons (1× Slow / 2× Med / 3× Fast) with descriptions
+   - Keyboard Shortcuts reference (Space, B, P, S, Esc)
+
+6. **Net Worth History Chart (NEW)** — Added a wealth chart toggle button (trending-up icon) in the bottom-right.
+   - SVG line chart showing each player's net worth over time
+   - Color-coded lines per coalition (PH red, PN blue, BN navy, etc.)
+   - Gridlines at 25%, 50%, 75%
+   - End-point dots showing current value
+   - Legend with current net worth per player
+   - Records net worth snapshot at the end of each turn (max 60 data points)
+   - Persisted in save/load
+
+## Completed Modifications This Round
+
+### `src/lib/game-store.ts`
+- Added `netWorthHistory: { turn: number; netWorths: Record<string, number> }[]` state
+- Added `showWealthChart: boolean` state
+- Added `toggleWealthChart()` and `recordNetWorth()` actions
+- Added initial netWorthHistory in `startGame` (turn 1, all players RM1500)
+- Added `recordNetWorth()` call in `endTurn` (records snapshot before save)
+- Added `netWorthHistory` to `saveGame`/`loadGame` (with array validation)
+- **Bug fix:** Removed `selectedTileId: tile.id` from buying phase (dual pop-up)
+- **Bug fix:** Removed auto-trigger of `aiTradeResponse` in `initiateTrade` (trade auto-reject)
+
+### `src/components/game/GameDashboard.tsx`
+- **Improved `PlayerCard`:** Wealth bar now h-1.5 (was h-0.5), gradient fill, glow shadow, shimmer animation, tick marks, "NW: RMxxx" label
+- **New `GameSettingsPanel`:** Settings button + dropdown panel with sound toggle, volume slider, AI speed, keyboard shortcuts
+- **New `WealthChart`:** SVG line chart showing net worth over time, with legend
+- Added "Chart" toggle button in bottom-right (next to Hero and Portfolio)
+- Added `GameSettingsPanel` to top-right controls (both desktop and mobile)
+
+### `src/components/game/GameBoard.tsx`
+- **Improved 2D tile text:** Replaced `truncate` with 2-line clamp, added word-break, added hover tooltip, added text-orientation for vertical side-tiles
+
+## Verification Results
+- Lint: clean ✓
+- Dev server: no errors ✓
+- Lobby loads: all coalition cards + CREATE PARTY + hero music ✓
+- Game start: 3D board renders, all HUD buttons visible ✓
+- Game Settings panel: opens, all controls work ✓
+- Wealth Chart: opens, shows correct net worths ✓
+- Wealth bar: thicker, visible, shows NW label ✓
+- 2D board: full tile names visible (no truncation) ✓
+- Trade panel: opens without auto-reject ✓
+- Dual pop-up: fixed (VLM confirmed no overlap) ✓
+
+## Unresolved Issues / Risks
+1. **Action button disappears after dice roll on loaded save:** When loading a saved game and rolling dice, the action area (roll/buy/pay buttons) becomes empty. This appears to be a pre-existing React state desync issue with the setTimeout chain in rollDice/movePlayer/handleLanding. Starting a fresh game works correctly. Not introduced by this round's changes.
+2. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+3. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+4. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+5. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+
+## Priority Recommendations for Next Phase
+1. Fix the action button desync on loaded save games (investigate setTimeout preservation across React re-renders)
+2. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+3. Implement cannon-es physics dice for more realistic rolling
+4. Add title deed card flip animation on property purchase
+5. Fine-tune board image alignment across viewport sizes

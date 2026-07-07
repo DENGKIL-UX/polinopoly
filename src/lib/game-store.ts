@@ -128,6 +128,13 @@ export interface GameState {
     isActive: boolean;
   } | null;
 
+  // Net worth history — array of {turn, netWorths: Record<playerId, number>}
+  // Recorded at the end of each turn for the in-game wealth chart.
+  netWorthHistory: { turn: number; netWorths: Record<string, number> }[];
+
+  // Show in-game wealth chart (toggle)
+  showWealthChart: boolean;
+
   // Actions
   startGame: (coalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => void;
   rollDice: () => void;
@@ -170,6 +177,8 @@ export interface GameState {
   acceptTrade: () => void;
   rejectTrade: () => void;
   aiTradeResponse: () => void;
+  toggleWealthChart: () => void;
+  recordNetWorth: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -319,6 +328,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   achievements: INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
   stats: { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
   tradeState: null,
+  netWorthHistory: [],
+  showWealthChart: false,
 
   startGame: (playerCoalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => {
     // If custom party, register it in COALITIONS at runtime
@@ -385,6 +396,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         playerName: 'System',
         message: '🗳️ Pilihan Raya dimulakan! The game has begun!',
         type: 'system',
+      }],
+      netWorthHistory: [{
+        turn: 1,
+        netWorths: Object.fromEntries(allPlayers.map(p => [p.id, p.money])),
       }],
     });
   },
@@ -530,7 +545,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           // Both human and AI land in 'buying' phase.
           // aiTurn (for AI players) uses the expert-system engine in ai-engine.ts
           // to decide buy-vs-skip. The human player clicks Buy/Pass in the UI.
-          set({ phase: 'buying', selectedTileId: tile.id });
+          // NOTE: Do NOT set selectedTileId here — the buying panel already shows
+          // full property details. Setting selectedTileId would cause a duplicate
+          // "TileDetail" pop-up to overlap the buying panel (visual clutter).
+          set({ phase: 'buying' });
         } else {
           get().addLog({
             playerId: currentPlayerId,
@@ -898,6 +916,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (humanPlayer && humanPlayer.money >= 3000) {
       get().unlockAchievement('banker');
     }
+
+    // Record net worth snapshot for the wealth chart
+    get().recordNetWorth();
 
     // Auto-save after each turn
     get().saveGame();
@@ -1708,6 +1729,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         aiSpeed: state.aiSpeed,
         achievements: state.achievements,
         stats: state.stats,
+        netWorthHistory: state.netWorthHistory,
       };
       localStorage.setItem('dewan-rakyat-save', JSON.stringify(saveData));
     } catch {
@@ -1755,6 +1777,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         aiSpeed: saveData.aiSpeed || 1,
         achievements: saveData.achievements || INITIAL_ACHIEVEMENTS.map(a => ({ ...a })),
         stats: saveData.stats || { timesJailed: 0, auctionsWon: 0, highestRentPaid: 0 },
+        netWorthHistory: Array.isArray(saveData.netWorthHistory) ? saveData.netWorthHistory : [],
       });
       return true;
     } catch {
@@ -1840,10 +1863,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
     });
 
-    // If responder is AI, trigger AI evaluation after a short delay
-    if (target.isAI) {
-      setTimeout(() => get().aiTradeResponse(), 1500);
-    }
+    // NOTE: Do NOT auto-trigger aiTradeResponse here.
+    // The trade panel lets the human configure their offer first; the AI
+    // only evaluates once the human clicks "Propose Trade" (see TradePanel.handlePropose).
+    // Auto-evaluating an empty offer caused immediate "BN rejected the trade offer!" pop-ups.
   },
 
   updateTradeOffer: (offeredProperties: number[], offeredCash: number, requestedProperties: number[], requestedCash: number) => {
@@ -2025,5 +2048,30 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else {
       get().rejectTrade();
     }
+  },
+
+  toggleWealthChart: () => {
+    set(s => ({ showWealthChart: !s.showWealthChart }));
+  },
+
+  recordNetWorth: () => {
+    const state = get();
+    const netWorths: Record<string, number> = {};
+    for (const p of state.players) {
+      if (p.isBankrupt) {
+        netWorths[p.id] = 0;
+        continue;
+      }
+      const propValue = p.properties.reduce((sum, tid) => {
+        const tile = state.tiles.find(t => t.id === tid);
+        const houses = tile?.houses ?? 0;
+        return sum + (tile?.price ?? 0) + houses * (tile?.housePrice ?? 0);
+      }, 0);
+      netWorths[p.id] = p.money + propValue;
+    }
+    const turn = state.turnCount;
+    set(s => ({
+      netWorthHistory: [...s.netWorthHistory, { turn, netWorths }].slice(-60),
+    }));
   },
 }));

@@ -153,20 +153,35 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
   const netWorth = player.money + propertyValue;
 
   return (
-    <div className={`relative overflow-hidden flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
+    <div className={`relative overflow-hidden flex items-center gap-2 px-2.5 py-2 pt-2.5 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
       isCurrentTurn
         ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
         : 'border-slate-700/30 bg-slate-800/30'
     }`}>
-      {/* Wealth bar at the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-700/40">
+      {/* Wealth bar at the bottom — thicker with gradient + glow */}
+      <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-900/60">
         <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: coalition.color }}
+          className="h-full relative overflow-hidden"
+          style={{
+            background: `linear-gradient(90deg, ${coalition.color}cc, ${coalition.color})`,
+            boxShadow: `0 0 8px ${coalition.color}80, inset 0 1px 0 rgba(255,255,255,0.25)`,
+          }}
           initial={{ width: 0 }}
           animate={{ width: `${Math.min(100, (netWorth / 4000) * 100)}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-        />
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          {/* Shimmering highlight that sweeps across the bar */}
+          <motion.div
+            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            animate={{ x: ['-100%', '400%'] }}
+            transition={{ repeat: Infinity, duration: 2.4, ease: 'linear', repeatDelay: 1.2 }}
+          />
+        </motion.div>
+        {/* Tick marks every RM1000 */}
+        {[1000, 2000, 3000].map(tick => (
+          <div key={tick} className="absolute top-0 bottom-0 w-px bg-slate-950/40"
+            style={{ left: `${(tick / 4000) * 100}%` }} />
+        ))}
       </div>
       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md border border-white/10 overflow-hidden bg-white"
         style={{ boxShadow: `0 0 8px ${coalition.color}30` }}>
@@ -182,6 +197,10 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
           <span className="flex items-center gap-0.5"><Wallet className="h-2.5 w-2.5" /><span className="font-semibold text-slate-300">RM{player.money.toLocaleString()}</span></span>
           <span className="flex items-center gap-0.5" title={`Net worth: RM${netWorth.toLocaleString()}`}><Building2 className="h-2.5 w-2.5" />{player.properties.length} props</span>
           {player.hasGetOutOfJailFree && <span className="text-amber-400" title="Get Out of Jail Free">🔑</span>}
+        </div>
+        {/* Net worth label under bar (tiny) */}
+        <div className="text-[7px] text-slate-500/80 mt-0.5 font-mono">
+          NW: RM{netWorth.toLocaleString()}
         </div>
       </div>
       {isCurrentTurn && (
@@ -697,6 +716,220 @@ function AISpeedControl() {
   );
 }
 
+/* ─── Game Settings Panel (sound volume + AI speed + shortcuts help) ─── */
+function GameSettingsPanel() {
+  const [open, setOpen] = useState(false);
+  const [soundOn, toggleSound] = useSoundEnabled();
+  const aiSpeed = useGameStore(s => s.aiSpeed);
+  const setAISpeed = useGameStore(s => s.setAISpeed);
+
+  // Local volume state (synced with soundManager singleton)
+  const [volume, setVolume] = useState(soundManager.volume);
+  useEffect(() => { soundManager.volume = volume; }, [volume]);
+
+  return (
+    <div className="relative">
+      <motion.button
+        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+        onClick={() => setOpen(v => !v)}
+        className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors backdrop-blur-sm"
+        title="Game Settings"
+      >
+        <Settings className="h-4 w-4" />
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            className="absolute top-10 right-0 w-64 z-40 pointer-events-auto"
+          >
+            <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 backdrop-blur-sm">
+              <CardHeader className="p-3 pb-1.5 flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5">
+                  <Settings className="h-3.5 w-3.5" />Tetapan / Settings
+                </CardTitle>
+                <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+              </CardHeader>
+              <CardContent className="p-3 pt-1.5 space-y-3">
+                {/* Sound on/off */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-300 flex items-center gap-1.5">
+                    {soundOn ? <Volume2 className="h-3 w-3 text-cyan-400" /> : <VolumeX className="h-3 w-3 text-slate-500" />}
+                    Sound Effects
+                  </span>
+                  <button
+                    onClick={toggleSound}
+                    className={`relative w-9 h-5 rounded-full transition-colors ${soundOn ? 'bg-cyan-600' : 'bg-slate-700'}`}
+                  >
+                    <motion.div
+                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow"
+                      animate={{ left: soundOn ? '18px' : '2px' }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
+                  </button>
+                </div>
+                {/* Volume slider */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] text-slate-400">Volume</span>
+                    <span className="text-[9px] text-cyan-400 font-mono">{Math.round(volume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range" min={0} max={1} step={0.05}
+                    value={volume}
+                    onChange={e => setVolume(parseFloat(e.target.value))}
+                    className="w-full h-1.5 rounded-full appearance-none bg-slate-700 accent-cyan-500 cursor-pointer"
+                  />
+                </div>
+                {/* AI speed */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-300 flex items-center gap-1">
+                      <Gauge className="h-3 w-3" />AI Speed
+                    </span>
+                    <span className="text-[9px] text-amber-400 font-mono">{aiSpeed}× speed</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map(s => (
+                      <button key={s} onClick={() => { setAISpeed(s); soundManager.playSpeedChange(); }}
+                        className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${
+                          aiSpeed === s
+                            ? 'bg-amber-500 text-black shadow-md shadow-amber-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                        }`}>
+                        {s === 1 ? '1× Slow' : s === 2 ? '2× Med' : '3× Fast'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Quick keyboard reference */}
+                <div className="pt-2 border-t border-slate-700/30">
+                  <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-1.5">Keyboard Shortcuts</p>
+                  <div className="grid grid-cols-2 gap-1 text-[8px]">
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">Space</kbd>
+                    <span className="text-slate-500">Roll dice</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">B</kbd>
+                    <span className="text-slate-500">Buy property</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">P</kbd>
+                    <span className="text-slate-500">Pass / Skip</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">S</kbd>
+                    <span className="text-slate-500">Toggle sound</span>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">Esc</kbd>
+                    <span className="text-slate-500">Close panel</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Wealth Chart (Net Worth History) ─── */
+function WealthChart() {
+  const showWealthChart = useGameStore(s => s.showWealthChart);
+  const toggleWealthChart = useGameStore(s => s.toggleWealthChart);
+  const history = useGameStore(s => s.netWorthHistory);
+  const players = useGameStore(s => s.players);
+  const turnCount = useGameStore(s => s.turnCount);
+
+  if (!showWealthChart) return null;
+
+  // Compute chart bounds
+  const maxNW = Math.max(1500, ...history.flatMap(h => Object.values(h.netWorths)));
+  const minNW = Math.min(0, ...history.flatMap(h => Object.values(h.netWorths)));
+  const range = Math.max(100, maxNW - minNW);
+  const chartW = 240;
+  const chartH = 100;
+  const padX = 8;
+  const padY = 8;
+
+  const points = (playerId: string) => {
+    return history.map((h, i) => {
+      const x = padX + (i / Math.max(1, history.length - 1)) * (chartW - padX * 2);
+      const v = h.netWorths[playerId] ?? 0;
+      const y = chartH - padY - ((v - minNW) / range) * (chartH - padY * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -300 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -300 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="absolute top-16 right-1 z-30 w-72 pointer-events-auto"
+    >
+      <Card className="bg-slate-900/95 border-slate-600/30 shadow-2xl shadow-black/30 backdrop-blur-sm">
+        <CardHeader className="p-3 pb-2 flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />Carta Kekayaan
+          </CardTitle>
+          <button onClick={toggleWealthChart} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
+        </CardHeader>
+        <CardContent className="p-2.5 pt-0">
+          <p className="text-[8px] text-slate-500 mb-2">Net worth over time — Turn {turnCount}</p>
+          {/* SVG line chart */}
+          <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-24 bg-slate-950/40 rounded-lg border border-slate-700/30">
+            {/* Gridlines */}
+            {[0.25, 0.5, 0.75].map(t => (
+              <line key={t} x1={padX} y1={padY + t * (chartH - padY * 2)} x2={chartW - padX} y2={padY + t * (chartH - padY * 2)}
+                stroke="rgba(148,163,184,0.1)" strokeDasharray="2,3" />
+            ))}
+            {/* Lines for each player */}
+            {players.filter(p => !p.isBankrupt).map(p => {
+              const coal = COALITIONS[p.coalitionId];
+              const pts = points(p.id);
+              if (!pts) return null;
+              return (
+                <g key={p.id}>
+                  <polyline
+                    points={pts}
+                    fill="none"
+                    stroke={coal?.color || '#94a3b8'}
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    opacity="0.9"
+                  />
+                  {/* End-point dot */}
+                  {history.length > 0 && (() => {
+                    const last = history[history.length - 1];
+                    const v = last.netWorths[p.id] ?? 0;
+                    const x = chartW - padX;
+                    const y = chartH - padY - ((v - minNW) / range) * (chartH - padY * 2);
+                    return <circle cx={x} cy={y} r="2" fill={coal?.color || '#94a3b8'} />;
+                  })()}
+                </g>
+              );
+            })}
+          </svg>
+          {/* Legend */}
+          <div className="mt-2 grid grid-cols-2 gap-1">
+            {players.filter(p => !p.isBankrupt).map(p => {
+              const coal = COALITIONS[p.coalitionId];
+              const last = history[history.length - 1];
+              const nw = last ? (last.netWorths[p.id] ?? 0) : 0;
+              return (
+                <div key={p.id} className="flex items-center gap-1.5 text-[8px]">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: coal?.color }} />
+                  <span className="font-semibold truncate" style={{ color: coal?.color }}>{p.name}</span>
+                  <span className="text-slate-400 ml-auto font-mono">RM{nw.toLocaleString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 /* ─── Achievements Panel ─── */
 function AchievementsPanel() {
   const achievements = useGameStore(s => s.achievements);
@@ -1168,6 +1401,15 @@ function PropertyPortfolio() {
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+          onClick={() => useGameStore.getState().toggleWealthChart()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-emerald-600/40 text-[10px] text-emerald-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+          title="Toggle wealth chart"
+        >
+          <TrendingUp className="h-3.5 w-3.5" />
+          <span>Chart</span>
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
           onClick={togglePortfolio}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
         >
@@ -1461,6 +1703,7 @@ export default function GameDashboard() {
         <TradeButton />
         <SaveLoadButtons />
         <SoundToggleButton />
+        <GameSettingsPanel />
         <HowToPlayButton />
       </div>
       <div className="absolute top-[4.5rem] right-1.5 z-30 pointer-events-auto flex items-center gap-1.5 md:hidden">
@@ -1469,6 +1712,7 @@ export default function GameDashboard() {
         <TradeButton />
         <SaveLoadButtons />
         <SoundToggleButton />
+        <GameSettingsPanel />
         <HowToPlayButton />
       </div>
 
@@ -1743,6 +1987,7 @@ export default function GameDashboard() {
       <AIQuoteBubble />
       <TileDetail />
       <PropertyPortfolio />
+      <WealthChart />
       <TurnBanner />
       <AchievementToast />
     </div>
