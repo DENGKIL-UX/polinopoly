@@ -1790,39 +1790,44 @@ export default function GameDashboard() {
             </motion.div>
           )}
 
-          {phase === 'buying' && selectedTile && (
+          {phase === 'buying' && currentPlayer && (() => {
+            // Derive tile from current player's position (not selectedTileId).
+            // This avoids the dual pop-up issue while still showing the buying panel.
+            const buyingTile = BOARD_TILES[currentPlayer.position];
+            if (!buyingTile) return null;
+            return (
             <motion.div key="buy" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className="max-w-xs mx-auto w-full">
               <Card className="bg-slate-900/95 border-emerald-500/20 shadow-2xl shadow-black/20 backdrop-blur-sm">
                 <CardContent className="p-3.5 space-y-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xl shadow-inner"
-                      style={{ backgroundColor: selectedTile.colorGroup ? `${COLOR_GROUP_HEX[selectedTile.colorGroup]}25` : 'rgba(100,116,139,0.2)' }}>
-                      {selectedTile.type === 'highway' ? '🚂' : selectedTile.type === 'media' ? '📺' : '🏛️'}
+                      style={{ backgroundColor: buyingTile.colorGroup ? `${COLOR_GROUP_HEX[buyingTile.colorGroup]}25` : 'rgba(100,116,139,0.2)' }}>
+                      {buyingTile.type === 'highway' ? '🚂' : buyingTile.type === 'media' ? '📺' : '🏛️'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-100">{selectedTile.name}</p>
-                      <p className="text-[9px] text-slate-400 truncate">{selectedTile.description}</p>
+                      <p className="text-xs font-bold text-slate-100">{buyingTile.name}</p>
+                      <p className="text-[9px] text-slate-400 truncate">{buyingTile.description}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
-                      <span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{selectedTile.price}</span>
+                      <span className="text-slate-500">Price</span><span className="font-bold text-amber-400">RM{buyingTile.price}</span>
                     </div>
-                    {selectedTile.rent && (
+                    {buyingTile.rent && (
                       <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
-                        <span className="text-slate-500">Rent</span><span className="font-bold text-emerald-400">RM{selectedTile.rent[0]}</span>
+                        <span className="text-slate-500">Rent</span><span className="font-bold text-emerald-400">RM{buyingTile.rent[0]}</span>
                       </div>
                     )}
-                    {selectedTile.housePrice && (
+                    {buyingTile.housePrice && (
                       <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
-                        <span className="text-slate-500">Hotel</span><span className="text-blue-400">RM{selectedTile.rent[5]}</span>
+                        <span className="text-slate-500">Hotel</span><span className="text-blue-400">RM{buyingTile.rent[5]}</span>
                       </div>
                     )}
-                    {selectedTile.colorGroup && (
+                    {buyingTile.colorGroup && (
                       <div className="flex justify-between text-[10px] bg-slate-800/50 rounded px-2 py-1">
                         <span className="text-slate-500">Group</span>
-                        <span className="font-semibold" style={{ color: COLOR_GROUP_HEX[selectedTile.colorGroup] }}>{selectedTile.colorGroup}</span>
+                        <span className="font-semibold" style={{ color: COLOR_GROUP_HEX[buyingTile.colorGroup] }}>{buyingTile.colorGroup}</span>
                       </div>
                     )}
                   </div>
@@ -1837,7 +1842,8 @@ export default function GameDashboard() {
                 </CardContent>
               </Card>
             </motion.div>
-          )}
+            );
+          })()}
 
           {phase === 'paying_rent' && currentRentPayment && (
             <motion.div key="rent" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20 }}
