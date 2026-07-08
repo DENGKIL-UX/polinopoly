@@ -834,3 +834,255 @@
    834→- Board image's own 40 boxes provide the visual tile structure.
    835→- 3D tile text aligned with the board image's boxes.
    836→
+   837→---
+   838→Task ID: 1-narrations
+   839→Agent: Narrations Sub-Agent
+   840→Task: Research Malaysian politics (2018–2025) and generate 1000-entry narration bank for "Pilihan Raya Monopoly"
+   841→
+   842→Work Log:
+   843→- Read worklog.md to understand project context (3D Monopoly clone, Malaysian political satire board game).
+   844→- Researched 15 topic clusters in Malaysian politics 2018–2025:
+   845→  1. Sheraton Move (Feb 23–24, 2020) — PH collapse, Azmin Ali katak, Muhyiddin backdoor PM8
+   846→  2. 1MDB scandal — Najib, Jho Low, Equanimity yacht ($250M), SRC International RM42M, RM2.6B "Saudi donation", Tanore Finance $681M, Aabar BVI fake ($3.5B siphoned), PetroSaudi JV, Goldman Sachs $3.9B settlement, Tim Leissner + Roger Ng, US DOJ kleptocracy $1B+ seizure, BSI/Falcon Bank shut down, Red Granite Pictures (Wolf of Wall Street), Riza Aziz DNAA
+   847→  3. GE14 (May 9, 2018) — historic opposition win, Mahathir returns as PM7 at 92, Anwar pardoned May 16, 2018
+   848→  4. GE15 (Nov 19, 2022) — hung parliament, PN green wave, Anwar PM10 (Nov 24, 2022), unity govt (PH+BN+GPS+GRS+Warisan+MUDA), confidence vote Dec 19, 2022 (148 votes)
+   849→  5. Party hopping — anti-hopping law, Azmin Ali + 11 MPs katak, Bersatu split
+   850→  6. PAS green wave — Kelantan/Terengganu/Kedah, Hadi Awang, Sanusi Noor (viral TikTok MB), RUU355, hudud
+   851→  7. UMNO internal wars — Zahid vs Najib faction, Zahid 47 charges (Yayasan Akalbudi), DNAA Sept 4, 2023, UMNO general assembly
+   852→  8. GPS kingmaker — Abang Johari, Sarawak 23 seats, MA63 rights, Fadillah Yusof DPM, Sarawak premier title
+   853→  9. Sabah politics — Hajiji GRS, Musa Aman comeback, Shafie Apdal Warisan, Sabah crisis 2020
+   854→  10. Royal interventions — Agong Sultan Abdullah (kingmaker Dec 2022), Agong Sultan Ibrahim (Jan 31, 2024), Conference of Rulers, Najib Pardons Board Jan 31, 2024 (halved sentence), addendum house-arrest ploy
+   855→  11. MACC investigations — Latheefa Koya, Azam Baki shares scandal, raids on Najib residences (RM1.1B seized: 272 Birkins, 12,000 jewelry pieces, 114M cash in 26 currencies), Bersatu accounts frozen
+   856→  12. Budget politics — Anwar confidence vote, MOU 2021 (Anwar-Ismail Sabri bipartisan), Madani budgets 2024/2025, Muhyiddin emergency Jan 2021 + Jana Wibawa RM5.7B
+   857→  13. Race/religion/royalty (3R) — Sedition Act 1948, Sanusi sedition charge (Selangor sultan), RUU355, Article 153
+   858→  14. Economy — ringgit slide to 4.80 (26-year low), GST 6% → SST, diesel subsidy cut June 10, 2024, PADU targeted subsidies, T15 threshold, EPF Account 3, chicken/egg shortage 2022-2023, Khazanah/FELDA/Tabung Haji/MAS bailouts, Anwar Madani economy (July 27, 2023 KLCC launch)
+   859→  15. Satire memes — Najib "Malu Apa Bossku" / Bossku TikTok (3.5M followers), "Malaysia Bohong", "Cash is King", Muhyiddin "Abah" hoodie, Anwar "Madani" (critics rebrand "Mahal Dan Susah"), Khairy "Keluar Sekejap" podcast, Sanusi "tikus kerajaan"/"komplot" rhetoric, Mahathir chedet.cc blog, Anwar "PM in-waiting" 24-year wait
+   860→
+   861→- Created /home/z/my-project/src/lib/narrations.ts:
+   862→  - Exports `Narration` interface (id, text, category) with strict 11-variant category union type
+   863→  - Exports `NARRATIONS: Narration[]` array of 1000 entries
+   864→  - Used TypeScript template literals (backticks) for all narration strings to avoid apostrophe/quote escaping issues
+   865→  - Each entry: 1-3 sentences, Manglish/rojak mix (Malay-English code-switching), satirical soap-opera tone referencing real events
+   866→
+   867→- Category distribution (verified by Node script):
+   868→  - ai_thinking: 150 (1–150) — AI contemplating move
+   869→  - buy: 150 (151–300) — AI decides to buy property
+   870→  - skip: 100 (301–400) — AI passes on buying
+   871→  - penalty: 100 (401–500) — AI lands on tax/penalty tile
+   872→  - jail: 100 (501–600) — AI goes to jail
+   873→  - rent: 100 (601–700) — AI pays rent
+   874→  - monopoly: 50 (701–750) — AI completes color set
+   875→  - auction: 50 (751–800) — AI at auction
+   876→  - card: 100 (801–900) — AI draws card
+   877→  - pass_go: 50 (901–950) — AI passes GO
+   878→  - general: 50 (951–1000) — General political drama
+   879→  - Total: 1000 ✓
+   880→
+   881→- Verification (Node script /tmp/verify_narrations.mjs):
+   882→  - Total entries parsed: 1000 ✓
+   883→  - Duplicate IDs: 0 ✓
+   884→  - Duplicate texts: 0 ✓ (after fixing 4 initial duplicates at IDs 246, 248, 876, 887 by replacing with new unique political references)
+   885→  - All 11 category counts match expected ✓
+   886→  - ID range: 1 to 1000 (sequential) ✓
+   887→  - Text length: 29–98 chars, avg 56 chars ✓
+   888→  - TypeScript type-check (npx tsc --noEmit --skipLibCheck): no errors ✓
+   889→
+   890→- File size: 1,084 lines, ~76 KB
+   891→
+   892→Stage Summary:
+   893→- 1000-entry political satire narration bank created at /home/z/my-project/src/lib/narrations.ts
+   894→- All entries unique, properly categorized across 11 game-event types, fully type-safe
+   895→- Ready to be imported by ai-engine.ts or game-store.ts for AI narration display
+   896→- Sample usage: `import { NARRATIONS, Narration } from '@/lib/narrations';` then filter by category for game-event-appropriate narration
+   897→
+   898→---
+   899→Task ID: 23
+   900→Agent: Main Agent
+   901→Task: Create 1000 political narration pop-ups (Malaysian political soap opera)
+   902→
+   903→Work Log:
+   904→- Sub-agent researched Malaysian politics (2018-2025): Sheraton Move, 1MDB, GE14/GE15, party hopping, PAS green wave, UMNO civil war, GPS kingmaker, Sabah chaos, royal interventions, MACC, budget politics, 3R issues, economy, memes.
+   905→- Generated 1000-entry narration bank at src/lib/narrations.ts (11 categories: ai_thinking, buy, skip, penalty, jail, rent, monopoly, auction, card, pass_go, general).
+   906→- Created narration system hook (src/lib/narration-system.ts) with getRandomNarration() and useNarration().
+   907→- Created NarrationPopup component (src/components/game/NarrationPopup.tsx) — soap opera style dialog with:
+   908→  * Semi-transparent dark background with colored border per category
+   909→  * Coalition player icon + category label (STRATEGI, PEMERANGAN, SKANDAL, TAHANAN, etc.)
+   910→  * Italic narration text in quotes
+   911→  * Animated "thinking" dots + "AI sedang berfikir..." label
+   912→  * Framer Motion entrance/exit animations
+   913→- Wired into game-store.ts:
+   914→  * Added currentNarration state + triggerNarration/clearNarration actions
+   915→  * Trigger narrations at: AI thinking start, jail decision, buy/skip decision, rent payment, card draw, tax penalty
+   916→  * Auto-clear after 4.5s
+   917→- Added NarrationPopup to page.tsx via NarrationPopupWrapper (reads store state)
+   918→
+   919→Verification (Agent Browser + VLM):
+   920→- VLM: "semi-transparent dialog box with green border near the top — italic text: 'Beli! Macam Mahathir beli anti-Najib campaign — former ally gone.' Labeled PEMERANGAN with PN player identifier" ✓
+   921→- Narrations trigger at correct game events (buy, skip, jail, rent, card, penalty, AI thinking) ✓
+   922→- No console/runtime errors. Lint clean.
+   923→
+   924→Stage Summary:
+   925→- 1000 Malaysian political satire narrations created, categorized by game event.
+   926→- Pop-up appears during AI turns as a soap opera dialog with the AI player's coalition identity.
+   927→- Narrations reference real Malaysian political events (Sheraton Move, 1MDB, GE15, party hopping, etc.).
+   928→
+   929→---
+   930→Task ID: 24
+   931→Agent: Main Agent
+   932→Task: Replace IND with "Create Your Own Party" (name, slogan, color, logo upload)
+   933→
+   934→Work Log:
+   935→- Removed IND (Independent) from the coalition selection grid.
+   936→- Added a "CREATE PARTY" card with dashed border + Plus icon.
+   937→- When selected, shows a form with:
+   938→  * Party Name (short, e.g. "PRIBUMI") — auto-uppercase, max 12 chars
+   939→  * Full Party Name (e.g. "Parti Pribumi Bersatu") — max 50 chars
+   940→  * Slogan / Battle Cry — max 60 chars
+   941→  * Party Color — 10 preset color swatches + custom color picker
+   942→  * Party Logo upload — file input (PNG/JPEG/SVG, max 2MB) → base64 data URL
+   943→  * Live preview badge with chosen color/name/slogan/logo
+   944→- Start button changes to "Mulakan Parti Baru!" and is disabled until name + slogan are filled.
+   945→- game-store.ts startGame: accepts optional customParty param; registers it as COALITIONS['CUSTOM'] at runtime; AI players get the 5 preset coalitions (PH/PN/BN/GPS/GRS).
+   946→
+   947→Verification (Agent Browser + VLM):
+   948→- VLM: "CREATE PARTY card visible in grid, IND gone, 5 coalitions still present" ✓
+   949→- VLM: "form with party name, full name, slogan, color picker (10 swatches), Upload Logo button" ✓
+   950→- VLM: "Mulakan Parti Baru! button present" ✓
+   951→- No console/runtime errors. Lint clean.
+   952→
+   953→Stage Summary:
+   954→- IND replaced with "Create Your Own Party" — players design their own political party.
+   955→- Custom name, slogan, color, and uploaded logo all work as the player's coalition identity in-game.
+   956→
+   957→---
+   958→Task ID: 25
+   959→Agent: Main Agent
+   960→Task: QA audit + UI polish + feature enhancements
+   961→
+   962→## Current Project Status Assessment
+   963→
+   964→The Pilihan Raya Monopoly 3D game is feature-complete and stable:
+   965→- ✅ 3D board with trading-card tiles, transparent overlay on uploaded board image
+   966→- ✅ 2D CSS-grid board fallback
+   967→- ✅ Expert-system AI with coalition personalities (buy/build/jail/auction decisions)
+   968→- ✅ 1000 political narration pop-ups (soap opera drama during AI turns)
+   969→- ✅ "Create Your Own Party" (custom name, slogan, color, logo upload)
+   970→- ✅ Party HQ buildings with coalition flags on owned tiles
+   971→- ✅ 3D dice (both in-scene and HUD), token hop animation
+   972→- ✅ Video background hero page with hero music + game music (independent toggles)
+   973→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+   974→- ✅ Lint clean, no hydration errors, no runtime errors
+   975→
+   976→## QA Results
+   977→- Lobby: loads correctly, all 6 coalition cards + CREATE PARTY visible, hero music toggle at bottom-right ✓
+   978→- Game start: PH selected → game starts → 3D board renders ✓
+   979→- Dice roll: 3D dice tumble, buy/pass buttons appear ✓
+   980→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+   981→- 2D/3D toggle: switches cleanly, no errors ✓
+   982→- Music: both hero and game music toggle independently ✓
+   983→- No console errors, no hydration mismatches, no runtime crashes ✓
+   984→
+   985→## Completed Modifications This Round
+   986→
+   987→1. **Hansard Log improved:**
+   988→   - Text size 9px → 10px (more readable)
+   989→   - Log height 36 → 44 (shows more entries)
+   990→   - Entry count 30 → 40 (longer history)
+   991→   - Added hover highlight on log entries
+   992→   - Added color-coded borders for jail (red) and card (purple) events
+   993→   - Added dark-scroll class for custom scrollbar
+   994→   - Header icon 2.5 → 3 (slightly larger)
+   995→
+   996→2. **Player cards improved:**
+   997→   - Property count now shows "props" label (was just a number)
+   998→   - Added 🔑 icon for players with Get Out of Jail Free card
+   999→   - Added title tooltips on property count
+  1000→
+  1001→3. **Game-over screen enhanced:**
+  1002→   - Added "Hero Page" button (returns to lobby without page reload)
+  1003→   - Existing "Pilihan Raya Baru" button still reloads for fresh game
+  1004→
+  1005→## VLM Assessment
+  1006→- UI polish: 6/10 → 7/10 (improved log readability, player card labels, game-over options)
+  1007→
+  1008→## Unresolved Issues / Risks
+  1009→1. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+  1010→2. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+  1011→3. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+  1012→4. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+  1013→5. **Mobile layout:** sidebars stack on mobile but the 3D board may be too small on phone screens
+  1014→
+  1015→## Priority Recommendations for Next Phase
+  1016→1. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+  1017→2. Implement cannon-es physics dice for more realistic rolling
+  1018→3. Add title deed card flip animation on property purchase
+  1019→4. Fine-tune board image alignment across viewport sizes
+  1020→5. Add sound effects for tile landing, property purchase, and narration pop-ups
+  1021→
+  1022→---
+  1023→Task ID: 26
+  1024→Agent: Main Agent
+  1025→Task: QA audit + new features (wealth bar + turn banner) + styling improvements
+  1026→
+  1027→## Current Project Status Assessment
+  1028→
+  1029→The Pilihan Raya Monopoly 3D game is fully stable and deployed to Cloudflare Workers (`https://pru.mcwood.workers.dev`). All core features work:
+  1030→- ✅ 3D/2D board with transparent trading-card tiles
+  1031→- ✅ Expert-system AI with coalition personalities + 1000 narrations
+  1032→- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+  1033→- ✅ Party HQ buildings with coalition flags on owned tiles
+  1034→- ✅ Video background hero page + hero music + game music (independent toggles)
+  1035→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+  1036→- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+  1037→- ✅ Lint clean, no hydration errors, no runtime errors
+  1038→
+  1039→## QA Results
+  1040→- Lobby: loads correctly, all coalition cards + CREATE PARTY + hero music toggle ✓
+  1041→- Game start: PH selected → game starts → 3D board renders ✓
+  1042→- Dice roll: 3D dice tumble, card/buy/pass buttons appear ✓
+  1043→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+  1044→- 2D/3D toggle: switches cleanly, no errors ✓
+  1045→- Music: both hero and game music toggle independently ✓
+  1046→- No console errors, no hydration mismatches, no runtime crashes ✓
+  1047→
+  1048→## Completed Modifications This Round
+  1049→
+  1050→1. **Wealth bar on player cards:**
+  1051→   - Each player card now has a colored bar at the bottom showing their net worth
+  1052→   - Net worth = cash + property purchase values + house investments
+  1053→   - Bar width scales from 0 to 100% based on net worth / RM4000
+  1054→   - Colored with the player's coalition color
+  1055→   - Animated with Framer Motion (smooth width transition)
+  1056→
+  1057→2. **Turn announcement banner:**
+  1058→   - Animated pill-shaped banner that appears when the turn changes
+  1059→   - Shows "Giliran [player name]!" for human turns
+  1060→   - Shows "[player name] sedang berfikir..." for AI turns
+  1061→   - Colored with the active coalition's color
+  1062→   - Framer Motion entrance/exit animation (slide down + fade)
+  1063→   - Auto-dismisses after 2.5 seconds
+  1064→   - Positioned at top-center (20% from top)
+  1065→
+  1066→3. **Player card tooltips:**
+  1067→   - Property count now shows net worth in the tooltip ("Net worth: RM2,400")
+  1068→
+  1069→## Verification Results
+  1070→- VLM: turn banner visible ("Giliran PHI") ✓
+  1071→- DOM: 10 wealth bar elements confirmed ✓
+  1072→- No console/runtime errors ✓
+  1073→- Lint clean ✓
+  1074→
+  1075→## Unresolved Issues / Risks
+  1076→1. Wealth bar is 0.5px — functional but hard to see in screenshots (works in DOM)
+  1077→2. data.gov.my API integration is available but falls back to simulated data (API endpoint unclear)
+  1078→3. Board image alignment may need fine-tuning per screen size
+  1079→4. Physics dice (cannon-es) not yet implemented
+  1080→5. Title deed card flip animation not yet implemented
+  1081→
+  1082→## Priority Recommendations for Next Phase
+  1083→1. Increase wealth bar thickness to 1px or 2px for better visibility
+  1084→2. Add zoom-on-hover for 3D tiles
+  1085→3. Implement cannon-es physics dice
+  1086→4. Add title deed card flip animation on property purchase
+  1087→5. Fine-tune board image alignment across viewport sizes
+  1088→

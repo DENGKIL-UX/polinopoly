@@ -1,0 +1,1826 @@
+     1→# Polinopoly 3D Conversion — Work Log
+     2→
+     3→This file tracks all agent work for converting the polinopoly 2D Monopoly clone into a full 3D game.
+     4→
+     5→---
+     6→Task ID: 0
+     7→Agent: Main Agent
+     8→Task: Clone polinopoly, research 3D elements, bring game into project, enhance to full 3D
+     9→
+    10→Work Log:
+    11→- Cloned https://github.com/DENGKIL-UX/polinopoly to /tmp/polinopoly
+    12→- Analyzed repo: already has 3D components (Board3D, Token3D, GameScene) but page.tsx uses the 2D GameBoard
+    13→- Researched 3D Monopoly elements from: Unity-Monopoly (3D dice + browser play), itaylayzer/Monopoly (board rotation/scaling, property nav), Three.js integration patterns
+    14→- Copied game files into /home/z/my-project: src/lib/{game-data,game-store,sound-effects,strict-mode-fix}.ts, src/components/game/{LobbyScreen,GameBoard,GameDashboard,Board3D,Token3D,GameScene}.tsx
+    15→- Installed deps: three@0.185, @react-three/fiber@9.6, @react-three/drei@10.7, @types/three, gsap
+    16→- Appended custom CSS animations (shimmer, pulse-glow, sparkle-float, lobby-gradient, corner-glow, dice-shake, etc.) to globals.css
+    17→
+    18→Stage Summary:
+    19→- Repo cloned and analyzed. Game logic (Zustand store, 40 Malaysian political-satire tiles, 6 coalitions) is complete.
+    20→- 3D scaffolding exists but needs enhancement: 3D dice, token movement animation, camera focus controls, tile click interactions, environment polish.
+    21→- Next: wire 3D scene as primary board + build the researched 3D enhancements.
+    22→
+    23→---
+    24→Task ID: 0 (continuation)
+    25→Agent: Main Agent
+    26→Task: Build & verify the 3D enhancements
+    27→
+    28→Work Log:
+    29→- Wrote src/app/page.tsx: 3D GameScene as primary board + floating 2D/3D toggle (persisted to localStorage). LobbyScreen shown when phase==='lobby'.
+    30→- Created src/components/game/Dice3D.tsx: Two 3D dice (RoundedBox + sphere pips on all 6 faces) with tumbling physics — spins on a random axis while rolling, then slerps to the target face rotation showing the rolled value. Glowing disc beneath. (Unity-Monopoly inspired)
+    31→- Rewrote src/components/game/Token3D.tsx: Added tile-to-tile hopping movement. Tracks previous position; on change builds a forward path (wrapping 0-39) and animates through each intermediate tile with a sin-arc hop (HOP_HEIGHT=0.9, 0.22s/tile). Token faces travel direction; shadow shrinks at apex. (itaylayzer/Monopoly inspired)
+    32→- Enhanced src/components/game/Board3D.tsx: Tiles now clickable (selectTile) with hover lift + emissive glow + pointer cursor. CornerTile and EdgeTile both lift ~0.2 on hover/select.
+    33→- Rewrote src/components/game/GameScene.tsx: Added CameraRig (lerps OrbitControls target to active player / selected tile), ContactShadows, Environment(night), Stars, dark reflective Ground, coalition-coloured rim spotlights, onPointerMissed deselect.
+    34→- Fixed CSS duplication in globals.css (stray @apply from append).
+    35→- Fixed lint error (setState-in-effect) via lazy useState initializer for view preference.
+    36→
+    37→Verification (Agent Browser):
+    38→- Lobby renders: "DEWAN RAKYAT" title + 6 coalition cards (PH/PN/BN/GPS/GRS/IND) + start button. ✓
+    39→- Selected PH → started game → 3D scene renders (188KB screenshot). ✓
+    40→- Clicked "Baling Dadu" → 3D dice tumbled, token hopped along path, turn advanced to "Akhir Giliran". ✓
+    41→- 2D toggle works (69KB CSS-grid board), toggled back to 3D cleanly. ✓
+    42→- No console errors (only harmless THREE.Clock / PCFSoftShadowMap deprecation warnings). ✓
+    43→- Lint clean. Dev log shows only 200 responses after CSS fix.
+    44→
+    45→Stage Summary:
+    46→- Polinopoly 2D clone successfully converted to a full 3D game.
+    47→- 3D enhancements delivered: tumbling 3D dice, hopping token movement, camera focus rig, clickable/hoverable 3D tiles, contact shadows, environment lighting, ground plane, starfield.
+    48→- Game is fully playable end-to-end in 3D with a 2D fallback toggle.
+    49→
+    50→---
+    51→Task ID: 1
+    52→Agent: Main Agent
+    53→Task: Replace emoji emblems with official coalition logos + Jalur Gemilang flag
+    54→
+    55→Work Log:
+    56→- Researched & downloaded official logos from Wikimedia Commons via the Commons API:
+    57→  - PN: Logo_Perikatan_Nasional.svg
+    58→  - BN: Barisan_Nasional.png (resized 500x336 -> 400x269)
+    59→  - PH: Pakatan_Harapan_Logo.svg
+    60→  - GPS: Logo_GPS.png (resized 5120x2880 -> 400x225, 4.7MB -> 39KB)
+    61→  - GRS: Gabungan_Rakyat_Sabah_logo.svg
+    62→  - Jalur Gemilang: Flag_of_Malaysia.svg
+    63→  All saved to /public/logos/ and verified accessible (HTTP 200).
+    64→- Added `logo: string` field to the Coalition interface in game-data.ts (with emoji kept as fallback).
+    65→- Created reusable CoalitionLogo component (src/components/game/CoalitionLogo.tsx) that renders the official logo <img> with graceful emoji fallback on error.
+    66→- Updated LobbyScreen: coalition cards now show official logos in circular white-backed badges; added two animated Jalur Gemilang flags flanking the title.
+    67→- Updated GameDashboard: all 7 player-avatar spots (player cards, AI thinking bubble, tile owner, auction bidders, trade list, game-over standings) now use CoalitionLogo instead of avatarEmoji.
+    68→- Updated 2D GameBoard: center coalition emblem row + on-tile player tokens + owner indicators now render real logos.
+    69→- Updated 3D Board3D: added FlagMesh component (textured waving Jalur Gemilang on a gold pole) at two inner corners; wrapped in Suspense.
+    70→- Updated 3D Token3D: tokens now display a billboarded coalition logo disc above each piece (TokenLogo component using useTexture + Billboard) instead of emoji text.
+    71→
+    72→Verification (Agent Browser):
+    73→- Lobby: all 6 coalition logos + 2 Jalur Gemilang flags render (410KB screenshot). ✓
+    74→- 3D game: tokens show billboarded logos, flags wave on board. ✓
+    75→- 2D game: 20 logo images rendered across tiles/center/owner indicators. ✓
+    76→- Dice roll + token movement with logos works. ✓
+    77→- No console/runtime errors. Lint clean. All /logos/* return 200.
+    78→
+    79→Stage Summary:
+    80→- Emoji placeholders replaced with real, researched official coalition logos and the national flag (Jalur Gemilang).
+    81→- Logos appear consistently across lobby, 2D board, 3D board, 3D tokens, and all dashboard panels.
+    82→
+    83→---
+    84→Task ID: 2
+    85→Agent: Main Agent
+    86→Task: Fix tokens moving outside the 3D board, enlarge board, disable rotation, make tile text readable
+    87→
+    88→Work Log:
+    89→- Analyzed user screenshot with VLM: confirmed (1) text labels unreadable, (2) board ~40-50% of viewport, (3) tiles/tokens hanging off the felt edge.
+    90→- Root-caused the "token outside board" bug: SingleToken's inner groupRef was being set to ABSOLUTE tile coords (pos.x, pos.z) while nested inside a parent group already translated to [tilePos + offset]. Result: world position = 2*tilePos + offset → tokens rendered ~2× off the board.
+    91→- Research applied (itaylayzer/Monopoly board-scaling + elena-pan/Unity-Monopoly crisp-text/camera practices): enlarge playing surface, top-down camera, bigger outlined text.
+    92→
+    93→Fixes:
+    94→1. Token3D.tsx — Fixed double-translation bug:
+    95→   - Removed the parent group's [tilePos+offset] translation (now origin).
+    96→   - SingleToken now owns its full world position: idle lerps to (tilePos + offset), hop path interpolates (fromPos→toPos + offset). Offset passed as a prop.
+    97→   - Tokens now sit exactly on their tiles and hop along the board edge, never off-board.
+    98→2. Board3D.tsx — Enlarged board so tiles & tokens stay ON the felt:
+    99→   - Added FELT_MARGIN = 3.2; felt now BOARD_SIZE + 6.4 = 26.4 wide (was 20.4), giving a 3.2-unit margin around the 20-wide tile loop.
+   100→   - Tiles enlarged: EDGE_W 1.7→1.9, EDGE_D 0.85→1.1, CORNER 2.0→2.3, TILE_H 0.15→0.18.
+   101→   - Frame enlarged: FRAME_W 1.0→1.2, FRAME_H 0.45→0.5; shadow bounds ±18→±24.
+   102→3. Board3D.tsx — Made tile text readable:
+   103→   - Tile name fontSize 0.14→0.26 with white outline (0.018).
+   104→   - Sub-label 0.09→0.16 with outline.
+   105→   - Price 0.17→0.32 with amber outline.
+   106→   - Corner name 0.22→0.30, icon 0.5→0.6, sub 0.13→0.17, all with outlines.
+   107→4. GameScene.tsx — Camera & rotation:
+   108→   - autoRotate: true → false (user: "no need to rotate").
+   109→   - Camera position [20,24,20]→[13,33,13]: nearly top-down (polar ~21°) so flat tile text isn't foreshortened.
+   110→   - fov 46→42, zoom limits tightened (16–48).
+   111→   - CameraRig: now keeps target centered on (0,0,0) by default so all 40 tiles stay visible; only pulls focus when a tile is explicitly selected.
+   112→
+   113→Verification (Agent Browser + VLM):
+   114→- Lobby → start game → 3D board renders. ✓
+   115→- VLM: "player tokens are on the green board (no floating off edges)". ✓
+   116→- VLM: "text labels on board tiles are readable" (RM prices legible), readability 7/10 (was "not readable"). ✓
+   117→- VLM: "board is large in the viewport". ✓
+   118→- VLM: "view is more top-down (looking down at the board)". ✓
+   119→- Dice roll: tokens stay ON the board throughout the hop animation. ✓
+   120→- No console/runtime errors. Lint clean.
+   121→
+   122→Stage Summary:
+   123→- Token-outside-board bug fixed (double-translation root cause).
+   124→- Board enlarged with felt margin so all tiles/tokens sit on the playing surface.
+   125→- Auto-rotate disabled; static top-down readable camera.
+   126→- Tile text (names, prices, sub-labels) now readable via bigger fonts + outlines + top-down angle.
+   127→
+   128→---
+   129→Task ID: 3
+   130→Agent: Main Agent
+   131→Task: Fix AI turns stalling; add chess-like expert-system AI decision engine with surprising elements
+   132→
+   133→Work Log:
+   134→- Analyzed stuck-game screenshot with VLM: PH was active but no "AI thinking" indicator — AI turns weren't firing after the human's turn.
+   135→- Root-caused the stall: aiTurn used FIXED `await delay(1500)` after rollDice, but the rollDice→movePlayer→handleLanding pipeline takes 800+1500=2300ms. The AI checked `phase==='buying'` at 1500ms while phase was still 'moving' (handleLanding hadn't fired), so it skipped the buy branch, and the final `if (phase==='landed'||'playing')` was false → endTurn() never called → game frozen.
+   136→- SECOND bug: handleLanding had DUPLICATE AI-buy logic (lines 447-506) that called /api/ai-decision (which 404s) and fell back to random, racing with aiTurn's own buy logic. The AI branch never set phase='buying' (only the human branch did), so aiTurn's buying check never matched for AI players.
+   137→- Researched GitHub Monopoly AI (intrepidcoder, itaylayzer, AniketSanghi): cash-multiple buy heuristic, greedy-ROI house building, expert-system rules, simple positional eval function.
+   138→
+   139→Fixes implemented:
+   140→
+   141→1. NEW MODULE: src/lib/ai-engine.ts — chess-like expert-system AI:
+   142→   - evaluatePosition(): positional score = cash (diminishing) + property equity + monopoly bonus + jail penalty − opponent-threat. Lets the AI compare decision branches.
+   143→   - decideBuy(): 8-rule expert system — cash buffer, cash-multiple affordability, color-group completion (+80), block-opponent-monopoly (+35), ROI ratio, highway/media count-scaling, dark-blue federal-power bonus, inflation hedge, coalition-personality aggression + random variance. Returns shouldBuy + human-readable reason.
+   144→   - decideBuild(): greedy ROI on completed monopolies, even-build rule enforced, dark-blue/green prioritised, aggressive coalitions build more.
+   145→   - decideJail(): use Get-Out-Of-Jail card if held; early game with few props = wait; late game with monopolies = pay bail; affordability check.
+   146→   - decideAuctionBid(): max-bid = price × (0.8 + personality), 50% premium to complete a monopoly, surprise over-bid 20% of the time.
+   147→   - getCoalitionPersonality(): 6 coalition profiles (PH cautious, PN aggressive, BN steady, GPS opportunistic, GRS unpredictable, IND chaotic) with aggressionBonus, buildAggression, variance — creates surprising, non-deterministic, flavourful plays.
+   148→
+   149→2. game-store.ts — rewrote aiTurn with PHASE-POLLING waits:
+   150→   - Replaced fragile fixed delays with waitForPhase(targets, timeout, interval=150ms) that polls until the phase matches. No more desync with the 2.3s move pipeline or the token-hop animation.
+   151→   - Structured 8-step flow: jail decision → roll → wait-for-landing → buy (expert) → pay rent → draw card (with recursive buy/rent handling) → auction wait → build houses (expert) → end turn.
+   152→   - Safety net: if final phase isn't terminal, endTurn() is called anyway so the game can never stall.
+   153→   - Removed duplicate AI-buy logic from handleLanding — AI players now land in 'buying' phase just like humans, and aiTurn's expert system decides buy-vs-skip. This eliminated the /api/ai-decision 404 path entirely.
+   154→   - aiAuctionTurn upgraded to use decideAuctionBid() expert function.
+   155→   - buildAIContext() helper assembles the AIContext (player + tiles + opponents + market + turn) for the engine.
+   156→
+   157→Verification (Agent Browser + VLM):
+   158→- Started game as GRS (user's scenario). Rolled dice, bought property, ended turn. ✓
+   159→- Turn advanced to PH → "AI sedang berfikir..." indicator showed. ✓
+   160→- Waited 40s: turn progressed PH → PN → BN → GPS → IND (all 5 AI players completed turns). ✓
+   161→- Waited 20s more: turn cycled back to GRS (human), "Baling Dadu!" button reappeared. ✓
+   162→- VLM read Hansard log: "T1 IND: Buy (affordable, high-roi, first-in-type, score 56)" — the expert system's reasoning is logged with rule factors + score. ✓
+   163→- IND: RM1500→RM1300, 1 property (bought); GRS: bought Amanah RM100. ✓
+   164→- No console/runtime errors. Lint clean.
+   165→
+   166→Stage Summary:
+   167→- AI turn-stall bug fixed (root cause: fixed delays desynced from move pipeline + duplicate AI-buy logic in handleLanding).
+   168→- Chess-like expert-system AI engine added: 8-rule buy decisions, greedy-ROI house building, positional evaluation, jail strategy, auction bidding — all with coalition personalities for surprising plays.
+   169→- AI decisions are explainable: each move logs the rule factors and a score (e.g. "Buy (completes-monopoly, high-roi, score 92)").
+   170→- Game now plays continuously: human rolls → all 5 AI players auto-take turns → returns to human. No stalls.
+   171→
+   172→---
+   173→Task ID: 4
+   174→Agent: Main Agent
+   175→Task: Fix 2D board dimensions so all 40 boxes/tiles are visible
+   176→
+   177→Work Log:
+   178→- Analyzed user screenshot with VLM: 2D board was heavily cropped — only left column partially visible, right column and corners cut off, board off-center.
+   179→- Root cause: GameBoard.tsx sized the board with `w-[min(82vh,92vw)]` (the SMALLER of vh/vw), but on a wide desktop screen 92vw ≈ 1177px while the available space between the dashboard sidebars (left w-44=176px + right w-52=208px) is only ~880px. The board overflowed behind the sidebars, clipping the left/right columns. Also positioned at top-[46%] (not centered) and Framer Motion's transform overrode the translate(-50%,-50%), shifting the board right.
+   180→
+   181→Fixes (GameBoard.tsx):
+   182→- Separated centering from animation: wrapped the motion.div in a static centering div with `position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)` so Framer Motion's scale/rotateX can't break the centering.
+   183→- Desktop sizing via media query: `width: min(70vh, calc(100vw - 32rem))` — reserves 32rem (512px) for the two sidebars + margins, capped by 70vh for top/bottom bars. Board now fits cleanly between sidebars.
+   184→- Mobile sizing: `min(92vw, 70vh)` — leaves room for the top dice bar and bottom action bar.
+   185→- Board is now vertically centered (top:50%) instead of top:46%.
+   186→
+   187→Verification (Agent Browser + VLM):
+   188→- Desktop 1280×860: board measures 602×602, left=236 right=838 — fits between left sidebar (ends 180) and right sidebar (starts 1068) with clear margins. VLM confirms: "all 4 corners visible, 9 tiles per side, clean unclipped square, centered between sidebars." ✓
+   189→- Grid has all 41 children (40 tiles + center area). ✓
+   190→- Mobile 390×844: board 359px wide, fits viewport width. ✓
+   191→- No console/runtime errors. Lint clean.
+   192→
+   193→Stage Summary:
+   194→- 2D board now properly sized and centered: all 40 tiles (9 per side + 4 corners) fully visible on desktop, not clipped by sidebars.
+   195→- Centering bug fixed (Framer Motion transform no longer overrides translate(-50%,-50%)).
+   196→- Responsive: desktop reserves sidebar space via calc(); mobile reserves top/bottom bar space.
+   197→
+   198→---
+   199→Task ID: 5
+   200→Agent: Main Agent
+   201→Task: Fix 2D board — tiles rendering off-board, corners not visible, text chopped
+   202→
+   203→Work Log:
+   204→- Analyzed user screenshot with VLM: board shifted up, right column and bottom row cut off, only 1 corner visible, text truncated.
+   205→- Measured the grid in the browser: grid CONTAINER was at (428, 132, 424×424) but its CHILDREN (tiles) were at coordinates like (1139, 1032) — completely outside the grid! The grid columns summed to ~834px while the container was only 424px.
+   206→- Root cause: CSS grid `1fr` overflow bug. `1fr` is actually `minmax(auto, 1fr)`, meaning columns won't shrink below their content's intrinsic minimum size. Tile content (text, icons, prices) had minimum widths that forced the 9 edge columns to grow far beyond the container, causing tiles to render outside the visible board area and the `overflow: hidden` to clip them.
+   207→
+   208→Fix (GameBoard.tsx):
+   209→- Changed `gridTemplateColumns: '1.6fr repeat(9, 1fr) 1.6fr'` → `'minmax(0, 1.6fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.6fr)'`. The `minmax(0, 1fr)` allows columns to shrink to 0 if needed, keeping all tiles within the grid container. Same fix for rows.
+   210→- Added `minWidth: 0; minHeight: 0; overflow: hidden` to each tile wrapper div to reinforce that tiles must not force the grid to grow.
+   211→- Increased board size from 60vh to 72vh (desktop) / 64vh to 68vh (mobile) now that the overflow bug is fixed and the board can safely use more space.
+   212→- Kept the flexbox centering + paddingTop/paddingBottom for dashboard bars.
+   213→
+   214→Verification (Agent Browser + VLM):
+   215→- Grid columns now measure: 56, 35, 35, ... 35, 56 (total 427px ≈ 424px container). ✓
+   216→- At 1280×720: VLM confirms "ALL 4 corners visible, ALL 40 tiles visible, clean square not cut off." ✓
+   217→- At 1536×860: VLM confirms "all 4 corners, 9 tiles per side, full board visible and not cut off." ✓
+   218→- No console/runtime errors. Lint clean.
+   219→
+   220→Stage Summary:
+   221→- Root cause was the CSS grid `1fr` overflow bug (1fr = minmax(auto, 1fr), content min-width forced columns to grow beyond container).
+   222→- Fixed with `minmax(0, 1fr)` which allows columns to shrink, keeping all 40 tiles within the board.
+   223→- Board now renders as a proper square with all 40 tiles + 4 corners visible at all viewport sizes.
+   224→
+   225→---
+   226→Task ID: 6
+   227→Agent: Main Agent
+   228→Task: Enhance 3D board with extruded tiles, shaders, particles, Parliament, post-processing
+   229→
+   230→Work Log:
+   231→- Researched GitHub 3D game enhancement ideas: threejs-game-skills (PBR/extrusion), three.quarks (particles), SirNeural/monopoly (3D Monopoly reference), post-processing (bloom/SSAO/vignette).
+   232→- Installed @react-three/postprocessing for cinematic post-FX.
+   233→
+   234→Enhancements implemented:
+   235→
+   236→1. EXTRUDED 3D TILES (Board3D.tsx):
+   237→   - Per-type extrusion heights: property 1.4×, highway 2.0×, media 1.3×, tax 1.6×, chest/chance 1.2× (was all flat TILE_H).
+   238→   - Per-type materials: highway metalness 0.8, tax metalness 0.9, property roughness 0.25 with clearcoat feel.
+   239→   - All tiles use RoundedBox with bevel radius for premium look.
+   240→   - Hover lift + tilt-toward-camera (tiles physically lean toward the viewer).
+   241→
+   242→2. SHADER MATERIALS for premium corners (Shader3D.tsx):
+   243→   - GO/Start corner: scrolling Jalur Gemilang flag pattern shader (14 stripes + blue canton + crescent + star, UV scrolling).
+   244→   - Tax corners (Istana, SPR): shimmering gold shader with fresnel rim glow.
+   245→   - Jail corner: iridescent holographic shader (fresnel-based color shift as camera moves).
+   246→   - All shaders animated via useShaderAnimation hook (uTime uniform).
+   247→
+   248→3. 3D MINIATURES on tiles (Shader3D.tsx):
+   249→   - Highway tiles: tiny 3D train (body + chimney + wheels, metallic).
+   250→   - Tax tiles: gold coin stack (3 cylinders, gold metalness 0.9, emissive).
+   251→   - Chest/Chance tiles: card stack (3 offset cards).
+   252→   - Media tiles: TV monitor (dark body + emissive blue screen).
+   253→
+   254→4. 3D PARLIAMENT BUILDING (Parliament3D.tsx):
+   255→   - Low-poly Malaysian Parliament in center: octagonal drum + 16 columns + blue dome with 12 gold ribs + spire + gold finial.
+   256→   - Slowly rotates. Pulses with light when a Jawatan Menteri / card tile is landed on (watches game log).
+   257→   - Vertical light beam from the dome (additive blending).
+   258→   - "DEWAN RAKYAT" label on the base. Decorative gold ring on ground.
+   259→   - Replaces the empty center area.
+   260→
+   261→5. PARTICLE EFFECTS (Particle3D.tsx):
+   262→   - Custom lightweight particle system (InstancedMesh, avoids three.quarks bundle overhead).
+   263→   - 4 effect types: confetti (plane particles, rotating), sparks (additive spheres), smoke (rising spheres), claim (upward burst).
+   264→   - LandingEffects component watches player positions; spawns effect burst + shockwave ring + light beam when a player lands.
+   265→   - Per-tile-type effect colors (property=coalition color, highway=sparks, tax=gold, jail=smoke, etc.).
+   266→   - Shockwave: expanding ring on the tile surface (800ms).
+   267→   - LightBeam: vertical additive-blended cylinder (3 units tall, pulsing).
+   268→
+   269→6. POST-PROCESSING (GameScene.tsx):
+   270→   - EffectComposer with Bloom (intensity 0.85, mipmapBlur, threshold 0.35) — gold/neon/particles glow.
+   271→   - Vignette (darkness 0.65) — draws eye to center.
+   272→   - ACES Filmic tone mapping — cinematic color.
+   273→   - SSAO removed (required heavy NormalPass; ContactShadows already provides ground depth).
+   274→   - Canvas gl: ACESFilmicToneMapping + exposure 1.1.
+   275→
+   276→Verification (Agent Browser + VLM):
+   277→- Game starts, 3D board renders with all enhancements. ✓
+   278→- VLM: "tiles are 3D extruded with visible depth and raised surfaces" ✓
+   279→- VLM: "3D Parliament-like structure in center with domed roof, blue globe, white columns" ✓
+   280→- VLM: "3D miniatures present — trains, coin stacks" ✓
+   281→- VLM: "bloom/glow effect enhances gold and bright elements" ✓
+   282→- VLM: "shader effects on corners — flag pattern, gold shimmer, iridescent" ✓
+   283→- VLM: "overall visual quality 8/10, significantly more premium and cinematic than a flat board" ✓
+   284→- No console/runtime errors. Lint clean.
+   285→
+   286→Stage Summary:
+   287→- 3D board transformed from flat colored tiles to premium extruded 3D objects with per-type materials.
+   288→- 4 shader materials (flag scroll, gold shimmer, iridescent, standard) for visual variety.
+   289→- 5 types of 3D miniatures (train, coin stack, card stack, monitor, keris) on special tiles.
+   290→- 3D Parliament building replaces empty center, rotates and pulses on card events.
+   291→- Particle system (confetti/sparks/smoke) + shockwave + light beam on every landing.
+   292→- Bloom + vignette + ACES tone mapping for cinematic post-processing.
+   293→
+   294→---
+   295→Task ID: 7
+   296→Agent: Main Agent
+   297→Task: Merge the 3D edition into the GitHub main branch
+   298→
+   299→Work Log:
+   300→- Discovered origin/main (08569cd) and the 3D work (ea8c25a, on 3d-edition) had NO common history — they evolved from different root commits. A normal PR/merge failed with "no history in common".
+   301→- Remote main had its own valuable 10-commit history: trade system, AI house building, market sim, keyboard shortcuts, hydration fixes, VLM testing worklog.
+   302→- Merged origin/main into local main with `git merge --allow-unrelated-histories -X ours`:
+   303→  * Preserves BOTH histories in the commit graph (merge commit 07939bb has two parents: 3D work + polinopoly 2D dev)
+   304→  * `-X ours` keeps the 3D-enhanced code as canonical for game files (Board3D, GameScene, Token3D, Dice3D, ai-engine, Parliament3D, Particle3D, Shader3D, CoalitionLogo, game-store, game-data, GameDashboard, GameBoard, LobbyScreen, page.tsx) since it is the more recently verified + enhanced codebase
+   305→  * Brought in 13 remote-only files: API routes (action, ai-decision, full-page), mini-services (game-server, static-server), screenshots, serve.mjs, the upload design doc
+   306→- Pushed merged main to GitHub — clean fast-forward push (08569cd..07939bb), no force needed since origin/main was an ancestor of the merge commit.
+   307→
+   308→Verification (GitHub API):
+   309→- main HEAD = 07939bb "Merge origin/main (polinopoly 2D dev) into 3D edition"
+   310→- main:/src/components/game/ now contains all 3D files: Board3D, CoalitionLogo, Dice3D, GameBoard, GameDashboard, GameScene, LobbyScreen, Parliament3D, Particle3D, Shader3D, Token3D
+   311→- Lint clean, compiles (HTTP 200)
+   312→
+   313→Stage Summary:
+   314→- GitHub main now has the full 3D Polinopoly game (default branch).
+   315→- Both development lineages unified under one merge commit.
+   316→- 3d-edition branch is fully merged into main (can be deleted as cleanup if desired).
+   317→
+   318→---
+   319→Task ID: 9
+   320→Agent: Main Agent
+   321→Task: Revert classic Monopoly changes; fix 3D lighting so tile text is readable
+   322→
+   323→Work Log:
+   324→- User feedback: classic Monopoly additions (white border, red trim, diamond logo) looked uglier; 3D lighting made tile text unreadable.
+   325→- Reverted commit 90cdf55 (classic Monopoly aesthetics) via `git revert --no-edit`. Back to the pre-classic-look state (ea8c25a style).
+   326→- VLM confirmed the lighting problems: bloom washout on bright tiles, harsh shadows, uneven illumination from colored spot lights + overhead point light.
+   327→
+   328→Lighting fixes (GameScene.tsx):
+   329→- Ambient light: 0.42 -> 0.85 (much brighter base so shadows aren't harsh)
+   330→- Key directional light: 1.15 -> 0.6 (softer, less glare)
+   331→- Removed the overhead pointLight (was causing central hotspot/bloom)
+   332→- Removed the two colored spotLights (amber + emerald) that caused color washout
+   333→- Bloom: intensity 0.85 -> 0.35, luminanceThreshold 0.35 -> 0.7 (only brightest emissives glow, not tile text)
+   334→- Vignette: darkness 0.65 -> 0.5 (less edge darkening)
+   335→- Tone mapping exposure: 1.1 -> 0.95 (slightly less bright overall)
+   336→
+   337→Tile material fixes (Board3D.tsx):
+   338→- roughness floored at 0.6 (matte, no glossy reflections)
+   339→- metalness capped at 0.3 (no mirror-like glare)
+   340→- emissive hover/select intensity halved (0.5/0.32 -> 0.2/0.12) to avoid washout on interaction
+   341→
+   342→Text size fixes (Board3D.tsx):
+   343→- Tile name fontSize: 0.26 -> 0.34 (bigger)
+   344→- Sub-label: 0.16 -> 0.2
+   345→- Price: 0.32 -> 0.42 (much bigger)
+   346→- All outlines thickened (0.018/0.012/0.018 -> 0.024/0.016/0.024) for contrast
+   347→
+   348→Verification (Agent Browser + VLM):
+   349→- VLM: "lighting is balanced — not harsh, not dark" ✓
+   350→- VLM: "no bloom or glare washing out text" ✓
+   351→- VLM: "board looks clean and professional — no ugly elements" ✓
+   352→- Nearest tiles readable when focused on ✓
+   353→- No console/runtime errors. Lint clean.
+   354→
+   355→Stage Summary:
+   356→- Classic Monopoly additions reverted (back to the cleaner pre-classic look).
+   357→- 3D lighting rebalanced: bright ambient + soft directional, no colored spots, minimal bloom.
+   358→- Tile text enlarged + matte materials so text stays crisp.
+   359→- Board now looks clean (not ugly) and text is readable without glare.
+   360→
+   361→---
+   362→Task ID: 10
+   363→Agent: Main Agent
+   364→Task: Enhance board with classic Monopoly geometry — flat tiles, outer color bars, ownership flags, smaller Parliament
+   365→
+   366→Work Log:
+   367→- Researched user's detailed 10-point Monopoly design analysis. Prioritized #1 (tile proportions), #9 (shrink center), #6 (ownership flags).
+   368→- Identified root problem: tiles were extruded tall (1.4×-2.0× TILE_H) making them look like raised blocks, not flat Monopoly tiles. Color strip was on the center-facing side (wrong). 3D miniatures added clutter.
+   369→
+   370→Changes implemented:
+   371→
+   372→1. FLAT TILES (Board3D.tsx — #1 priority):
+   373→   - All tile types now use the same thin height (TILE_H = 0.18) instead of 1.4×-2.0× extrusion.
+   374→   - Removed per-type height variation; tiles are flat rectangles like real Monopoly.
+   375→   - Matte materials (roughness 0.6, metalness 0.1) — no glossy glare.
+   376→
+   377→2. COLOR BAR ON OUTER EDGE (Board3D.tsx — #1 priority):
+   378→   - Moved the property color strip from the center-facing side to the OUTER edge (outX/outZ direction) — classic Monopoly position.
+   379→   - Enlarged to 28% of tile depth (stripDepth = EDGE_D * 0.28).
+   380→   - This is the instant "Monopoly recognition" cue.
+   381→
+   382→3. CLASSIC TEXT LAYOUT (Board3D.tsx):
+   383→   - Color bar on outer edge, name in center, price on INNER side (toward board center).
+   384→   - Price moved from +outX (outer) to -outX (inner) — classic Monopoly layout.
+   385→
+   386→4. REMOVED 3D MINIATURES (Board3D.tsx):
+   387→   - Removed TileTrain, TileCoinStack, TileCardStack, TileMonitor from tiles.
+   388→   - Classic Monopoly tiles are clean flat rectangles — miniatures added clutter.
+   389→
+   390→5. SHRUNK PARLIAMENT (Parliament3D.tsx — #9 priority):
+   391→   - Scale 1.0 → 0.45 — center is now a decorative monument, not a dominant structure.
+   392→   - Board center has negative space like real Monopoly.
+   393→
+   394→6. OWNERSHIP FLAG POLES (Board3D.tsx — #6 priority):
+   395→   - Replaced the owner indicator sphere with a classic flag-on-pole:
+   396→     * Silver pole (cylinder, metalness 0.7)
+   397→     * Coalition-colored flag (quad, DoubleSide, emissive)
+   398→     * Gold finial on top (sphere, metalness 0.9)
+   399→   - Positioned at the inner corner of the tile.
+   400→   - Only appears on owned tiles — instant ownership feedback.
+   401→
+   402→Verification (Agent Browser + VLM):
+   403→- VLM: "tiles appear flat (no tall extrusions)" ✓
+   404→- VLM: "color bars visible on the outer edge of property tiles" ✓
+   405→- VLM: "center Parliament is smaller/less dominant" ✓
+   406→- VLM: "tile names and prices are readable" ✓
+   407→- VLM: "flag on a pole visible on the purchased property" ✓
+   408→- VLM: "board looks clean and Monopoly-like — 8/10" ✓
+   409→- VLM: "text is readable, not washed out" ✓
+   410→- No console/runtime errors. Lint clean.
+   411→
+   412→Stage Summary:
+   413→- Tiles rebuilt as flat narrow rectangles with color bars on the outer edge — instant Monopoly recognition.
+   414→- Center Parliament shrunk to 45% — correct spatial hierarchy.
+   415→- Ownership flag poles added — classic Monopoly visual feedback.
+   416→- 3D miniatures removed — cleaner classic look.
+   417→- VLM-rated 8/10 Monopoly-like (up from 6/10).
+   418→
+   419→---
+   420→Task ID: 11
+   421→Agent: Main Agent
+   422→Task: Convert 40 tiles to flat 2D-style panels; classic Monopoly colors; readable text
+   423→
+   424→Work Log:
+   425→- User feedback: tiles should be 2D (flat), easy to read, with classic Monopoly colors while keeping Malaysian political theme.
+   426→
+   427→Changes implemented:
+   428→
+   429→1. CLASSIC MONOPOLY COLOR PALETTE (game-data.ts):
+   430→   - Updated COLOR_GROUP_HEX to authentic classic Monopoly hues (muted, not bright Tailwind):
+   431→     brown #8b5a3c, lightblue #a8d8ea, pink #d4458f, orange #f0833a,
+   432→     red #d62828, yellow #f5d020, green #1d8c4d, darkblue #1b4d8e.
+   433→   - Coalition mapping preserved (IND/PH/PN/BN/GPS/GRS).
+   434→
+   435→2. FLAT 2D-STYLE TILES (Board3D.tsx EdgeTile):
+   436→   - Replaced RoundedBox (3D extruded box) with a flat planeGeometry lying on the felt.
+   437→   - Tile body is now a thin flat panel rotated [-PI/2, 0, pos.rotation] — like a printed Monopoly tile.
+   438→   - Color strip converted to a flat plane on the outer edge (no more 3D box strip).
+   439→   - textY changed from tileH+0.01 to 0.03 (flat on felt).
+   440→   - Hover lift reduced (0.3 → 0.08) and tilt-toward-camera removed so tiles stay flat & readable.
+   441→   - House indicators and flag poles repositioned to flat surface (y=0.02-0.06).
+   442→
+   443→3. FLAT CORNERS (Board3D.tsx CornerTile):
+   444→   - Same flat plane treatment for all 4 corners (was extruded 2.2× TILE_H).
+   445→   - Corner text repositioned to flat surface (y=0.04).
+   446→   - Hover tilt removed; flat lift only.
+   447→
+   448→4. READABILITY:
+   449→   - Tile name fontSize 0.34, price 0.42 (large, with white/amber outlines).
+   450→   - Matte materials (roughness 0.65, metalness 0.05) — no glare.
+   451→   - Flat panels eliminate perspective foreshortening from tall extrusion.
+   452→
+   453→Verification (Agent Browser + VLM):
+   454→- VLM: "tiles are now flat 2D-style panels lying on the felt (no 3D raised boxes)" ✓
+   455→- VLM: "color bars on outer edges use classic Monopoly colors (brown, light blue, pink, orange, red, yellow, green, dark blue)" ✓
+   456→- VLM: "tile names and prices are readable (e.g. 'Jalan Ampang', 'RM1,500')" ✓
+   457→- VLM: "board is clean and readable — not washed out, not ugly" ✓
+   458→- VLM: "8/10 Monopoly-like + readable" ✓
+   459→- No console/runtime errors. Lint clean.
+   460→
+   461→Stage Summary:
+   462→- 40 tiles converted from 3D extruded boxes to flat 2D-style panels on the felt.
+   463→- Classic Monopoly color palette applied (muted authentic hues, coalition mapping preserved).
+   464→- Text large and readable; flat panels eliminate foreshortening.
+   465→- VLM-rated 8/10 for Monopoly-likeness + readability.
+   466→
+   467→---
+   468→Task ID: 12
+   469→Agent: Main Agent
+   470→Task: Fix inverted 3D text on tiles (top row upside down, left/right mirrored)
+   471→
+   472→Work Log:
+   473→- User reported text on some 3D tiles is inverted (cannot be read).
+   474→- VLM confirmed: top row text upside down, left column mirrored, right column mirrored. Root cause: text rotation `[-Math.PI/2, pos.rotation, 0]` applied the tile's facing rotation (pos.rotation) which is correct for the tile MESH but inverts the TEXT when viewed from outside the board on 3 of the 4 sides.
+   475→- Classic Monopoly convention: text on all 4 sides reads from OUTSIDE the board (you stand outside and read inward). Each side needs a different rotation.
+   476→
+   477→Fix (Board3D.tsx):
+   478→- Added textRotationForTile(id) helper that returns the correct Euler rotation per side:
+   479→  * Bottom row (1-9):   [-PI/2, 0, 0]        — reads left-to-right facing south
+   480→  * Left col (11-19):   [-PI/2, PI/2, 0]     — faces east (left viewer)
+   481→  * Top row (21-29):    [-PI/2, PI, 0]       — flip 180° so readable from top
+   482→  * Right col (31-39):  [-PI/2, -PI/2, 0]    — faces west (right viewer)
+   483→- Applied to all 7 text elements: corner icon/name/sub-label, edge tile name/sub-label/price.
+   484→
+   485→Verification (Agent Browser + VLM):
+   486→- VLM: "top row text readable (not upside down)" ✓
+   487→- VLM: "left column readable (not mirrored)" ✓
+   488→- VLM: "right column readable (not mirrored)" ✓
+   489→- VLM: "bottom row readable" ✓
+   490→- VLM: "all 4 sides readable from outside the board — 9/10" ✓
+   491→- No console/runtime errors. Lint clean.
+   492→
+   493→Stage Summary:
+   494→- All 40 tiles' text now reads correctly from outside the board (classic Monopoly convention).
+   495→- Top row no longer upside down; left/right columns no longer mirrored.
+   496→- VLM-rated 9/10 text orientation correctness.
+   497→
+   498→---
+   499→Task ID: 13
+   500→Agent: Main Agent
+   501→Task: Fix remaining inverted text — bottom row was still upside down
+   502→
+   503→Work Log:
+   504→- User reported text STILL inverted. VLM confirmed: bottom row (tiles 1-9) text was rotated 180° (upside down), e.g. "B1aiiws0" instead of readable text.
+   505→- Root cause: my previous fix used X-rotation -PI/2 which orients text face-DOWN (into the felt). For the bottom row, the text faced away from the viewer → appeared upside down.
+   506→- Fix: switched to +PI/2 X-rotation (text faces UP toward camera) and moved the directional orientation to the Z-axis:
+   507→  * Bottom row (1-9):   [PI/2, 0, PI]       — faces south, reads left-to-right
+   508→  * Left col (11-19):   [PI/2, 0, PI/2]     — faces west
+   509→  * Top row (21-29):    [PI/2, 0, 0]        — faces north
+   510→  * Right col (31-39):  [PI/2, 0, -PI/2]    — faces east
+   511→
+   512→Verification (Agent Browser + VLM):
+   513→- VLM: "bottom row text readable (not upside down)" ✓
+   514→- VLM: "top row text readable" ✓
+   515→- VLM: "left column readable (not mirrored)" ✓
+   516→- VLM: "right column readable (not mirrored)" ✓
+   517→- VLM: can read RM prices — RM1,500, RM2,000, RM2,500, RM3,000, RM3,500, RM4,000 ✓
+   518→- VLM: "9/10 text orientation" ✓
+   519→- No console/runtime errors. Lint clean.
+   520→
+   521→Stage Summary:
+   522→- All 40 tiles' text now reads correctly from outside the board on ALL 4 sides.
+   523→- Bottom row (the previously broken side) now reads correctly.
+   524→- VLM-rated 9/10.
+   525→
+   526→---
+   527→Task ID: 14
+   528→Agent: Main Agent
+   529→Task: Fix all-inverted text — unify text direction for single-camera view
+   530→
+   531→Work Log:
+   532→- User reported ALL text inverted again. Root cause identified: I was trying to orient text "outward" for each of the 4 sides (classic Monopoly 4-player convention), but with a SINGLE fixed camera at the southeast diagonal, only 2 sides can ever read correctly — the other 2 are always upside down. Each attempt to fix one side broke another.
+   533→- Solution: For a DIGITAL game with one camera, ALL tile text must face the SAME direction (toward the camera), not 4 different outward directions. This is the standard approach for digital board game adaptations.
+   534→
+   535→Fix (Board3D.tsx):
+   536→- Simplified textRotationForTile() to return [-Math.PI/2, 0, 0] for ALL tiles.
+   537→  * -PI/2 X-rotation: lays text flat on the felt, facing up.
+   538→  * Y=0: top of text points north (-Z, away from south camera).
+   539→  * Result: all text reads left-to-right with top-away, like reading a book on a table from the south side.
+   540→- Removed the per-side Y-rotation logic that was causing 2 sides to always be inverted.
+   541→
+   542→Verification (Agent Browser + VLM):
+   543→- VLM: "bottom edge readable" ✓
+   544→- VLM: "top edge readable" ✓
+   545→- VLM: "left edge readable" ✓
+   546→- VLM: "right edge readable" ✓
+   547→- VLM: can read RM prices — RM1,500, RM1,200, RM1,000, RM900, RM750, RM600, RM500, RM400, RM300, RM200 ✓
+   548→- VLM: "8/10 text readability" ✓
+   549→- No console/runtime errors. Lint clean.
+   550→
+   551→Stage Summary:
+   552→- All 40 tiles' text now faces the same direction (toward the camera) — all 4 sides readable simultaneously.
+   553→- Abandoned the classic 4-direction outward orientation (impossible with a single camera).
+   554→- VLM-rated 8/10 readability.
+   555→
+   556→---
+   557→Task ID: 15
+   558→Agent: Main Agent
+   559→Task: Transform tiles into Hearthstone-style trading cards (from uploaded reference files)
+   560→
+   561→Work Log:
+   562→- Read the 3 uploaded reference files: pilihan_raya_cards.json (40-card schema), CardBoard.js (Three.js engine), index.html (demo harness).
+   563→- Extracted key patterns: ExtrudeGeometry rounded-rect cards, CanvasTexture face generation, card back with Jalur Gemilang pattern, card state machine (UNOWNED/OWNED/MONOPOLY/MORTGAGED), cawangan/markas houses, flag poles, center card decks.
+   564→- Adapted these into the existing React/R3F board (rather than replacing the whole engine, to preserve the working game logic).
+   565→
+   566→Changes implemented:
+   567→
+   568→1. NEW MODULE: src/components/game/CardTexture.ts
+   569→   - generateCardFaceTexture(tile): draws each tile as a trading-card face on a 512×896 canvas (1:1.75 ratio). Layout: dark base → color-group frame border → art panel with description → type bar (HAK MILIK/INFRASTRUKTUR/CUKAI/etc.) → rarity gem (diamond) → card name → rent text box (Kosong/1-4 Cawangan/Markas with RM prices) → price (bottom-right gold) → mortgage value (bottom-left) → party affinity badge (top-left circle with coalition ID).
+   570→   - generateCardBackTexture(): Jalur Gemilang 14-stripe pattern + dark overlay + gold border + "PILIHAN RAYA" center text.
+   571→   - createCardGeometry(): rounded-rectangle ExtrudeGeometry (Shape with quadraticCurveTo corners, bevel enabled) — NOT BoxGeometry.
+   572→
+   573→2. Board3D.tsx — EdgeTile rewritten as trading cards:
+   574→   - Each tile is a thick ExtrudeGeometry card (1.7 × 1.0 × 0.08) with 6 material groups: 4 edges (dark clearcoat) + front face (canvas texture) + back face (Jalur Gemilang).
+   575→   - Card back faces UP when unowned; card flips (Y-rotation π) to show face when owned.
+   576→   - Card lies flat with per-side Z-rotation (pos.rotation) so the long edge aligns with the board perimeter.
+   577→   - Cawangan (houses): small party-colored cubes; Markas (hotel): cylinder with party color.
+   578→   - Flag pole on owned tiles (silver pole + party-colored flag + gold finial).
+   579→
+   580→3. Board3D.tsx — CornerTile rewritten as mythic cards:
+   581→   - Same thick ExtrudeGeometry card treatment, always showing face (corners are mythic rarity).
+   582→   - Removed old shader-material references (useFlagScrollMaterial etc.) that caused a runtime error.
+   583→
+   584→4. Parliament3D.tsx — shrunk to 25% (was 45%) — decorative token, not dominant.
+   585→
+   586→5. Board3D.tsx — added CardDeck component + 2 center decks:
+   587→   - Kad Nasib (Chance): orange card stack at 10 o'clock (-3.5, 0.02, 3.5).
+   588→   - Kad SPR (Community Chest): blue card stack at 2 o'clock (3.5, 0.02, 3.5).
+   589→   - Each deck: 8 stacked cards with slight random rotation, gold rim on top, floating breathe animation, label text.
+   590→
+   591→6. Copied pilihan_raya_cards.json to /public for reference.
+   592→
+   593→Verification (Agent Browser + VLM):
+   594→- Game loads, no runtime errors. ✓
+   595→- Flag poles visible on owned tiles after purchase. ✓
+   596→- Cards render as thick 3D objects (not flat planes). ✓
+   597→- Card backs (Jalur Gemilang) on unowned tiles; card faces flip up on owned. ✓
+   598→- Center has Kad Nasib + Kad SPR card decks. ✓
+   599→- Parliament shrunken to decorative size. ✓
+   600→- Lint clean.
+   601→
+   602→Stage Summary:
+   603→- All 40 tiles transformed into thick trading cards with canvas-generated faces.
+   604→- Card state machine: UNOWNED (back up) → OWNED (flip to face + flag pole) → cawangan/markas houses.
+   605→- Center redesigned: shrunken Parliament + Kad Nasib + Kad SPR card decks.
+   606→- Malaysian political theme preserved (coalition badges, Jalur Gemilang card backs, party-colored houses/flags).
+   607→
+   608→---
+   609→Task ID: 16
+   610→Agent: Main Agent
+   611→Task: Create a video-background landing page merged with the coalition chooser
+   612→
+   613→Work Log:
+   614→- Uploaded video: Malaysian_election_Monopoly_board_202607052052.mp4 (2.8MB, 10s, 1280x720 H.264).
+   615→- Copied to /public/hero-bg.mp4 — serves at HTTP 200, 2.8MB.
+   616→- Researched the user's Next.js landing page suggestion (video background hero pattern from thatanjan repo + Xora section layout). Adapted the pattern to merge with the existing LobbyScreen coalition chooser rather than creating a separate page (so the video hero flows directly into the game).
+   617→
+   618→Changes implemented (LobbyScreen.tsx):
+   619→- Replaced the static gradient background + animation with a full-viewport <video> element:
+   620→  * autoPlay, muted, loop, playsInline, preload="metadata", aria-hidden
+   621→  * absolute inset-0 z-0, object-cover object-center
+   622→  * sources /hero-bg.mp4 (the uploaded Malaysian election Monopoly clip)
+   623→- Added a dark gradient overlay (z-1) for text contrast: from-slate-950/85 via-[#0a1628]/80 to-emerald-950/85 — keeps the political theme while letting the video show through.
+   624→- Kept the radial-dot pattern, ambient glow blobs, and floating particles (bumped to z-1/z-2 with higher opacity since they now layer over video).
+   625→- Bumped z-index of all lobby content (header z-10, coalition cards z-10, rules z-10, footer z-10) so they sit above the video + overlay.
+   626→- Updated version footer to "v3.0 — DENGKIL-UX · Pilihan Raya Edition".
+   627→
+   628→Merge approach: the video IS the lobby background. The existing coalition chooser (6 party cards), title (DEWAN RAKYAT + Jalur Gemilang flags), start button, rules, and footer all render on top of the video. Selecting a coalition and clicking "Mulakan Pilihan Raya!" starts the game as before — no separate landing page needed, the video enhances the existing entry point.
+   629→
+   630→Verification (Agent Browser + VLM):
+   631→- Video serves at /hero-bg.mp4 (HTTP 200, 2.8MB). ✓
+   632→- VLM: "video playing in the background (visible as a moving game board scene)" ✓
+   633→- VLM: "DEWAN RAKYAT title prominently displayed, flanked by Jalur Gemilang flags" ✓
+   634→- VLM: "all 6 coalition cards visible with their logos (PH, PN, BN, GPS, GRS, IND)" ✓
+   635→- VLM: "text readable over the video — dark overlay + high-contrast colors" ✓
+   636→- VLM: "Mulakan Pilihan Raya! start button present" ✓
+   637→- VLM: "8/10 visual appeal — cohesive and visually striking" ✓
+   638→- Game starts correctly from the landing page (coalition select → 3D game). ✓
+   639→- No console/runtime errors. Lint clean.
+   640→
+   641→Stage Summary:
+   642→- Landing page now uses the uploaded Malaysian election Monopoly video as a full-viewport background hero.
+   643→- Video merges seamlessly with the existing coalition chooser — no separate page, the video enhances the lobby.
+   644→- Dark overlay + high-contrast text keep everything readable.
+   645→- VLM-rated 8/10 visual appeal.
+   646→
+   647→---
+   648→Task ID: 17
+   649→Agent: Main Agent
+   650→Task: Fix 3D dice not visible, black card faces, cards not looking like trading cards
+   651→
+   652→Work Log:
+   653→- User reported 3 issues: (1) dice above Baling Dadu not real 3D, (2) card text invisible (black), (3) cards don't look like trading cards.
+   654→- VLM confirmed: dice were flat UI elements (dashboard DiceDisplay with unicode ⚀⚁), 3D Dice3D was too small/far; cards were black because ExtrudeGeometry material groups weren't mapping correctly.
+   655→
+   656→Fixes:
+   657→
+   658→1. 3D DICE (Dice3D.tsx):
+   659→   - Increased DICE_SIZE from 0.85 → 1.4 (64% bigger).
+   660→   - Increased PIP_RADIUS from 0.07 → 0.12.
+   661→   - Lowered dice tray position from [0, 2.6, 0] → [0, 1.8, 0] (closer to board).
+   662→   - Widened dice spacing from ±0.7 → ±1.1.
+   663→   - Enlarged glow disc from 2.4 → 3.2 radius.
+   664→   - VLM: "3D dice clearly visible as white cubes with black pips — 9/10"
+   665→
+   666→2. CARD FACES BLACK → COLORFUL (CardTexture.ts + Board3D.tsx):
+   667→   - Root cause: ExtrudeGeometry material group indices didn't map to front/back faces correctly; canvas texture wasn't uploading to GPU.
+   668→   - Switched from ExtrudeGeometry to a simpler approach: thin box for thickness + flat plane on top with the face texture.
+   669→   - Used meshBasicMaterial (not Standard) for the face plane so the texture shows at full brightness regardless of lighting.
+   670→   - Added texture.flipY = true, texture.needsUpdate = true, texture.source.data = canvas to force GPU upload.
+   671→   - VLM: "tiles are colorful with visible text — vibrant colors, readable names/prices"
+   672→
+   673→3. TRADING CARD LOOK (Board3D.tsx):
+   674→   - Card = thin dark box (thickness) + textured plane on top showing the full trading-card face (color frame, art panel, type bar, rarity gem, name, rent table, price, mortgage, party badge).
+   675→   - VLM: "3D glossy trading-card appearance with bold contrasting text"
+   676→
+   677→Verification (Agent Browser + VLM):
+   678→- VLM: "tiles are colorful with visible text (not black)" ✓
+   679→- VLM: "3D dice clearly visible as physical cubes with pips" ✓
+   680→- VLM: "trading-card aesthetic with 3D glossy appearance" ✓
+   681→- No console/runtime errors. Lint clean.
+   682→
+   683→Stage Summary:
+   684→- 3D dice enlarged and repositioned — clearly visible as physical 3D objects.
+   685→- Card faces now render colorful canvas textures (was black) — property names, RM prices, rent tables all readable.
+   686→- Cards look like trading cards: thick box base + glossy textured face on top.
+   687→
+   688→---
+   689→Task ID: 18
+   690→Agent: Main Agent
+   691→Task: Fix the flat dice above Baling Dadu button — make them real 3D dice
+   692→
+   693→Work Log:
+   694→- User clarified: the dice ABOVE the "Baling Dadu!" button (in the GameDashboard UI) were flat 2D unicode symbols (⚀⚁⚂⚃⚄⚅), not 3D dice. The VLM confirmed: "flat 2D placeholder or icon representations rather than actual 3D dice."
+   695→- The 3D Dice3D in the Three.js scene (center of board) was already fixed, but the user was referring to the HUD dice above the roll button.
+   696→
+   697→Fix (GameDashboard.tsx DiceDisplay component):
+   698→- Replaced the flat unicode die (DICE_FACES[value]) with a CSS 3D dice face:
+   699→  * White rounded-cube face with linear-gradient (145deg white→slate) + inset highlights + drop shadow for a physical 3D look.
+   700→  * Black pip dots positioned via PIP_LAYOUT (percentage coordinates per die value 1-6) with radial-gradient (dark center) + inset shadow for depth.
+   701→  * Rolling animation: 3D rotateX + rotateY tumbling (0→720°) + scale bounce, using Framer Motion with preserve-3d transformStyle.
+   702→  * Perspective container (200px) so the 3D rotation has depth.
+   703→- Added PIP_LAYOUT constant with proper pip positions for values 1-6.
+   704→
+   705→Verification (Agent Browser + VLM):
+   706→- VLM: "3D-looking dice above the Baling Dadu button — physical 3D dice, not flat icons. Pip dots clearly visible. White rounded-cube shaped with black pip dots." ✓
+   707→- VLM: "dice exhibit 3D tumbling — rotation and perspective, dynamic movement" ✓
+   708→- No console/runtime errors. Lint clean.
+   709→
+   710→Stage Summary:
+   711→- The dice above the "Baling Dadu!" button are now real 3D-looking dice with pip dots and tumbling animation (was flat unicode symbols).
+   712→
+   713→---
+   714→Task ID: 19
+   715→Agent: Main Agent
+   716→Task: Fill the green board area with the uploaded Malaysian political Monopoly board image
+   717→
+   718→Work Log:
+   719→- User uploaded a full Malaysian political Monopoly board image (Monopoly_board_Malaysian_politic…_2K_202607052148.jpeg, 2048×2048, 2.7MB).
+   720→- VLM confirmed: the image is a themed Monopoly board with Malaysian election imagery (SPR building, ballot boxes, state names, political symbols) — suitable as a board surface texture.
+   721→- Optimized the image to 683KB (quality 85) and copied to /public/board-surface.jpg — serves at HTTP 200.
+   722→
+   723→Changes (Board3D.tsx BoardBase):
+   724→- Loaded the uploaded image as a texture via useTexture('/board-surface.jpg').
+   725→- Added a flat plane (planeGeometry, feltSize × feltSize) on top of the felt box, rotated -π/2 to lie flat, with meshBasicMaterial + the board texture (toneMapped=false so it shows at full brightness).
+   726→- Removed the old "Inner felt accent" (darker center patch) — the uploaded image replaces it.
+   727→- Wrapped BoardBase in <Suspense> since useTexture suspends.
+   728→
+   729→Verification (Agent Browser + VLM):
+   730→- Image serves at /board-surface.jpg (HTTP 200, 683KB). ✓
+   731→- VLM: "center/inside of the board is now showing the uploaded Malaysian political Monopoly board image — SPR building, ballot boxes, state names, political symbols" ✓
+   732→- VLM: "no longer a plain green felt — colorful, detailed illustration fills the playing surface" ✓
+   733→- No console/runtime errors. Lint clean.
+   734→
+   735→Stage Summary:
+   736→- The green board area is now filled with the uploaded Malaysian political Monopoly board image.
+   737→- The uploaded art (SPR building, ballot boxes, state names, election imagery) replaces the plain green felt.
+   738→
+   739→---
+   740→Task ID: 20
+   741→Agent: Main Agent
+   742→Task: Fill green area with new uploaded board image + make 40 cards transparent/see-through
+   743→
+   744→Work Log:
+   745→- User uploaded a new board image (Monopoly_board_Malaysian_politic…_2K_202607052210.jpeg, 2.3MB, 2048x2048).
+   746→- VLM confirmed: Malaysian political Monopoly board with Parliament building, ballot boxes, state names, diamond center — suitable for board surface.
+   747→- Copied to /public/board-surface.jpg (optimized to 606KB), replacing the previous board image.
+   748→
+   749→Transparency changes (CardTexture.ts):
+   750→- generateCardFaceTexture: replaced dark '#0a0a0a' base fill with clearRect (transparent canvas).
+   751→- Art panel: replaced dark '#1a1a2e' fill with semi-transparent group-color gradient (groupHex+'30' → groupHex+'10').
+   752→- Text boxes: replaced '#2a2a3e' with 'rgba(20,20,35,0.65)' (65% opacity).
+   753→- generateCardBackTexture: replaced dark '#0a0a1a' base with clearRect; Jalur Gemilang stripes now semi-transparent (rgba 0.5/0.4); dark overlay reduced from 0.72 to 0.35.
+   754→
+   755→Material changes (Board3D.tsx):
+   756→- Card box base: added transparent opacity={0.15} depthWrite={false} (was opaque dark).
+   757→- Card face plane: added transparent opacity={0.9} depthWrite={false} (was fully opaque).
+   758→- Applied to both EdgeTile and CornerTile.
+   759→
+   760→Verification (Agent Browser + VLM):
+   761→- VLM: "40 perimeter tiles are transparent/see-through" ✓
+   762→- VLM: "Malaysian political board image (building, diamond pattern, colors) visible through the tiles" ✓
+   763→- VLM: "text on tiles remains readable, though slightly muted by transparency" ✓
+   764→- VLM: "semi-transparent — board artwork shows through while tile text/colors remain legible" ✓
+   765→- No console/runtime errors. Lint clean.
+   766→
+   767→Stage Summary:
+   768→- Green board area filled with the new uploaded Malaysian political Monopoly image.
+   769→- All 40 card tiles are now transparent/see-through — the board artwork shows through them.
+   770→- Tile text (names, prices, rent tables) remains readable via semi-transparent canvas textures.
+   771→
+   772→---
+   773→Task ID: 21
+   774→Agent: Main Agent
+   775→Task: Remove shadow outlines from transparent tiles
+   776→
+   777→Work Log:
+   778→- User reported visible shadow outlines of the 40 tiles despite transparency.
+   779→- Root cause: card meshes had castShadow + receiveShadow, producing visible shadow outlines on the board surface even though the card materials were transparent.
+   780→
+   781→Fix (Board3D.tsx — both CornerTile and EdgeTile):
+   782→- Removed castShadow and receiveShadow from card base box meshes.
+   783→- Removed receiveShadow from card face plane meshes.
+   784→- Reduced card box base opacity from 0.15 → 0.05 (nearly invisible edge box).
+   785→- Kept face plane opacity at 0.85 (text still readable).
+   786→
+   787→Verification (Agent Browser + VLM):
+   788→- VLM: "no visible shadow outlines or dark edges around the 40 tiles" ✓
+   789→- VLM: "board artwork clearly visible through transparent tiles without shadow obscuring" ✓
+   790→- VLM: "text on tiles still fully readable — sharp and unobstructed" ✓
+   791→- VLM: "clean and polished — tiles blend seamlessly into the background artwork" ✓
+   792→- No console/runtime errors. Lint clean.
+   793→
+   794→Stage Summary:
+   795→- Shadow outlines removed from all 40 transparent tiles.
+   796→- Board artwork now shows through cleanly with no shadow artifacts.
+   797→
+   798→---
+   799→Task ID: 22
+   800→Agent: Main Agent
+   801→Task: Remove all remaining tile outlines + align tiles with board image boxes
+   802→
+   803→Work Log:
+   804→- User reported still seeing outlines of the 40 tiles. Root cause: the canvas card texture still drew colored backgrounds (frame border, art panel gradient, type bar, text boxes) that created visible outlines/backgrounds on each tile.
+   805→
+   806→Changes:
+   807→
+   808→1. CardTexture.ts — removed ALL background fills:
+   809→   - Removed frame border (strokeRect in color-group color) — was the main outline.
+   810→   - Removed art panel gradient fill (groupHex+'30' → groupHex+'10') — was a visible colored rectangle.
+   811→   - Removed type bar background fill (TYPE_COLORS fillRect) — was a colored bar.
+   812→   - Set all text box backgrounds to rgba(20,20,35,0.0) — fully transparent.
+   813→   - Removed gold border from card back texture (strokeRect #D4AF37).
+   814→   - Canvas now draws ONLY: text (names, prices, rent), rarity gem, party badge — no backgrounds.
+   815→
+   816→2. Board3D.tsx — card box base completely invisible:
+   817→   - Changed opacity from 0.05 → 0.0 + visible={false} (both CornerTile + EdgeTile).
+   818→   - Card box no longer renders at all — only the face texture plane (transparent canvas with text).
+   819→
+   820→3. Board image alignment:
+   821→   - Scaled the board image plane to imagePlaneSize = BOARD_SIZE / 0.88 ≈ 22.7 (was feltSize = 26.4).
+   822→   - The uploaded image's tile loop occupies ~88% of the image; scaling the plane so its tile loop matches the 3D tile loop (BOARD_SIZE = 20).
+   823→   - VLM: "3D tile text positions align precisely with the board's 40 boxes."
+   824→
+   825→Verification (Agent Browser + VLM):
+   826→- VLM: "board artwork clearly visible — central logo, buildings, thematic details" ✓
+   827→- VLM: "text on tiles is legible — property names, prices, icons" ✓
+   828→- VLM: "3D tile text positions align precisely with the board's 40 boxes" ✓
+   829→- The "outlines" now visible are the board IMAGE's own drawn tiles (desired), not 3D mesh outlines.
+   830→- No console/runtime errors. Lint clean.
+   831→
+   832→Stage Summary:
+   833→- All 3D tile outlines/backgrounds removed — cards are now just transparent text overlays.
+   834→- Board image's own 40 boxes provide the visual tile structure.
+   835→- 3D tile text aligned with the board image's boxes.
+   836→
+   837→---
+   838→Task ID: 1-narrations
+   839→Agent: Narrations Sub-Agent
+   840→Task: Research Malaysian politics (2018–2025) and generate 1000-entry narration bank for "Pilihan Raya Monopoly"
+   841→
+   842→Work Log:
+   843→- Read worklog.md to understand project context (3D Monopoly clone, Malaysian political satire board game).
+   844→- Researched 15 topic clusters in Malaysian politics 2018–2025:
+   845→  1. Sheraton Move (Feb 23–24, 2020) — PH collapse, Azmin Ali katak, Muhyiddin backdoor PM8
+   846→  2. 1MDB scandal — Najib, Jho Low, Equanimity yacht ($250M), SRC International RM42M, RM2.6B "Saudi donation", Tanore Finance $681M, Aabar BVI fake ($3.5B siphoned), PetroSaudi JV, Goldman Sachs $3.9B settlement, Tim Leissner + Roger Ng, US DOJ kleptocracy $1B+ seizure, BSI/Falcon Bank shut down, Red Granite Pictures (Wolf of Wall Street), Riza Aziz DNAA
+   847→  3. GE14 (May 9, 2018) — historic opposition win, Mahathir returns as PM7 at 92, Anwar pardoned May 16, 2018
+   848→  4. GE15 (Nov 19, 2022) — hung parliament, PN green wave, Anwar PM10 (Nov 24, 2022), unity govt (PH+BN+GPS+GRS+Warisan+MUDA), confidence vote Dec 19, 2022 (148 votes)
+   849→  5. Party hopping — anti-hopping law, Azmin Ali + 11 MPs katak, Bersatu split
+   850→  6. PAS green wave — Kelantan/Terengganu/Kedah, Hadi Awang, Sanusi Noor (viral TikTok MB), RUU355, hudud
+   851→  7. UMNO internal wars — Zahid vs Najib faction, Zahid 47 charges (Yayasan Akalbudi), DNAA Sept 4, 2023, UMNO general assembly
+   852→  8. GPS kingmaker — Abang Johari, Sarawak 23 seats, MA63 rights, Fadillah Yusof DPM, Sarawak premier title
+   853→  9. Sabah politics — Hajiji GRS, Musa Aman comeback, Shafie Apdal Warisan, Sabah crisis 2020
+   854→  10. Royal interventions — Agong Sultan Abdullah (kingmaker Dec 2022), Agong Sultan Ibrahim (Jan 31, 2024), Conference of Rulers, Najib Pardons Board Jan 31, 2024 (halved sentence), addendum house-arrest ploy
+   855→  11. MACC investigations — Latheefa Koya, Azam Baki shares scandal, raids on Najib residences (RM1.1B seized: 272 Birkins, 12,000 jewelry pieces, 114M cash in 26 currencies), Bersatu accounts frozen
+   856→  12. Budget politics — Anwar confidence vote, MOU 2021 (Anwar-Ismail Sabri bipartisan), Madani budgets 2024/2025, Muhyiddin emergency Jan 2021 + Jana Wibawa RM5.7B
+   857→  13. Race/religion/royalty (3R) — Sedition Act 1948, Sanusi sedition charge (Selangor sultan), RUU355, Article 153
+   858→  14. Economy — ringgit slide to 4.80 (26-year low), GST 6% → SST, diesel subsidy cut June 10, 2024, PADU targeted subsidies, T15 threshold, EPF Account 3, chicken/egg shortage 2022-2023, Khazanah/FELDA/Tabung Haji/MAS bailouts, Anwar Madani economy (July 27, 2023 KLCC launch)
+   859→  15. Satire memes — Najib "Malu Apa Bossku" / Bossku TikTok (3.5M followers), "Malaysia Bohong", "Cash is King", Muhyiddin "Abah" hoodie, Anwar "Madani" (critics rebrand "Mahal Dan Susah"), Khairy "Keluar Sekejap" podcast, Sanusi "tikus kerajaan"/"komplot" rhetoric, Mahathir chedet.cc blog, Anwar "PM in-waiting" 24-year wait
+   860→
+   861→- Created /home/z/my-project/src/lib/narrations.ts:
+   862→  - Exports `Narration` interface (id, text, category) with strict 11-variant category union type
+   863→  - Exports `NARRATIONS: Narration[]` array of 1000 entries
+   864→  - Used TypeScript template literals (backticks) for all narration strings to avoid apostrophe/quote escaping issues
+   865→  - Each entry: 1-3 sentences, Manglish/rojak mix (Malay-English code-switching), satirical soap-opera tone referencing real events
+   866→
+   867→- Category distribution (verified by Node script):
+   868→  - ai_thinking: 150 (1–150) — AI contemplating move
+   869→  - buy: 150 (151–300) — AI decides to buy property
+   870→  - skip: 100 (301–400) — AI passes on buying
+   871→  - penalty: 100 (401–500) — AI lands on tax/penalty tile
+   872→  - jail: 100 (501–600) — AI goes to jail
+   873→  - rent: 100 (601–700) — AI pays rent
+   874→  - monopoly: 50 (701–750) — AI completes color set
+   875→  - auction: 50 (751–800) — AI at auction
+   876→  - card: 100 (801–900) — AI draws card
+   877→  - pass_go: 50 (901–950) — AI passes GO
+   878→  - general: 50 (951–1000) — General political drama
+   879→  - Total: 1000 ✓
+   880→
+   881→- Verification (Node script /tmp/verify_narrations.mjs):
+   882→  - Total entries parsed: 1000 ✓
+   883→  - Duplicate IDs: 0 ✓
+   884→  - Duplicate texts: 0 ✓ (after fixing 4 initial duplicates at IDs 246, 248, 876, 887 by replacing with new unique political references)
+   885→  - All 11 category counts match expected ✓
+   886→  - ID range: 1 to 1000 (sequential) ✓
+   887→  - Text length: 29–98 chars, avg 56 chars ✓
+   888→  - TypeScript type-check (npx tsc --noEmit --skipLibCheck): no errors ✓
+   889→
+   890→- File size: 1,084 lines, ~76 KB
+   891→
+   892→Stage Summary:
+   893→- 1000-entry political satire narration bank created at /home/z/my-project/src/lib/narrations.ts
+   894→- All entries unique, properly categorized across 11 game-event types, fully type-safe
+   895→- Ready to be imported by ai-engine.ts or game-store.ts for AI narration display
+   896→- Sample usage: `import { NARRATIONS, Narration } from '@/lib/narrations';` then filter by category for game-event-appropriate narration
+   897→
+   898→---
+   899→Task ID: 23
+   900→Agent: Main Agent
+   901→Task: Create 1000 political narration pop-ups (Malaysian political soap opera)
+   902→
+   903→Work Log:
+   904→- Sub-agent researched Malaysian politics (2018-2025): Sheraton Move, 1MDB, GE14/GE15, party hopping, PAS green wave, UMNO civil war, GPS kingmaker, Sabah chaos, royal interventions, MACC, budget politics, 3R issues, economy, memes.
+   905→- Generated 1000-entry narration bank at src/lib/narrations.ts (11 categories: ai_thinking, buy, skip, penalty, jail, rent, monopoly, auction, card, pass_go, general).
+   906→- Created narration system hook (src/lib/narration-system.ts) with getRandomNarration() and useNarration().
+   907→- Created NarrationPopup component (src/components/game/NarrationPopup.tsx) — soap opera style dialog with:
+   908→  * Semi-transparent dark background with colored border per category
+   909→  * Coalition player icon + category label (STRATEGI, PEMERANGAN, SKANDAL, TAHANAN, etc.)
+   910→  * Italic narration text in quotes
+   911→  * Animated "thinking" dots + "AI sedang berfikir..." label
+   912→  * Framer Motion entrance/exit animations
+   913→- Wired into game-store.ts:
+   914→  * Added currentNarration state + triggerNarration/clearNarration actions
+   915→  * Trigger narrations at: AI thinking start, jail decision, buy/skip decision, rent payment, card draw, tax penalty
+   916→  * Auto-clear after 4.5s
+   917→- Added NarrationPopup to page.tsx via NarrationPopupWrapper (reads store state)
+   918→
+   919→Verification (Agent Browser + VLM):
+   920→- VLM: "semi-transparent dialog box with green border near the top — italic text: 'Beli! Macam Mahathir beli anti-Najib campaign — former ally gone.' Labeled PEMERANGAN with PN player identifier" ✓
+   921→- Narrations trigger at correct game events (buy, skip, jail, rent, card, penalty, AI thinking) ✓
+   922→- No console/runtime errors. Lint clean.
+   923→
+   924→Stage Summary:
+   925→- 1000 Malaysian political satire narrations created, categorized by game event.
+   926→- Pop-up appears during AI turns as a soap opera dialog with the AI player's coalition identity.
+   927→- Narrations reference real Malaysian political events (Sheraton Move, 1MDB, GE15, party hopping, etc.).
+   928→
+   929→---
+   930→Task ID: 24
+   931→Agent: Main Agent
+   932→Task: Replace IND with "Create Your Own Party" (name, slogan, color, logo upload)
+   933→
+   934→Work Log:
+   935→- Removed IND (Independent) from the coalition selection grid.
+   936→- Added a "CREATE PARTY" card with dashed border + Plus icon.
+   937→- When selected, shows a form with:
+   938→  * Party Name (short, e.g. "PRIBUMI") — auto-uppercase, max 12 chars
+   939→  * Full Party Name (e.g. "Parti Pribumi Bersatu") — max 50 chars
+   940→  * Slogan / Battle Cry — max 60 chars
+   941→  * Party Color — 10 preset color swatches + custom color picker
+   942→  * Party Logo upload — file input (PNG/JPEG/SVG, max 2MB) → base64 data URL
+   943→  * Live preview badge with chosen color/name/slogan/logo
+   944→- Start button changes to "Mulakan Parti Baru!" and is disabled until name + slogan are filled.
+   945→- game-store.ts startGame: accepts optional customParty param; registers it as COALITIONS['CUSTOM'] at runtime; AI players get the 5 preset coalitions (PH/PN/BN/GPS/GRS).
+   946→
+   947→Verification (Agent Browser + VLM):
+   948→- VLM: "CREATE PARTY card visible in grid, IND gone, 5 coalitions still present" ✓
+   949→- VLM: "form with party name, full name, slogan, color picker (10 swatches), Upload Logo button" ✓
+   950→- VLM: "Mulakan Parti Baru! button present" ✓
+   951→- No console/runtime errors. Lint clean.
+   952→
+   953→Stage Summary:
+   954→- IND replaced with "Create Your Own Party" — players design their own political party.
+   955→- Custom name, slogan, color, and uploaded logo all work as the player's coalition identity in-game.
+   956→
+   957→---
+   958→Task ID: 25
+   959→Agent: Main Agent
+   960→Task: QA audit + UI polish + feature enhancements
+   961→
+   962→## Current Project Status Assessment
+   963→
+   964→The Pilihan Raya Monopoly 3D game is feature-complete and stable:
+   965→- ✅ 3D board with trading-card tiles, transparent overlay on uploaded board image
+   966→- ✅ 2D CSS-grid board fallback
+   967→- ✅ Expert-system AI with coalition personalities (buy/build/jail/auction decisions)
+   968→- ✅ 1000 political narration pop-ups (soap opera drama during AI turns)
+   969→- ✅ "Create Your Own Party" (custom name, slogan, color, logo upload)
+   970→- ✅ Party HQ buildings with coalition flags on owned tiles
+   971→- ✅ 3D dice (both in-scene and HUD), token hop animation
+   972→- ✅ Video background hero page with hero music + game music (independent toggles)
+   973→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+   974→- ✅ Lint clean, no hydration errors, no runtime errors
+   975→
+   976→## QA Results
+   977→- Lobby: loads correctly, all 6 coalition cards + CREATE PARTY visible, hero music toggle at bottom-right ✓
+   978→- Game start: PH selected → game starts → 3D board renders ✓
+   979→- Dice roll: 3D dice tumble, buy/pass buttons appear ✓
+   980→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+   981→- 2D/3D toggle: switches cleanly, no errors ✓
+   982→- Music: both hero and game music toggle independently ✓
+   983→- No console errors, no hydration mismatches, no runtime crashes ✓
+   984→
+   985→## Completed Modifications This Round
+   986→
+   987→1. **Hansard Log improved:**
+   988→   - Text size 9px → 10px (more readable)
+   989→   - Log height 36 → 44 (shows more entries)
+   990→   - Entry count 30 → 40 (longer history)
+   991→   - Added hover highlight on log entries
+   992→   - Added color-coded borders for jail (red) and card (purple) events
+   993→   - Added dark-scroll class for custom scrollbar
+   994→   - Header icon 2.5 → 3 (slightly larger)
+   995→
+   996→2. **Player cards improved:**
+   997→   - Property count now shows "props" label (was just a number)
+   998→   - Added 🔑 icon for players with Get Out of Jail Free card
+   999→   - Added title tooltips on property count
+  1000→
+  1001→3. **Game-over screen enhanced:**
+  1002→   - Added "Hero Page" button (returns to lobby without page reload)
+  1003→   - Existing "Pilihan Raya Baru" button still reloads for fresh game
+  1004→
+  1005→## VLM Assessment
+  1006→- UI polish: 6/10 → 7/10 (improved log readability, player card labels, game-over options)
+  1007→
+  1008→## Unresolved Issues / Risks
+  1009→1. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+  1010→2. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+  1011→3. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+  1012→4. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+  1013→5. **Mobile layout:** sidebars stack on mobile but the 3D board may be too small on phone screens
+  1014→
+  1015→## Priority Recommendations for Next Phase
+  1016→1. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+  1017→2. Implement cannon-es physics dice for more realistic rolling
+  1018→3. Add title deed card flip animation on property purchase
+  1019→4. Fine-tune board image alignment across viewport sizes
+  1020→5. Add sound effects for tile landing, property purchase, and narration pop-ups
+  1021→
+  1022→---
+  1023→Task ID: 26
+  1024→Agent: Main Agent
+  1025→Task: QA audit + new features (wealth bar + turn banner) + styling improvements
+  1026→
+  1027→## Current Project Status Assessment
+  1028→
+  1029→The Pilihan Raya Monopoly 3D game is fully stable and deployed to Cloudflare Workers (`https://pru.mcwood.workers.dev`). All core features work:
+  1030→- ✅ 3D/2D board with transparent trading-card tiles
+  1031→- ✅ Expert-system AI with coalition personalities + 1000 narrations
+  1032→- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+  1033→- ✅ Party HQ buildings with coalition flags on owned tiles
+  1034→- ✅ Video background hero page + hero music + game music (independent toggles)
+  1035→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+  1036→- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+  1037→- ✅ Lint clean, no hydration errors, no runtime errors
+  1038→
+  1039→## QA Results
+  1040→- Lobby: loads correctly, all coalition cards + CREATE PARTY + hero music toggle ✓
+  1041→- Game start: PH selected → game starts → 3D board renders ✓
+  1042→- Dice roll: 3D dice tumble, card/buy/pass buttons appear ✓
+  1043→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+  1044→- 2D/3D toggle: switches cleanly, no errors ✓
+  1045→- Music: both hero and game music toggle independently ✓
+  1046→- No console errors, no hydration mismatches, no runtime crashes ✓
+  1047→
+  1048→## Completed Modifications This Round
+  1049→
+  1050→1. **Wealth bar on player cards:**
+  1051→   - Each player card now has a colored bar at the bottom showing their net worth
+  1052→   - Net worth = cash + property purchase values + house investments
+  1053→   - Bar width scales from 0 to 100% based on net worth / RM4000
+  1054→   - Colored with the player's coalition color
+  1055→   - Animated with Framer Motion (smooth width transition)
+  1056→
+  1057→2. **Turn announcement banner:**
+  1058→   - Animated pill-shaped banner that appears when the turn changes
+  1059→   - Shows "Giliran [player name]!" for human turns
+  1060→   - Shows "[player name] sedang berfikir..." for AI turns
+  1061→   - Colored with the active coalition's color
+  1062→   - Framer Motion entrance/exit animation (slide down + fade)
+  1063→   - Auto-dismisses after 2.5 seconds
+  1064→   - Positioned at top-center (20% from top)
+  1065→
+  1066→3. **Player card tooltips:**
+  1067→   - Property count now shows net worth in the tooltip ("Net worth: RM2,400")
+  1068→
+  1069→## Verification Results
+  1070→- VLM: turn banner visible ("Giliran PHI") ✓
+  1071→- DOM: 10 wealth bar elements confirmed ✓
+  1072→- No console/runtime errors ✓
+  1073→- Lint clean ✓
+  1074→
+  1075→## Unresolved Issues / Risks
+  1076→1. Wealth bar is 0.5px — functional but hard to see in screenshots (works in DOM)
+  1077→2. data.gov.my API integration is available but falls back to simulated data (API endpoint unclear)
+  1078→3. Board image alignment may need fine-tuning per screen size
+  1079→4. Physics dice (cannon-es) not yet implemented
+  1080→5. Title deed card flip animation not yet implemented
+  1081→
+  1082→## Priority Recommendations for Next Phase
+  1083→1. Increase wealth bar thickness to 1px or 2px for better visibility
+  1084→2. Add zoom-on-hover for 3D tiles
+  1085→3. Implement cannon-es physics dice
+  1086→4. Add title deed card flip animation on property purchase
+  1087→5. Fine-tune board image alignment across viewport sizes
+  1088→
+  1089→---
+  1090→Task ID: 27
+  1091→Agent: Main Agent
+  1092→Task: QA audit + bug fixes + new features (game settings, wealth chart, styling improvements)
+  1093→
+  1094→## Current Project Status Assessment
+  1095→
+  1096→The Pilihan Raya Monopoly 3D game is feature-complete and stable on commit `3bf3f4b`. All core systems work:
+  1097→- ✅ 3D/2D board with transparent trading-card tiles
+  1098→- ✅ Expert-system AI with coalition personalities + 1000 narrations
+  1099→- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+  1100→- ✅ Party HQ buildings with coalition flags on owned tiles
+  1101→- ✅ Video background hero page + hero music + game music (independent toggles)
+  1102→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+  1103→- ✅ Achievements system (9 achievements), Trade system, Save/Load, Mortgage system
+  1104→- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+  1105→- ✅ Lint clean, no hydration errors, no runtime errors
+  1106→
+  1107→## QA Results (agent-browser + VLM)
+  1108→
+  1109→### Bugs Found & Fixed
+  1110→
+  1111→1. **Dual pop-up overlap (HIGH)** — VLM identified "two overlapping pop-ups for Amanah property" creating clutter.
+  1112→   - **Root cause:** `handleLanding` set `selectedTileId` when entering 'buying' phase, which triggered BOTH the `TileDetail` panel (top-center) AND the buying panel (bottom-center) to show the same property info.
+  1113→   - **Fix:** Removed `selectedTileId: tile.id` from the `set({ phase: 'buying' })` call in `game-store.ts`. The buying panel already shows full property details; setting `selectedTileId` was redundant.
+  1114→   - **Verification:** VLM confirmed "There are no overlapping duplicate panels" after fix.
+  1115→
+  1116→2. **Trade auto-rejects before player proposes (HIGH)** — Clicking "Trade with BN" immediately showed "BN rejected the trade offer!" without letting the player configure an offer.
+  1117→   - **Root cause:** `initiateTrade` auto-called `aiTradeResponse()` after 1500ms, evaluating an empty trade offer (0 properties, 0 cash) which the AI heuristic always rejected.
+  1118→   - **Fix:** Removed the `setTimeout(() => get().aiTradeResponse(), 1500)` call from `initiateTrade`. The AI now only evaluates when the human clicks "Propose Trade" (via `TradePanel.handlePropose`).
+  1119→   - **Verification:** Trade panel opens correctly, no auto-reject, player can configure offer.
+  1120→
+  1121→### Styling Improvements
+  1122→
+  1123→3. **Wealth bar visibility (MEDIUM)** — Wealth bar was h-0.5 (0.5px), hard to see in screenshots.
+  1124→   - **Fix:** Increased to h-1.5 (1.5px), added linear gradient (coalition color), added box-shadow glow, added shimmering sweep animation, added tick marks every RM1000, added "NW: RMxxx" net worth label below player info.
+  1125→
+  1126→4. **2D board text truncation (MEDIUM)** — VLM noted property labels were truncated (e.g., "Kri...", "Am...").
+  1127→   - **Fix:** Replaced `truncate` with 2-line clamp (`-webkit-line-clamp: 2`), added `wordBreak: break-word`, added `title={tile.name}` for hover tooltip, added `textOrientation: mixed` for vertical side-tiles.
+  1128→
+  1129→### New Features Added
+  1130→
+  1131→5. **Game Settings Panel (NEW)** — Added a settings button (gear icon) in the top-right controls.
+  1132→   - Sound Effects toggle (animated switch)
+  1133→   - Volume slider (0-100%, synced with soundManager singleton)
+  1134→   - AI Speed buttons (1× Slow / 2× Med / 3× Fast) with descriptions
+  1135→   - Keyboard Shortcuts reference (Space, B, P, S, Esc)
+  1136→
+  1137→6. **Net Worth History Chart (NEW)** — Added a wealth chart toggle button (trending-up icon) in the bottom-right.
+  1138→   - SVG line chart showing each player's net worth over time
+  1139→   - Color-coded lines per coalition (PH red, PN blue, BN navy, etc.)
+  1140→   - Gridlines at 25%, 50%, 75%
+  1141→   - End-point dots showing current value
+  1142→   - Legend with current net worth per player
+  1143→   - Records net worth snapshot at the end of each turn (max 60 data points)
+  1144→   - Persisted in save/load
+  1145→
+  1146→## Completed Modifications This Round
+  1147→
+  1148→### `src/lib/game-store.ts`
+  1149→- Added `netWorthHistory: { turn: number; netWorths: Record<string, number> }[]` state
+  1150→- Added `showWealthChart: boolean` state
+  1151→- Added `toggleWealthChart()` and `recordNetWorth()` actions
+  1152→- Added initial netWorthHistory in `startGame` (turn 1, all players RM1500)
+  1153→- Added `recordNetWorth()` call in `endTurn` (records snapshot before save)
+  1154→- Added `netWorthHistory` to `saveGame`/`loadGame` (with array validation)
+  1155→- **Bug fix:** Removed `selectedTileId: tile.id` from buying phase (dual pop-up)
+  1156→- **Bug fix:** Removed auto-trigger of `aiTradeResponse` in `initiateTrade` (trade auto-reject)
+  1157→
+  1158→### `src/components/game/GameDashboard.tsx`
+  1159→- **Improved `PlayerCard`:** Wealth bar now h-1.5 (was h-0.5), gradient fill, glow shadow, shimmer animation, tick marks, "NW: RMxxx" label
+  1160→- **New `GameSettingsPanel`:** Settings button + dropdown panel with sound toggle, volume slider, AI speed, keyboard shortcuts
+  1161→- **New `WealthChart`:** SVG line chart showing net worth over time, with legend
+  1162→- Added "Chart" toggle button in bottom-right (next to Hero and Portfolio)
+  1163→- Added `GameSettingsPanel` to top-right controls (both desktop and mobile)
+  1164→
+  1165→### `src/components/game/GameBoard.tsx`
+  1166→- **Improved 2D tile text:** Replaced `truncate` with 2-line clamp, added word-break, added hover tooltip, added text-orientation for vertical side-tiles
+  1167→
+  1168→## Verification Results
+  1169→- Lint: clean ✓
+  1170→- Dev server: no errors ✓
+  1171→- Lobby loads: all coalition cards + CREATE PARTY + hero music ✓
+  1172→- Game start: 3D board renders, all HUD buttons visible ✓
+  1173→- Game Settings panel: opens, all controls work ✓
+  1174→- Wealth Chart: opens, shows correct net worths ✓
+  1175→- Wealth bar: thicker, visible, shows NW label ✓
+  1176→- 2D board: full tile names visible (no truncation) ✓
+  1177→- Trade panel: opens without auto-reject ✓
+  1178→- Dual pop-up: fixed (VLM confirmed no overlap) ✓
+  1179→
+  1180→## Unresolved Issues / Risks
+  1181→1. **Action button disappears after dice roll on loaded save:** When loading a saved game and rolling dice, the action area (roll/buy/pay buttons) becomes empty. This appears to be a pre-existing React state desync issue with the setTimeout chain in rollDice/movePlayer/handleLanding. Starting a fresh game works correctly. Not introduced by this round's changes.
+  1182→2. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+  1183→3. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+  1184→4. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+  1185→5. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+  1186→
+  1187→## Priority Recommendations for Next Phase
+  1188→1. Fix the action button desync on loaded save games (investigate setTimeout preservation across React re-renders)
+  1189→2. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+  1190→3. Implement cannon-es physics dice for more realistic rolling
+  1191→4. Add title deed card flip animation on property purchase
+  1192→5. Fine-tune board image alignment across viewport sizes
+  1193→
+  1194→---
+  1195→Task ID: 1-a
+  1196→Agent: Research Agent (Explore)
+  1197→Task: Research bankruptcy / sell / mortgage / payRent / endTurn / AI liquidation logic in polinopoly
+  1198→
+  1199→Work Log:
+  1200→- Read /home/z/my-project/worklog.md (prior context: Task 0–27 history).
+  1201→- Grep'd `isBankrupt` across `src/` → 28 hits across game-store.ts, ai-engine.ts, GameDashboard.tsx, Board3D.tsx, GameBoard.tsx, Token3D.tsx.
+  1202→- Read game-store.ts sections: lines 1-100 (types), 193-239 (calculateRent), 250-470 (startGame), 480-700 (handleLanding/buyProperty/payRent), 700-870 (applyCard + bankruptcy sweep), 871-940 (endTurn), 1059-1255 (aiTurn), 1300-1510 (sellProperty + auction), 1600-1700 (mortgage/unmortgage), 1770-2077 (trade + recordNetWorth).
+  1203→- Read ai-engine.ts in full (421 lines).
+  1204→- Grep'd `sellProperty|mortgageProperty|unmortgageProperty` in components → only GameDashboard.tsx wires these to buttons (lines 1352-1354, 1515, 1524, 1537). AI never calls them.
+  1205→
+  1206→# FINDINGS REPORT
+  1207→
+  1208→## 1. BANKRUPTCY HANDLING — every site where `isBankrupt` is set to `true`
+  1209→
+  1210→| # | File:Line | Trigger | Code | Asset transfer? | Removed from turnOrder? |
+  1211→|---|-----------|---------|------|-----------------|-------------------------|
+  1212→| A | game-store.ts:267 | `buildAIContext` synthetic fallback when player not found (defensive) | `isBankrupt: true,` in stub object | N/A (stub) | N/A |
+  1213→| B | game-store.ts:510-513 | `handleLanding` TAX tile (RM200 / RM100) and newMoney < 0 | `const isBankrupt = newMoney < 0;` then `...money:newMoney, isBankrupt` | **NO** — properties stay owned, cash goes negative | **NO** — only skipped via while-loop in endTurn:889 |
+  1214→| C | game-store.ts:679-684 | `payRent` — payer.money − amount < 0 | `if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 }` | **NO** — payer's properties NOT transferred to payee (creditor). Payee still receives full `amount` (goes positive). | **NO** |
+  1215→| D | game-store.ts:735-738 | `applyCard` `effect.type === 'money'` and newMoney < 0 | `p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt: newMoney < 0 }` | **NO** | **NO** |
+  1216→| E | game-store.ts:847-860 | `applyCard` `collect_all` / `pay_all` — any player with money<0 after | `players: state.players.map(p => p.money < 0 ? { ...p, isBankrupt: true } : p)` | **NO** — bulk flag sweep, no asset transfer | **NO** |
+  1217→| F | game-store.ts:867 | `applyCard` end-of-fn: currentPlayer.money < 0 (re-check) | `set({ phase: 'game_over' });` (does NOT actually set isBankrupt — only ends game) | N/A | N/A |
+  1218→| G | game-store.ts:1984-1994 | `acceptTrade` — any player with money<0 after trade | `p.money < 0 ? { ...p, isBankrupt: true } : p` | **NO** | **NO** |
+  1219→
+  1220→**Critical bug identified:** In every real-bankruptcy path (B, C, D, E, G), the bankrupt player's `properties[]` array is left untouched and the corresponding `tiles[].owner` field is NOT cleared. Their portfolio is orphaned — no one can buy or rent those tiles ever again. Per official Monopoly rules, when a player bankrupts to a creditor, all their assets should transfer to the creditor; when they bankrupt to the Bank, all properties should be returned to the Bank (auction-able or unmortgaged+returned). Neither happens.
+  1221→
+  1222→The player is also NEVER removed from `turnOrder[]`. Instead, `endTurn` (line 889) uses a `while (nextPlayer?.isBankrupt && safety < 10)` loop to skip them. This is functionally correct for turn rotation but means `turnOrder.length` still includes dead players (relevant for the round-count formula in GameDashboard.tsx:1723 which divides by `players.filter(p => !p.isBankrupt).length`).
+  1223→
+  1224→## 2. `sellProperty` (game-store.ts:1304-1334)
+  1225→
+  1226→```ts
+  1227→sellProperty: (tileId: number) => {
+  1228→  const state = get();
+  1229→  const tile = state.tiles.find(t => t.id === tileId);
+  1230→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1231→  if (!tile || !player || tile.owner !== 'player') return;
+  1232→
+  1233→  // If mortgaged, sell price is reduced (only get mortgage value, not 80% of price)
+  1234→  const isMortgaged = state.mortgagedTiles.includes(tileId);
+  1235→  const sellPrice = isMortgaged
+  1236→    ? Math.round((tile.mortgageValue || tile.price || 0) * 0.5)        // 50% if mortgaged
+  1237→    : Math.round((tile.mortgageValue || tile.price || 0) * 0.8);       // 80% if free
+  1238→  const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);  // houses @ 50%
+  1239→
+  1240→  set(state => ({
+  1241→    players: state.players.map(p =>
+  1242→      p.id === 'player'
+  1243→        ? { ...p, money: p.money + sellPrice + houseRefund, properties: p.properties.filter(pid => pid !== tileId) }
+  1244→        : p
+  1245→    ),
+  1246→    tiles: state.tiles.map(t =>
+  1247→      t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t       // ← RETURNED TO BANK
+  1248→    ),
+  1249→    mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1250→  }));
+  1251→  get().addLog({ ... message: `📉 Sold ${tile.name} for RM${sellPrice + houseRefund}` });
+  1252→},
+  1253→```
+  1254→
+  1255→- **Behaviour:** Returns property to the Bank (`owner: undefined`, houses wiped). NOT auctioned. Removes from `mortgagedTiles` list.
+  1256→- **Refund:** `sellPrice + houseRefund` where:
+  1257→  - sellPrice = 80% of (mortgageValue || price) if free, 50% if mortgaged
+  1258→  - houseRefund = houses × 50% of housePrice
+  1259→- **AI access:** **NO.** Hardcoded `p.id === 'player'`. AI never calls `sellProperty` (confirmed by grep).
+  1260→
+  1261→## 3. `mortgageProperty` (game-store.ts:1625-1650)
+  1262→
+  1263→```ts
+  1264→mortgageProperty: (tileId: number) => {
+  1265→  const state = get();
+  1266→  const tile = state.tiles.find(t => t.id === tileId);
+  1267→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1268→  if (!tile || !player || tile.owner !== 'player') return;
+  1269→  if (state.mortgagedTiles.includes(tileId)) return;
+  1270→  if ((tile.houses || 0) > 0) return;                                  // can't mortgage if houses
+  1271→
+  1272→  const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1273→  set(state => ({
+  1274→    players: state.players.map(p =>
+  1275→      p.id === 'player' ? { ...p, money: p.money + mortgageValue } : p
+  1276→    ),
+  1277→    mortgagedTiles: [...state.mortgagedTiles, tileId],
+  1278→  }));
+  1279→  get().addLog({ ... message: `🏦 ... menggadai ${tile.name} for RM${mortgageValue}!` });
+  1280→},
+  1281→```
+  1282→
+  1283→## `unmortgageProperty` (game-store.ts:1652-1677)
+  1284→
+  1285→```ts
+  1286→unmortgageProperty: (tileId: number) => {
+  1287→  const state = get();
+  1288→  const tile = state.tiles.find(t => t.id === tileId);
+  1289→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1290→  if (!tile || !player || tile.owner !== 'player') return;
+  1291→  if (!state.mortgagedTiles.includes(tileId)) return;
+  1292→
+  1293→  const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1294→  const cost = Math.round(mortgageValue * 1.1);                        // 10% INTEREST
+  1295→  if (player.money < cost) return;
+  1296→
+  1297→  set(state => ({
+  1298→    players: state.players.map(p =>
+  1299→      p.id === 'player' ? { ...p, money: p.money - cost } : p
+  1300→    ),
+  1301→    mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1302→  }));
+  1303→  get().addLog({ ... message: `🏦 ... membuka gadai ${tile.name} for RM${cost} (incl. 10% interest)!` });
+  1304→},
+  1305→```
+  1306→
+  1307→- **Interest:** 10% flat (`mortgageValue * 1.1`). Standard Monopoly uses 10% — matches.
+  1308→- **AI access:** **NO** for both. Hardcoded to `'player'`. ai-engine.ts has no `decideMortgage` / `decideUnmortgage` / `decideSell` function. aiTurn never calls these.
+  1309→
+  1310→## 4. `payRent` (game-store.ts:665-697)
+  1311→
+  1312→```ts
+  1313→payRent: () => {
+  1314→  const state = get();
+  1315→  if (!state.currentRentPayment) return;
+  1316→
+  1317→  const { from, to, amount } = state.currentRentPayment;
+  1318→  const payer = state.players.find(p => p.id === from);
+  1319→  const payee = state.players.find(p => p.id === to);
+  1320→  if (!payer || !payee) return;
+  1321→
+  1322→  const payerNew = payer.money - amount;
+  1323→  const payeeNew = payee.money + amount;
+  1324→
+  1325→  set(state => ({
+  1326→    players: state.players.map(p => {
+  1327→      if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 };
+  1328→      if (p.id === to)   return { ...p, money: payeeNew };
+  1329→      return p;
+  1330→    }),
+  1331→    currentRentPayment: null,
+  1332→    phase: payerNew < 0 ? 'game_over' : 'landed',                       // ← triggers game-over immediately
+  1333→  }));
+  1334→
+  1335→  // Achievement: high_roller (only when 'player' is payer, amount > 500)
+  1336→  if (from === 'player' && amount > 500) { ... }
+  1337→},
+  1338→```
+  1339→
+  1340→- **Can't afford rent:** `payerNew` goes negative. Payer is immediately flagged `isBankrupt: true`. Phase jumps to `'game_over'` (no chance to mortgage/sell first).
+  1341→- **Bankruptcy creditor:** The `to` (payee) gets the full rent added (`payeeNew = payee.money + amount`) — i.e., the creditor is "paid in full" even though the payer couldn't afford it. **However, the payer's properties are NOT transferred to the payee** (per Monopoly rules, they should be).
+  1342→- **No liquidation window:** Unlike real Monopoly, where a player can mortgage/sell/trade to raise cash before declaring bankruptcy, this implementation instantly ends the game the moment `money` dips below 0.
+  1343→- **The `game_over` phase is set immediately** rather than going through `endTurn`'s winner-check. This means if the bankrupt player was NOT the only non-bankrupt player, the game still ends abruptly — `endTurn`'s check (`activePlayers.length <= 1`) never runs because phase is already `game_over`.
+  1344→
+  1345→## 5. `endTurn` + winner detection (game-store.ts:871-937)
+  1346→
+  1347→```ts
+  1348→endTurn: () => {
+  1349→  const state = get();
+  1350→
+  1351→  // Check game over
+  1352→  const activePlayers = state.players.filter(p => !p.isBankrupt);
+  1353→  if (activePlayers.length <= 1) {
+  1354→    const winner = activePlayers[0]?.id || null;                        // ← winner = last man standing
+  1355→    set({ phase: 'game_over', winner });
+  1356→    return;
+  1357→  }
+  1358→
+  1359→  // Next player
+  1360→  let nextIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
+  1361→  let nextPlayerId = state.turnOrder[nextIndex];
+  1362→  let nextPlayer = state.players.find(p => p.id === nextPlayerId);
+  1363→
+  1364→  // Skip bankrupt players
+  1365→  let safety = 0;
+  1366→  while (nextPlayer?.isBankrupt && safety < 10) {                       // ← skip dead players
+  1367→    nextIndex = (nextIndex + 1) % state.turnOrder.length;
+  1368→    nextPlayerId = state.turnOrder[nextIndex];
+  1369→    nextPlayer = state.players.find(p => p.id === nextPlayerId);
+  1370→    safety++;
+  1371→  }
+  1372→
+  1373→  const isNextTurn = nextIndex <= state.currentTurnIndex;
+  1374→  const newTurnCount = isNextTurn ? state.turnCount + 1 : state.turnCount;
+  1375→
+  1376→  set({
+  1377→    currentTurnIndex: nextIndex,
+  1378→    turnCount: newTurnCount,
+  1379→    diceValues: null,
+  1380→    isDoubles: false,
+  1381→    consecutiveDoubles: 0,
+  1382→    phase: 'playing',
+  1383→    selectedTileId: null,
+  1384→  });
+  1385→
+  1386→  // ... achievements, recordNetWorth, saveGame, simulateMarket ...
+  1387→  // ... if next player is AI, setTimeout aiTurn ...
+  1388→},
+  1389→```
+  1390→
+  1391→- **Winner determination:** Last non-bankrupt player standing. `winner = activePlayers[0]?.id || null`. If all players are bankrupt, `winner = null`.
+  1392→- **Property-count-based win condition:** **NONE.** No code path checks for `properties.length >= N` to declare a winner.
+  1393→- **Exact end-game condition:** `activePlayers.length <= 1` (1 survivor → win; 0 survivors → game over with no winner).
+  1394→- **Other end-game triggers** (do NOT set winner):
+  1395→  - `handleLanding:515` — tax bankruptcy → `phase: 'game_over'` (no winner set!)
+  1396→  - `payRent:684` — rent bankruptcy → `phase: 'game_over'` (no winner set!)
+  1397→  - `applyCard:738` — money-card bankruptcy → `phase: 'game_over'` (no winner set!)
+  1398→  - `applyCard:867` — re-check after card → `set({ phase: 'game_over' })` (no winner set!)
+  1399→  - `applyCard:857` — collect_all/pay_all bankruptcy sweep → `phase: 'game_over', winner: activePlayers[0]?.id || null` (winner SET)
+  1400→  - `acceptTrade:1993` — post-trade bankruptcy sweep → `phase: 'game_over', winner: activePlayers[0]?.id || null` (winner SET)
+  1401→  - `endTurn:878` — turn-end check → `phase: 'game_over', winner` (winner SET)
+  1402→
+  1403→**Inconsistency:** When bankruptcy comes from tax / rent / money-card, the code sets `phase: 'game_over'` WITHOUT setting `winner` — even if other active players exist. The UI will show a "game over" screen with no winner, even though 3 players might still be alive. This is a bug. The bankruptcy should only flag `isBankrupt` and let `endTurn` decide if the game is actually over.
+  1404→
+  1405→## 6. AI EMERGENCY LIQUIDATION
+  1406→
+  1407→**Search results:** None found.
+  1408→
+  1409→- `ai-engine.ts` exposes 4 decision functions: `decideBuy`, `decideBuild`, `decideJail`, `decideAuctionBid`. There is **no** `decideMortgage`, `decideSell`, `decideUnmortgage`, or `raiseEmergencyCash` function.
+  1410→- `aiTurn` (game-store.ts:1059-1255) follows this rigid pipeline:
+  1411→  1. Jail decision
+  1412→  2. Roll dice
+  1413→  3. Buy decision (on unowned property)
+  1414→  4. Pay rent — calls `get().payRent()` which instantly bankrupts if `money < 0` (no liquidation attempt)
+  1415→  5. Draw card — calls `get().applyCard(card)` which instantly bankrupts on negative money
+  1416→  6. Auction — only as bidder, never as liquidator
+  1417→  7. Build houses — only if `money - housePrice >= 80` buffer (no sale to fund builds)
+  1418→  8. End turn
+  1419→- AI never calls `sellProperty`, `mortgageProperty`, or `unmortgageProperty` (confirmed by grep — those functions are only referenced in GameDashboard.tsx button onClick handlers, lines 1515/1524/1537).
+  1420→- AI never trades as initiator (only as responder via `aiTradeResponse`).
+  1421→
+  1422→**Consequence:** When an AI lands on a high-rent property and can't afford it, they instantly go bankrupt — no attempt to mortgage properties, sell houses, or trade to raise cash. The AI is brittle and dies easily in the late game.
+  1423→
+  1424→---
+  1425→
+  1426→# SUMMARY OF BUGS / GAPS FOR NEXT AGENT
+  1427→
+  1428→| Priority | Issue | Location | Fix direction |
+  1429→|----------|-------|----------|---------------|
+  1430→| **HIGH** | Bankrupt player's properties are orphaned (not transferred to creditor nor returned to Bank) | game-store.ts:510, 679, 735, 851, 1988 | In each bankruptcy path, either (a) transfer `properties[]` and `tiles[].owner` to creditor (payRent case), or (b) reset `tiles[].owner = undefined` and clear `houses` (tax/card/trade cases). Also clear from `mortgagedTiles`. |
+  1431→| **HIGH** | `payRent` sets `phase: 'game_over'` immediately, bypassing `endTurn` winner check — leaves `winner: null` even with survivors | game-store.ts:684 (also 515, 738, 867) | Set only `isBankrupt: true` and `phase: 'landed'`, then let `endTurn` decide. OR explicitly call a `checkGameOver()` helper that sets winner if `activePlayers.length <= 1`. |
+  1432→| **HIGH** | No liquidation window — player can't mortgage/sell to avoid bankruptcy | payRent, applyCard, handleLanding | Before flagging bankrupt, check if `player.money + liquidatableValue >= amount`. If yes, transition to a `'liquidating'` phase (UI lets player choose what to sell/mortgage). If no, declare bankrupt. |
+  1433→| **HIGH** | AI never liquidates — instant bankruptcy on rent it can't afford | aiTurn, ai-engine.ts | Add `decideLiquidation(ctx, shortfall): {mortgage:[], sell:[]}` to ai-engine.ts. In aiTurn before payRent, check `player.money < rent`; if so, call liquidation decision, apply it, then re-check. |
+  1434→| **MEDIUM** | `sellProperty`, `mortgageProperty`, `unmortgageProperty` hardcoded to `'player'` | game-store.ts:1307, 1628, 1655 | Accept `playerId?` param, default to current turn player. Lets AI call them. |
+  1435→| **MEDIUM** | Bankrupt players remain in `turnOrder[]` forever | game-store.ts (no removal) | Optionally `turnOrder = turnOrder.filter(id => id !== bankruptPlayerId)` after bankruptcy; ensures `turnOrder.length` reflects living players. |
+  1436→| **LOW** | `applyCard:867` sets `phase: 'game_over'` but never sets `isBankrupt: true` on the player — they remain "active" with negative money | game-store.ts:866-868 | Set `isBankrupt: true` alongside the phase change, or remove this redundant check (the per-effect handlers already set isBankrupt correctly). |
+  1437→| **LOW** | `buildAIContext` stub at line 267 sets `isBankrupt: true` for missing player — defensive but masks real bugs | game-store.ts:267 | Consider throwing or returning null instead. |
+  1438→
+  1439→Stage Summary:
+  1440→- Mapped all 7 sites where `isBankrupt` is set to `true` (1 defensive stub + 6 real bankruptcy paths).
+  1441→- Confirmed `sellProperty`/`mortgageProperty`/`unmortgageProperty` are all hardcoded to `p.id === 'player'` — AI cannot use any of them.
+  1442→- Confirmed `payRent` instantly ends the game on negative money — no liquidation window, no creditor asset transfer.
+  1443→- Confirmed `endTurn` uses last-man-standing winner detection with no property-count condition.
+  1444→- Confirmed AI engine has ZERO liquidation logic (ai-engine.ts has 4 decision functions; none for sell/mortgage).
+  1445→- Identified 4 HIGH-priority bugs for the next implementation agent to fix: orphaned assets on bankruptcy, premature game-over phase, no liquidation window, AI never liquidates.
+  1446→- No files modified — research only.
+  1447→
+  1448→---
+  1449→Task ID: 1-b
+  1450→Agent: Research Agent (Explore)
+  1451→Task: Research house building logic, supply limits, and even-build enforcement in polinopoly
+  1452→
+  1453→Work Log:
+  1454→- Read prior worklog (Task 0 + Task 1-a covering bankruptcy/liquidation/winner-detection gaps).
+  1455→- Located `buildHouse` action in `/home/z/my-project/src/lib/game-store.ts:1259-1302` (full code below).
+  1456→- Located `decideBuild` AI function in `/home/z/my-project/src/lib/ai-engine.ts:234-302`.
+  1457→- Located AI inline build loop in `/home/z/my-project/src/lib/game-store.ts:1214-1243` (BYPASSES `buildHouse` action — direct state mutation).
+  1458→- Located color-group monopoly checks at 4 sites: `calculateRent` (game-store.ts:220-231), `buyProperty` (game-store.ts:631-637), `buildHouse` (game-store.ts:1274-1278), `decideBuild` (ai-engine.ts:252-255). Also UI checks in GameBoard.tsx:89-98 and GameDashboard.tsx:1378-1383 + 1480. All duplicated, no shared helper.
+  1459→- Searched for global house/hotel counters (`housesAvailable`, `hotelsAvailable`, `houseSupply`, `hotelSupply`, `housesLeft`, `hotelsLeft`, `HOUSE_LIMIT`, `HOTEL_LIMIT`, `housesInPlay`, `hotelsInPlay`, `totalHouses`, `houseCount`, `hotelCount`). **No matches in `/home/z/my-project/src`.** Only mention is in `upload/polinopoly-review-report.md:124` as a recommended fix.
+  1460→- Located `buildHouse` UI button in `/home/z/my-project/src/components/game/GameDashboard.tsx:1503-1512` (inside PropertyPortfolio panel).
+  1461→- Located 2D house rendering in `/home/z/my-project/src/components/game/GameBoard.tsx:192-207` (small green squares + red square for hotel).
+  1462→- Located 3D house rendering in `/home/z/my-project/src/components/game/Board3D.tsx:283, 450-480` (party-colored cubes + cylinder for hotel).
+  1463→- Confirmed `Tile.houses` field is 0-5 (5 = hotel) per game-data.ts:136 comment and rent[0..5] array layout.
+  1464→
+  1465→# 1. `buildHouse` action — full code (game-store.ts:1259-1302)
+  1466→
+  1467→```ts
+  1468→buildHouse: (tileId: number) => {
+  1469→  const state = get();
+  1470→  const tile = state.tiles.find(t => t.id === tileId);
+  1471→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED 'player'
+  1472→  if (!tile || !player || tile.owner !== 'player') return;             // ← HARDCODED 'player'
+  1473→  if (tile.type !== 'property' || !tile.housePrice) return;
+  1474→  if ((tile.houses || 0) >= 5) return;                                  // ← MAX 5 (hotel)
+  1475→  // Cannot build on mortgaged properties
+  1476→  if (state.mortgagedTiles.includes(tileId)) return;
+  1477→  const cost = tile.housePrice;
+  1478→  if (player.money < cost) return;
+  1479→  // Must own full color group to build
+  1480→  if (tile.colorGroup) {
+  1481→    const groupTiles = BOARD_TILES.filter(t => t.colorGroup === tile.colorGroup);
+  1482→    const ownsAll = groupTiles.every(t => t.owner === 'player');        // ← HARDCODED 'player'
+  1483→    if (!ownsAll) return;
+  1484→  }
+  1485→  // ❌ NO even-build check here — would happily let a player put 2 houses
+  1486→  //    on tile A while tile B (same group) still has 0.
+  1487→  // ❌ NO 32-house / 12-hotel supply check — no global counter exists.
+  1488→  const newHouses = (tile.houses || 0) + 1;
+  1489→  set(state => ({
+  1490→    players: state.players.map(p =>
+  1491→      p.id === 'player' ? { ...p, money: p.money - cost } : p           // ← HARDCODED 'player'
+  1492→    ),
+  1493→    tiles: state.tiles.map(t =>
+  1494→      t.id === tileId ? { ...t, houses: newHouses } : t
+  1495→    ),
+  1496→  }));
+  1497→  get().addLog({
+  1498→    playerId: 'player',
+  1499→    playerName: player.name,
+  1500→    message: newHouses === 5
+  1501→      ? `🏨 Built a HOTEL on ${tile.name}! (RM${cost})`
+  1502→      : `🏠 Built house ${newHouses}/4 on ${tile.name} (RM${cost})`,
+  1503→    type: 'buy',
+  1504→  });
+  1505→  // Achievement: hotel_mogul — built a hotel (5 houses)
+  1506→  if (newHouses === 5) {
+  1507→    get().unlockAchievement('hotel_mogul');
+  1508→  }
+  1509→},
+  1510→```
+  1511→
+  1512→**Findings on `buildHouse`:**
+  1513→| Check | Implemented? | Line |
+  1514→|-------|--------------|------|
+  1515→| Tile exists & type='property' | ✅ Yes | 1261, 1264 |
+  1516→| Owner is `'player'` | ✅ Yes (**HARDCODED**) | 1262-1263 |
+  1517→| `houses < 5` (max houses) | ✅ Yes — 5 = hotel | 1265 |
+  1518→| Not mortgaged | ✅ Yes | 1268 |
+  1519→| Player can afford (`money >= cost`) | ✅ Yes | 1271 |
+  1520→| Owns full color group | ✅ Yes (**HARDCODED to `'player'`**) | 1274-1278 |
+  1521→| **Even-build rule (diff ≤ 1 within group)** | ❌ **NO** — completely missing | — |
+  1522→| **32-house / 12-hotel supply limit** | ❌ **NO** — no global counter exists anywhere in src/ | — |
+  1523→| AI can call this action | ❌ **NO** — AI uses its own inline mutation loop (see §2 below) | — |
+  1524→
+  1525→# 2. `decideBuild` in ai-engine.ts (full code, lines 234-302)
+  1526→
+  1527→```ts
+  1528→export function decideBuild(ctx: AIContext): number[] {
+  1529→  const me = ctx.player;
+  1530→  const builds: number[] = [];
+  1531→  const personality = getCoalitionPersonality(me.coalitionId);
+  1532→  // Lower buffer so AI builds more aggressively (was 200-300)
+  1533→  const minBuffer = ctx.turnCount < 10 ? 80 : 150;                     // ← AI build buffer
+  1534→  // Track virtual money separately (don't mutate ctx.player)
+  1535→  let virtualMoney = me.money;
+  1536→
+  1537→  // Find all completed color groups
+  1538→  const colorGroups = new Set<ColorGroup>();
+  1539→  for (const tileId of me.properties) {
+  1540→    const t = BOARD_TILES[tileId];
+  1541→    if (t?.colorGroup) colorGroups.add(t.colorGroup);
+  1542→  }
+  1543→
+  1544→  const buildableTiles: Array<{ tile: Tile; liveTile: Tile; priority: number }> = [];
+  1545→
+  1546→  for (const cg of colorGroups) {
+  1547→    const groupTiles = BOARD_TILES.filter((t) => t.colorGroup === cg);
+  1548→    const ownsAll = groupTiles.every((t) => me.properties.includes(t.id));
+  1549→    if (!ownsAll) continue;
+  1550→
+  1551→    for (const t of groupTiles) {
+  1552→      const liveTile = ctx.tiles[t.id];
+  1553→      const houses = liveTile?.houses ?? 0;
+  1554→      if (houses >= 5) continue; // already hotel
+  1555→      if (ctx.mortgagedTiles.includes(t.id)) continue;
+  1556→      if (!t.housePrice) continue;
+  1557→      if (virtualMoney - t.housePrice < minBuffer) continue;
+  1558→
+  1559→      // Priority: even-build across the group (Monopoly rule), but prefer
+  1560→      // cheaper tiles first for faster ROI. Boost high-rent groups.
+  1561→      let priority = 0;
+  1562→      if (t.rent && t.rent[0] && t.housePrice) {
+  1563→        priority = (t.rent[houses] ?? 0) / t.housePrice; // ROI of next house
+  1564→      }
+  1565→      // Dark blue & green get extra priority (high late-game rent)
+  1566→      if (cg === 'darkblue') priority *= 1.5;
+  1567→      if (cg === 'green') priority *= 1.2;
+  1568→      // Aggressive coalitions build more
+  1569→      priority *= 1 + personality.buildAggression * 0.3;
+  1570→
+  1571→      buildableTiles.push({ tile: t, liveTile: liveTile ?? t, priority });
+  1572→    }
+  1573→  }
+  1574→
+  1575→  // Sort by priority descending
+  1576→  buildableTiles.sort((a, b) => b.priority - a.priority);
+  1577→
+  1578→  // Even-build rule: don't let any tile get more than 1 ahead of others in its group
+  1579→  for (const { tile } of buildableTiles) {
+  1580→    if (virtualMoney - (tile.housePrice ?? 0) < minBuffer) break;
+  1581→    const liveTile = ctx.tiles[tile.id];
+  1582→    const myHouses = liveTile?.houses ?? 0;
+  1583→    // Check other tiles in same group aren't more than 1 house behind
+  1584→    const groupTiles = BOARD_TILES.filter((t) => t.colorGroup === tile.colorGroup);
+  1585→    const minInGroup = Math.min(
+  1586→      ...groupTiles.map((t) => ctx.tiles[t.id]?.houses ?? 0),
+  1587→    );
+  1588→    if (myHouses > minInGroup) continue; // would violate even-build     ← AI ENFORCES EVEN-BUILD
+  1589→
+  1590→    builds.push(tile.id);
+  1591→    // Deduct virtually for the next iteration's buffer check
+  1592→    virtualMoney -= tile.housePrice ?? 0;
+  1593→  }
+  1594→
+  1595→  return builds;
+  1596→}
+  1597→```
+  1598→
+  1599→**Findings on `decideBuild`:**
+  1600→- **Even-build rule:** ✅ **YES** — enforced at line 294 (`if (myHouses > minInGroup) continue`). The check uses `Math.min` of all siblings in the color group, so it prevents any tile from getting more than 1 house ahead. **However**, this rule is enforced by the *decision* function returning a filtered list — it does NOT re-check at apply time. There is no guard in the `aiTurn` build loop (game-store.ts:1218-1242) that calls `buildHouse`; it directly mutates state. So if `decideBuild` has a bug, no further defense exists.
+  1601→- **Build buffer:** `minBuffer = ctx.turnCount < 10 ? 80 : 150` (line 239). Early-game RM80 reserve, late-game RM150. Comment says "was 200-300" — reduced for aggression.
+  1602→- **AI does NOT use `buildHouse` action.** Instead, `aiTurn` (game-store.ts:1214-1243) directly mutates `tiles[].houses` and `players[].money`:
+  1603→
+  1604→```ts
+  1605→// ── 7. BUILD HOUSES (expert system: greedy ROI on monopolies) ──
+  1606→if (phase === 'landed' || phase === 'playing') {
+  1607→  const ctx = buildAIContext(get(), currentPlayerId);
+  1608→  const buildTiles = decideBuild(ctx);
+  1609→  for (const tileId of buildTiles) {
+  1610→    const tile = BOARD_TILES[tileId];
+  1611→    const liveTile = get().tiles[tileId];
+  1612→    const currentAI = get().players.find(p => p.id === currentPlayerId);
+  1613→    if (!currentAI || !tile.housePrice) break;
+  1614→    if (currentAI.money - tile.housePrice < 80) break;                  // ← HARDCODED 80 (not minBuffer)
+  1615→    const newHouses = (liveTile?.houses ?? 0) + 1;
+  1616→    set(s => ({
+  1617→      players: s.players.map(p =>
+  1618→        p.id === currentPlayerId ? { ...p, money: p.money - (tile.housePrice ?? 0) } : p,
+  1619→      ),
+  1620→      tiles: s.tiles.map(t =>
+  1621→        t.id === tileId ? { ...t, houses: newHouses } : t,
+  1622→      ),
+  1623→    }));
+  1624→    get().addLog({ /* ... */ });
+  1625→    await delay(250);
+  1626→  }
+  1627→}
+  1628→```
+  1629→
+  1630→- **Inconsistency:** `decideBuild` uses `minBuffer = 80 or 150`, but the apply loop hardcodes `80` (game-store.ts:1223). In late game, AI may decide more builds than it actually applies (the loop will break early).
+  1631→- **AI does NOT check 32-house / 12-hotel supply** either — same gap as the human path.
+  1632→- **AI does NOT re-verify monopoly ownership** at apply time — trusts `decideBuild`'s pre-filter.
+  1633→
+  1634→# 3. Color-group monopoly check (4 duplicated sites, no shared helper)
+  1635→
+  1636→| Site | File:Line | Logic | Purpose |
+  1637→|------|-----------|-------|---------|
+  1638→| `calculateRent` | game-store.ts:220-231 | `colorGroupTiles.every(t => owner.properties.includes(t.id))` | 2× rent bonus (no houses); 1.5× bonus (with houses) |
+  1639→| `buyProperty` achievement | game-store.ts:631-637 | `colorGroupTiles.every(t => newProperties.includes(t.id))` | Unlock `landlord` achievement (player only) |
+  1640→| `buildHouse` | game-store.ts:1274-1278 | `groupTiles.every(t => t.owner === 'player')` | Permit build only with full group (**HARDCODED to `'player'`**) |
+  1641→| `decideBuild` | ai-engine.ts:252-255 | `groupTiles.every(t => me.properties.includes(t.id))` | AI: only consider builds in completed groups |
+  1642→| GameBoard tile canBuild (memo) | GameBoard.tsx:89-98 | `groupTiles.every(t => gt?.owner === 'player')` | UI green glow when player can build on tile |
+  1643→| GameDashboard `canBuildAny` | GameDashboard.tsx:1378-1383 | `groupTiles.every(gt => gt.owner === 'player' && !mortgagedTiles.includes(gt.id))` | UI: pulse a green dot on Portfolio button |
+  1644→| GameDashboard per-tile `canBuild` | GameDashboard.tsx:1480 | `ownsGroup && ... && !isMortgaged && player.money >= housePrice && isPlayerTurn && phase !== 'rolling' && phase !== 'moving'` | Per-tile build button visibility |
+  1645→
+  1646→**No central `ownsMonopoly(colorGroup, playerId)` helper exists.** Logic duplicated 6+ times, each with slight variations (some include mortgage check, some don't). The `calculateRent` and `decideBuild` versions check `owner.properties.includes(t.id)` (player object); the `buildHouse`, UI versions check `t.owner === 'player'` (tile-level). Both are equivalent but the duplication invites drift.
+  1647→
+  1648→# 4. House / hotel count tracking
+  1649→
+  1650→**There is NO global house or hotel counter anywhere in `/home/z/my-project/src`.**
+  1651→
+  1652→Searches performed (all returned no matches in src/):
+  1653→- `housesAvailable`, `hotelsAvailable`
+  1654→- `houseSupply`, `hotelSupply`
+  1655→- `housesLeft`, `hotelsLeft`
+  1656→- `HOUSE_LIMIT`, `HOTEL_LIMIT`
+  1657→- `housesInPlay`, `hotelsInPlay`
+  1658→- `totalHouses`, `houseCount`, `hotelCount`
+  1659→- `houseBank`, `hotelBank`
+  1660→- Numeric `32`, `12` (in game-store.ts context)
+  1661→
+  1662→**Only per-tile tracking exists:** `Tile.houses: number` (0-5, 5 = hotel) at game-data.ts:136. The total house count is computed on-the-fly for display in `GameDashboard.tsx:1456`:
+  1663→
+  1664→```tsx
+  1665→<p className="text-[11px] font-black text-green-400">
+  1666→  {ownedTiles.reduce((s, t) => s + (t.houses || 0), 0)}
+  1667→</p>
+  1668→```
+  1669→
+  1670→This counts only the human player's own houses; it is not a global supply counter. Standard Monopoly rules limit the bank to 32 houses + 12 hotels — **this rule is completely unimplemented**. Once `houses === 5` on a tile, that's a hotel, but the engine never decrements a global hotel pool either.
+  1671→
+  1672→**The only mention of this gap** in the codebase is `upload/polinopoly-review-report.md:122-124` (Task 1-a's prior review document), which recommends adding `housesAvailable = 32` and `hotelsAvailable = 12` to game state.
+  1673→
+  1674→# 5. `buildHouse` UI (GameDashboard.tsx)
+  1675→
+  1676→The build button lives inside the **PropertyPortfolio** panel (not on the main dashboard). Two visibility layers:
+  1677→
+  1678→**Layer A — `canBuildAny` (line 1378-1383):** pulses a green dot on the "Portfolio" button when any owned tile is buildable.
+  1679→
+  1680→```tsx
+  1681→const canBuildAny = ownedTiles.some(t => {
+  1682→  if (t.type !== 'property' || !t.colorGroup || !t.housePrice || (t.houses || 0) >= 5) return false;
+  1683→  if (mortgagedTiles.includes(t.id)) return false;
+  1684→  const groupTiles = BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup);
+  1685→  return groupTiles.every(gt => gt.owner === 'player' && !mortgagedTiles.includes(gt.id));
+  1686→});
+  1687→```
+  1688→
+  1689→**Layer B — per-tile `canBuild` (line 1480):** shows the actual 🏠 build button on each property row.
+  1690→
+  1691→```tsx
+  1692→const canBuild = ownsGroup && t.type === 'property' && !!t.housePrice
+  1693→  && (t.houses || 0) < 5 && !isMortgaged
+  1694→  && player.money >= (t.housePrice || 0)
+  1695→  && isPlayerTurn && phase !== 'rolling' && phase !== 'moving';
+  1696→```
+  1697→
+  1698→The button itself (line 1503-1512):
+  1699→
+  1700→```tsx
+  1701→{canBuild && (
+  1702→  <motion.button
+  1703→    whileHover={{ scale: 1.1 }}
+  1704→    onClick={() => { soundManager.playBuildHouse(); buildHouse(t.id); }}
+  1705→    className="w-6 h-6 rounded bg-green-600/20 border border-green-500/30 flex items-center justify-center text-green-400 hover:bg-green-600/40 transition-colors"
+  1706→    title={`Build house (RM${t.housePrice})`}
+  1707→  >
+  1708→    <Home className="h-3 w-3" />
+  1709→  </motion.button>
+  1710→)}
+  1711→```
+  1712→
+  1713→**UI gap analysis:**
+  1714→- ✅ Requires `ownsGroup` (color-group monopoly)
+  1715→- ✅ Requires `(t.houses || 0) < 5` (max houses)
+  1716→- ✅ Requires `!isMortgaged` and `player.money >= housePrice`
+  1717→- ✅ Requires `isPlayerTurn && phase !== 'rolling' && phase !== 'moving'`
+  1718→- ❌ **Does NOT check even-build** — UI will show the build button on a tile that already has 2 houses while its sibling has 0. The player can click it and the store will happily accept (because `buildHouse` action also doesn't check — see §1).
+  1719→- ❌ **Does NOT check global house/hotel supply** — same gap as the action.
+  1720→
+  1721→**Conclusion:** The UI prevents the most obvious illegal builds (no monopoly, mortgaged, maxed out, can't afford, wrong phase) but mirrors the store's missing even-build and supply-limit checks. A player can build 4 houses on tile A while sibling tile B has 0 houses — clearly illegal in Monopoly.
+  1722→
+  1723→# 6. 2D and 3D board house rendering
+  1724→
+  1725→## 2D board (GameBoard.tsx:78, 192-207)
+  1726→
+  1727→```tsx
+  1728→const houses = currentTile?.houses || 0;                                  // line 78
+  1729→
+  1730→// ...
+  1731→
+  1732→{/* Houses */}
+  1733→{houses > 0 && !isCorner && (
+  1734→  <div className={`absolute flex gap-[1px] ${
+  1735→    isSideTile ? 'bottom-1 left-1/2 -translate-x-1/2 flex-col'
+  1736→               : 'bottom-0.5 left-1/2 -translate-x-1/2 flex-row'
+  1737→  }`}>
+  1738→    {Array.from({ length: Math.min(houses, 4) }).map((_, i) => (
+  1739→      <motion.div key={i}
+  1740→        initial={{ scale: 0 }} animate={{ scale: 1 }}
+  1741→        className="w-1.5 h-1.5 bg-green-400 rounded-[1px] border border-green-600 shadow-sm"  // ← up to 4 green squares
+  1742→      />
+  1743→    ))}
+  1744→    {houses >= 5 && (
+  1745→      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+  1746→        className="w-1.5 h-1.5 bg-red-500 rounded-[1px] border border-red-700 shadow-sm" />   // ← red square = hotel
+  1747→    )}
+  1748→  </div>
+  1749→)}
+  1750→```
+  1751→
+  1752→- Up to **4 small green squares** (1.5×1.5 px) laid in a row (for top/bottom tiles) or column (for left/right side tiles).
+  1753→- When `houses >= 5`, the green squares are still rendered (`Math.min(houses, 4)` = 4) PLUS one additional **red square** indicating hotel. So a hotel visually shows as "4 green + 1 red" — not strictly a replacement, but a 5th indicator.
+  1754→
+  1755→## 3D board (Board3D.tsx:283, 450-480)
+  1756→
+  1757→```tsx
+  1758→const houseCount = tileState?.houses ?? 0;                                // line 283
+  1759→
+  1760→// ...
+  1761→
+  1762→{/* ── Cawangan (houses) — small cubes in party color ── */}
+  1763→{houseCount > 0 && hasOwner && ownerColor && (
+  1764→  <group position={[-outX * 0.05, CARD_THICKNESS + 0.02, -outZ * 0.05]}>
+  1765→    {Array.from({ length: Math.min(houseCount, 4) }).map((_, i) => {
+  1766→      const hx = isAlongX ? (i - 1.5) * 0.22 : 0;
+  1767→      const hz = isAlongX ? 0 : (i - 1.5) * 0.22;
+  1768→      return (
+  1769→        <mesh key={`h${i}`} position={[hx, 0.05, hz]} castShadow>
+  1770→          <boxGeometry args={[0.13, 0.11, 0.13]} />                       // ← cube 0.13×0.11×0.13
+  1771→          <meshStandardMaterial
+  1772→            color={ownerColor}                                            // ← party/coalition color
+  1773→            emissive={ownerColor}
+  1774→            emissiveIntensity={0.2}
+  1775→          />
+  1776→        </mesh>
+  1777→      );
+  1778→    })}
+  1779→    {/* Markas (hotel) = 5th level */}
+  1780→    {houseCount >= 5 && (
+  1781→      <mesh position={[0, 0.08, 0]} castShadow>
+  1782→        <cylinderGeometry args={[0.08, 0.09, 0.16, 8]} />                 // ← octagonal cylinder = hotel
+  1783→        <meshStandardMaterial
+  1784→          color={ownerColor}
+  1785→          metalness={0.4}
+  1786→          emissive={ownerColor}
+  1787→          emissiveIntensity={0.25}
+  1788→        />
+  1789→      </mesh>
+  1790→    )}
+  1791→  </group>
+  1792→)}
+  1793→```
+  1794→
+  1795→- Up to **4 cubes** (0.13×0.11×0.13) in the owner's coalition color, spaced `(i-1.5)*0.22` apart along the tile's outer axis.
+  1796→- Hotel = **octagonal cylinder** (radius 0.08-0.09, height 0.16) at the center of the tile, rendered IN ADDITION to the 4 cubes (since `Math.min(houseCount, 4)` = 4 when `houseCount = 5`).
+  1797→- The hotel cylinder is more metallic (`metalness: 0.4`) and slightly more emissive than the house cubes to visually distinguish it.
+  1798→- Houses are positioned at `[-outX * 0.05, ..., -outZ * 0.05]` — slightly toward the inner side of the tile, leaving room for the color strip on the outer edge.
+  1799→- Politically-themed naming: houses = "Cawangan" (party branch), hotel = "Markas" (party headquarters).
+  1800→
+  1801→# SUMMARY OF GAPS
+  1802→
+  1803→| Priority | Issue | Location | Fix direction |
+  1804→|----------|-------|----------|---------------|
+  1805→| **HIGH** | `buildHouse` does NOT enforce even-build rule — player can stack houses unevenly within a color group | game-store.ts:1259-1302 | Before incrementing, check `Math.min(groupTiles.map(t => t.houses)) >= tile.houses`. If `tile.houses > minInGroup`, reject. Mirror the AI's `decideBuild` check at ai-engine.ts:294. |
+  1806→| **HIGH** | No global 32-house / 12-hotel supply limit — infinite houses possible | game-store.ts (state) + buildHouse + aiTurn build loop | Add `housesAvailable: number = 32` and `hotelsAvailable: number = 12` to `GameState`. Decrement on build, increment on sell/downgrade. Block build when counter is 0. |
+  1807→| **HIGH** | `buildHouse` hardcoded to `'player'` — AI cannot use the same action | game-store.ts:1262, 1263, 1276, 1283 | Accept `playerId?: string = currentPlayerId` param. Default to current turn player. |
+  1808→| **HIGH** | AI build loop bypasses `buildHouse` action entirely — direct state mutation. No defense-in-depth if `decideBuild` returns bad list | game-store.ts:1218-1242 | Replace inline mutation with `get().buildHouse(tileId)` call after refactoring buildHouse to accept `playerId`. |
+  1809→| **MEDIUM** | AI build buffer inconsistency: `decideBuild` uses 80-or-150, apply loop hardcodes 80 | ai-engine.ts:239 vs game-store.ts:1223 | Either read `minBuffer` from a shared const, or pass it via ctx. Late-game AI decides more builds than it can actually afford. |
+  1810→| **MEDIUM** | UI `canBuild` and `canBuildAny` do NOT check even-build — button is clickable when it should be disabled | GameDashboard.tsx:1378-1383, 1480; GameBoard.tsx:89-98 | Add even-build check mirroring the store fix. |
+  1811→| **MEDIUM** | Color-group monopoly logic duplicated 6+ times with subtle variations (some include mortgage, some don't) | game-store.ts:220, 631, 1274; ai-engine.ts:254; GameDashboard.tsx:1382, 1479 | Extract `ownsMonopoly(colorGroup, playerId, {allowMortgaged?: boolean}): boolean` helper. |
+  1812→| **LOW** | AI `decideBuild` even-build check uses `Math.min(siblings)` — correct, but the comment "more than 1 ahead" is misleading. The check `myHouses > minInGroup` actually blocks when current tile is ahead by ANY amount (not just >1). This is stricter than the standard rule (which allows +1). | ai-engine.ts:294 | Re-examine intent: standard Monopoly allows `myHouses <= minInGroup + 1`. Current code blocks at `myHouses > minInGroup` (i.e., requires `myHouses <= minInGroup`). Verify this is intentional strict behavior or a bug. |
+  1813→| **LOW** | 2D board renders hotel as "4 green + 1 red" (additive) rather than replacing the houses | GameBoard.tsx:202-205 | Optional: when `houses >= 5`, render only the red square (skip the green). Minor visual polish. |
+  1814→| **LOW** | 3D board same: hotel cylinder is added on top of 4 cubes | Board3D.tsx:453, 468 | Same: optional visual polish to hide cubes when hotel is present. |
+  1815→
+  1816→Stage Summary:
+  1817→- Located and fully documented `buildHouse` action (game-store.ts:1259-1302). It enforces monopoly + max-5 + mortgaged + affordability, but is **missing even-build rule** and **missing 32/12 supply limit**. Hardcoded to `'player'`.
+  1818→- Located and fully documented `decideBuild` AI function (ai-engine.ts:234-302). AI DOES enforce even-build (line 294) and uses an 80-or-150 cash buffer. AI is actually MORE rules-compliant than the human path.
+  1819→- Discovered that **AI never calls `buildHouse`** — `aiTurn` (game-store.ts:1218-1242) directly mutates state, bypassing all checks in `buildHouse`. Two parallel implementations of "build a house" exist.
+  1820→- Confirmed via grep that **NO global house/hotel counter exists** anywhere in `/home/z/my-project/src`. Only mention is in `upload/polinopoly-review-report.md:124` as a recommended fix.
+  1821→- Mapped 6+ duplicated monopoly-check sites with no shared helper (calculateRent, buyProperty, buildHouse, decideBuild, GameBoard.tsx canBuild memo, GameDashboard.tsx canBuildAny + per-tile canBuild).
+  1822→- Documented `buildHouse` UI button location and conditions (GameDashboard.tsx PropertyPortfolio panel). UI mirrors the store's gaps — no even-build check, no supply check.
+  1823→- Documented 2D house rendering (4 green squares + 1 red square for hotel, GameBoard.tsx:192-207) and 3D house rendering (4 colored cubes + octagonal cylinder for hotel, Board3D.tsx:450-480). Both render hotel additively on top of houses rather than replacing.
+  1824→- Identified 4 HIGH-priority gaps for next implementation agent: even-build in buildHouse, supply limit, playerId param refactor, AI to use buildHouse action.
+  1825→- No files modified — research only.
+  1826→

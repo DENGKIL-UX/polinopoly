@@ -834,3 +834,614 @@
    834→- Board image's own 40 boxes provide the visual tile structure.
    835→- 3D tile text aligned with the board image's boxes.
    836→
+   837→---
+   838→Task ID: 1-narrations
+   839→Agent: Narrations Sub-Agent
+   840→Task: Research Malaysian politics (2018–2025) and generate 1000-entry narration bank for "Pilihan Raya Monopoly"
+   841→
+   842→Work Log:
+   843→- Read worklog.md to understand project context (3D Monopoly clone, Malaysian political satire board game).
+   844→- Researched 15 topic clusters in Malaysian politics 2018–2025:
+   845→  1. Sheraton Move (Feb 23–24, 2020) — PH collapse, Azmin Ali katak, Muhyiddin backdoor PM8
+   846→  2. 1MDB scandal — Najib, Jho Low, Equanimity yacht ($250M), SRC International RM42M, RM2.6B "Saudi donation", Tanore Finance $681M, Aabar BVI fake ($3.5B siphoned), PetroSaudi JV, Goldman Sachs $3.9B settlement, Tim Leissner + Roger Ng, US DOJ kleptocracy $1B+ seizure, BSI/Falcon Bank shut down, Red Granite Pictures (Wolf of Wall Street), Riza Aziz DNAA
+   847→  3. GE14 (May 9, 2018) — historic opposition win, Mahathir returns as PM7 at 92, Anwar pardoned May 16, 2018
+   848→  4. GE15 (Nov 19, 2022) — hung parliament, PN green wave, Anwar PM10 (Nov 24, 2022), unity govt (PH+BN+GPS+GRS+Warisan+MUDA), confidence vote Dec 19, 2022 (148 votes)
+   849→  5. Party hopping — anti-hopping law, Azmin Ali + 11 MPs katak, Bersatu split
+   850→  6. PAS green wave — Kelantan/Terengganu/Kedah, Hadi Awang, Sanusi Noor (viral TikTok MB), RUU355, hudud
+   851→  7. UMNO internal wars — Zahid vs Najib faction, Zahid 47 charges (Yayasan Akalbudi), DNAA Sept 4, 2023, UMNO general assembly
+   852→  8. GPS kingmaker — Abang Johari, Sarawak 23 seats, MA63 rights, Fadillah Yusof DPM, Sarawak premier title
+   853→  9. Sabah politics — Hajiji GRS, Musa Aman comeback, Shafie Apdal Warisan, Sabah crisis 2020
+   854→  10. Royal interventions — Agong Sultan Abdullah (kingmaker Dec 2022), Agong Sultan Ibrahim (Jan 31, 2024), Conference of Rulers, Najib Pardons Board Jan 31, 2024 (halved sentence), addendum house-arrest ploy
+   855→  11. MACC investigations — Latheefa Koya, Azam Baki shares scandal, raids on Najib residences (RM1.1B seized: 272 Birkins, 12,000 jewelry pieces, 114M cash in 26 currencies), Bersatu accounts frozen
+   856→  12. Budget politics — Anwar confidence vote, MOU 2021 (Anwar-Ismail Sabri bipartisan), Madani budgets 2024/2025, Muhyiddin emergency Jan 2021 + Jana Wibawa RM5.7B
+   857→  13. Race/religion/royalty (3R) — Sedition Act 1948, Sanusi sedition charge (Selangor sultan), RUU355, Article 153
+   858→  14. Economy — ringgit slide to 4.80 (26-year low), GST 6% → SST, diesel subsidy cut June 10, 2024, PADU targeted subsidies, T15 threshold, EPF Account 3, chicken/egg shortage 2022-2023, Khazanah/FELDA/Tabung Haji/MAS bailouts, Anwar Madani economy (July 27, 2023 KLCC launch)
+   859→  15. Satire memes — Najib "Malu Apa Bossku" / Bossku TikTok (3.5M followers), "Malaysia Bohong", "Cash is King", Muhyiddin "Abah" hoodie, Anwar "Madani" (critics rebrand "Mahal Dan Susah"), Khairy "Keluar Sekejap" podcast, Sanusi "tikus kerajaan"/"komplot" rhetoric, Mahathir chedet.cc blog, Anwar "PM in-waiting" 24-year wait
+   860→
+   861→- Created /home/z/my-project/src/lib/narrations.ts:
+   862→  - Exports `Narration` interface (id, text, category) with strict 11-variant category union type
+   863→  - Exports `NARRATIONS: Narration[]` array of 1000 entries
+   864→  - Used TypeScript template literals (backticks) for all narration strings to avoid apostrophe/quote escaping issues
+   865→  - Each entry: 1-3 sentences, Manglish/rojak mix (Malay-English code-switching), satirical soap-opera tone referencing real events
+   866→
+   867→- Category distribution (verified by Node script):
+   868→  - ai_thinking: 150 (1–150) — AI contemplating move
+   869→  - buy: 150 (151–300) — AI decides to buy property
+   870→  - skip: 100 (301–400) — AI passes on buying
+   871→  - penalty: 100 (401–500) — AI lands on tax/penalty tile
+   872→  - jail: 100 (501–600) — AI goes to jail
+   873→  - rent: 100 (601–700) — AI pays rent
+   874→  - monopoly: 50 (701–750) — AI completes color set
+   875→  - auction: 50 (751–800) — AI at auction
+   876→  - card: 100 (801–900) — AI draws card
+   877→  - pass_go: 50 (901–950) — AI passes GO
+   878→  - general: 50 (951–1000) — General political drama
+   879→  - Total: 1000 ✓
+   880→
+   881→- Verification (Node script /tmp/verify_narrations.mjs):
+   882→  - Total entries parsed: 1000 ✓
+   883→  - Duplicate IDs: 0 ✓
+   884→  - Duplicate texts: 0 ✓ (after fixing 4 initial duplicates at IDs 246, 248, 876, 887 by replacing with new unique political references)
+   885→  - All 11 category counts match expected ✓
+   886→  - ID range: 1 to 1000 (sequential) ✓
+   887→  - Text length: 29–98 chars, avg 56 chars ✓
+   888→  - TypeScript type-check (npx tsc --noEmit --skipLibCheck): no errors ✓
+   889→
+   890→- File size: 1,084 lines, ~76 KB
+   891→
+   892→Stage Summary:
+   893→- 1000-entry political satire narration bank created at /home/z/my-project/src/lib/narrations.ts
+   894→- All entries unique, properly categorized across 11 game-event types, fully type-safe
+   895→- Ready to be imported by ai-engine.ts or game-store.ts for AI narration display
+   896→- Sample usage: `import { NARRATIONS, Narration } from '@/lib/narrations';` then filter by category for game-event-appropriate narration
+   897→
+   898→---
+   899→Task ID: 23
+   900→Agent: Main Agent
+   901→Task: Create 1000 political narration pop-ups (Malaysian political soap opera)
+   902→
+   903→Work Log:
+   904→- Sub-agent researched Malaysian politics (2018-2025): Sheraton Move, 1MDB, GE14/GE15, party hopping, PAS green wave, UMNO civil war, GPS kingmaker, Sabah chaos, royal interventions, MACC, budget politics, 3R issues, economy, memes.
+   905→- Generated 1000-entry narration bank at src/lib/narrations.ts (11 categories: ai_thinking, buy, skip, penalty, jail, rent, monopoly, auction, card, pass_go, general).
+   906→- Created narration system hook (src/lib/narration-system.ts) with getRandomNarration() and useNarration().
+   907→- Created NarrationPopup component (src/components/game/NarrationPopup.tsx) — soap opera style dialog with:
+   908→  * Semi-transparent dark background with colored border per category
+   909→  * Coalition player icon + category label (STRATEGI, PEMERANGAN, SKANDAL, TAHANAN, etc.)
+   910→  * Italic narration text in quotes
+   911→  * Animated "thinking" dots + "AI sedang berfikir..." label
+   912→  * Framer Motion entrance/exit animations
+   913→- Wired into game-store.ts:
+   914→  * Added currentNarration state + triggerNarration/clearNarration actions
+   915→  * Trigger narrations at: AI thinking start, jail decision, buy/skip decision, rent payment, card draw, tax penalty
+   916→  * Auto-clear after 4.5s
+   917→- Added NarrationPopup to page.tsx via NarrationPopupWrapper (reads store state)
+   918→
+   919→Verification (Agent Browser + VLM):
+   920→- VLM: "semi-transparent dialog box with green border near the top — italic text: 'Beli! Macam Mahathir beli anti-Najib campaign — former ally gone.' Labeled PEMERANGAN with PN player identifier" ✓
+   921→- Narrations trigger at correct game events (buy, skip, jail, rent, card, penalty, AI thinking) ✓
+   922→- No console/runtime errors. Lint clean.
+   923→
+   924→Stage Summary:
+   925→- 1000 Malaysian political satire narrations created, categorized by game event.
+   926→- Pop-up appears during AI turns as a soap opera dialog with the AI player's coalition identity.
+   927→- Narrations reference real Malaysian political events (Sheraton Move, 1MDB, GE15, party hopping, etc.).
+   928→
+   929→---
+   930→Task ID: 24
+   931→Agent: Main Agent
+   932→Task: Replace IND with "Create Your Own Party" (name, slogan, color, logo upload)
+   933→
+   934→Work Log:
+   935→- Removed IND (Independent) from the coalition selection grid.
+   936→- Added a "CREATE PARTY" card with dashed border + Plus icon.
+   937→- When selected, shows a form with:
+   938→  * Party Name (short, e.g. "PRIBUMI") — auto-uppercase, max 12 chars
+   939→  * Full Party Name (e.g. "Parti Pribumi Bersatu") — max 50 chars
+   940→  * Slogan / Battle Cry — max 60 chars
+   941→  * Party Color — 10 preset color swatches + custom color picker
+   942→  * Party Logo upload — file input (PNG/JPEG/SVG, max 2MB) → base64 data URL
+   943→  * Live preview badge with chosen color/name/slogan/logo
+   944→- Start button changes to "Mulakan Parti Baru!" and is disabled until name + slogan are filled.
+   945→- game-store.ts startGame: accepts optional customParty param; registers it as COALITIONS['CUSTOM'] at runtime; AI players get the 5 preset coalitions (PH/PN/BN/GPS/GRS).
+   946→
+   947→Verification (Agent Browser + VLM):
+   948→- VLM: "CREATE PARTY card visible in grid, IND gone, 5 coalitions still present" ✓
+   949→- VLM: "form with party name, full name, slogan, color picker (10 swatches), Upload Logo button" ✓
+   950→- VLM: "Mulakan Parti Baru! button present" ✓
+   951→- No console/runtime errors. Lint clean.
+   952→
+   953→Stage Summary:
+   954→- IND replaced with "Create Your Own Party" — players design their own political party.
+   955→- Custom name, slogan, color, and uploaded logo all work as the player's coalition identity in-game.
+   956→
+   957→---
+   958→Task ID: 25
+   959→Agent: Main Agent
+   960→Task: QA audit + UI polish + feature enhancements
+   961→
+   962→## Current Project Status Assessment
+   963→
+   964→The Pilihan Raya Monopoly 3D game is feature-complete and stable:
+   965→- ✅ 3D board with trading-card tiles, transparent overlay on uploaded board image
+   966→- ✅ 2D CSS-grid board fallback
+   967→- ✅ Expert-system AI with coalition personalities (buy/build/jail/auction decisions)
+   968→- ✅ 1000 political narration pop-ups (soap opera drama during AI turns)
+   969→- ✅ "Create Your Own Party" (custom name, slogan, color, logo upload)
+   970→- ✅ Party HQ buildings with coalition flags on owned tiles
+   971→- ✅ 3D dice (both in-scene and HUD), token hop animation
+   972→- ✅ Video background hero page with hero music + game music (independent toggles)
+   973→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+   974→- ✅ Lint clean, no hydration errors, no runtime errors
+   975→
+   976→## QA Results
+   977→- Lobby: loads correctly, all 6 coalition cards + CREATE PARTY visible, hero music toggle at bottom-right ✓
+   978→- Game start: PH selected → game starts → 3D board renders ✓
+   979→- Dice roll: 3D dice tumble, buy/pass buttons appear ✓
+   980→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+   981→- 2D/3D toggle: switches cleanly, no errors ✓
+   982→- Music: both hero and game music toggle independently ✓
+   983→- No console errors, no hydration mismatches, no runtime crashes ✓
+   984→
+   985→## Completed Modifications This Round
+   986→
+   987→1. **Hansard Log improved:**
+   988→   - Text size 9px → 10px (more readable)
+   989→   - Log height 36 → 44 (shows more entries)
+   990→   - Entry count 30 → 40 (longer history)
+   991→   - Added hover highlight on log entries
+   992→   - Added color-coded borders for jail (red) and card (purple) events
+   993→   - Added dark-scroll class for custom scrollbar
+   994→   - Header icon 2.5 → 3 (slightly larger)
+   995→
+   996→2. **Player cards improved:**
+   997→   - Property count now shows "props" label (was just a number)
+   998→   - Added 🔑 icon for players with Get Out of Jail Free card
+   999→   - Added title tooltips on property count
+  1000→
+  1001→3. **Game-over screen enhanced:**
+  1002→   - Added "Hero Page" button (returns to lobby without page reload)
+  1003→   - Existing "Pilihan Raya Baru" button still reloads for fresh game
+  1004→
+  1005→## VLM Assessment
+  1006→- UI polish: 6/10 → 7/10 (improved log readability, player card labels, game-over options)
+  1007→
+  1008→## Unresolved Issues / Risks
+  1009→1. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+  1010→2. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+  1011→3. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+  1012→4. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+  1013→5. **Mobile layout:** sidebars stack on mobile but the 3D board may be too small on phone screens
+  1014→
+  1015→## Priority Recommendations for Next Phase
+  1016→1. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+  1017→2. Implement cannon-es physics dice for more realistic rolling
+  1018→3. Add title deed card flip animation on property purchase
+  1019→4. Fine-tune board image alignment across viewport sizes
+  1020→5. Add sound effects for tile landing, property purchase, and narration pop-ups
+  1021→
+  1022→---
+  1023→Task ID: 26
+  1024→Agent: Main Agent
+  1025→Task: QA audit + new features (wealth bar + turn banner) + styling improvements
+  1026→
+  1027→## Current Project Status Assessment
+  1028→
+  1029→The Pilihan Raya Monopoly 3D game is fully stable and deployed to Cloudflare Workers (`https://pru.mcwood.workers.dev`). All core features work:
+  1030→- ✅ 3D/2D board with transparent trading-card tiles
+  1031→- ✅ Expert-system AI with coalition personalities + 1000 narrations
+  1032→- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+  1033→- ✅ Party HQ buildings with coalition flags on owned tiles
+  1034→- ✅ Video background hero page + hero music + game music (independent toggles)
+  1035→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+  1036→- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+  1037→- ✅ Lint clean, no hydration errors, no runtime errors
+  1038→
+  1039→## QA Results
+  1040→- Lobby: loads correctly, all coalition cards + CREATE PARTY + hero music toggle ✓
+  1041→- Game start: PH selected → game starts → 3D board renders ✓
+  1042→- Dice roll: 3D dice tumble, card/buy/pass buttons appear ✓
+  1043→- AI turns: proceed without stalling, narrations fire, properties bought, rent paid, cards drawn ✓
+  1044→- 2D/3D toggle: switches cleanly, no errors ✓
+  1045→- Music: both hero and game music toggle independently ✓
+  1046→- No console errors, no hydration mismatches, no runtime crashes ✓
+  1047→
+  1048→## Completed Modifications This Round
+  1049→
+  1050→1. **Wealth bar on player cards:**
+  1051→   - Each player card now has a colored bar at the bottom showing their net worth
+  1052→   - Net worth = cash + property purchase values + house investments
+  1053→   - Bar width scales from 0 to 100% based on net worth / RM4000
+  1054→   - Colored with the player's coalition color
+  1055→   - Animated with Framer Motion (smooth width transition)
+  1056→
+  1057→2. **Turn announcement banner:**
+  1058→   - Animated pill-shaped banner that appears when the turn changes
+  1059→   - Shows "Giliran [player name]!" for human turns
+  1060→   - Shows "[player name] sedang berfikir..." for AI turns
+  1061→   - Colored with the active coalition's color
+  1062→   - Framer Motion entrance/exit animation (slide down + fade)
+  1063→   - Auto-dismisses after 2.5 seconds
+  1064→   - Positioned at top-center (20% from top)
+  1065→
+  1066→3. **Player card tooltips:**
+  1067→   - Property count now shows net worth in the tooltip ("Net worth: RM2,400")
+  1068→
+  1069→## Verification Results
+  1070→- VLM: turn banner visible ("Giliran PHI") ✓
+  1071→- DOM: 10 wealth bar elements confirmed ✓
+  1072→- No console/runtime errors ✓
+  1073→- Lint clean ✓
+  1074→
+  1075→## Unresolved Issues / Risks
+  1076→1. Wealth bar is 0.5px — functional but hard to see in screenshots (works in DOM)
+  1077→2. data.gov.my API integration is available but falls back to simulated data (API endpoint unclear)
+  1078→3. Board image alignment may need fine-tuning per screen size
+  1079→4. Physics dice (cannon-es) not yet implemented
+  1080→5. Title deed card flip animation not yet implemented
+  1081→
+  1082→## Priority Recommendations for Next Phase
+  1083→1. Increase wealth bar thickness to 1px or 2px for better visibility
+  1084→2. Add zoom-on-hover for 3D tiles
+  1085→3. Implement cannon-es physics dice
+  1086→4. Add title deed card flip animation on property purchase
+  1087→5. Fine-tune board image alignment across viewport sizes
+  1088→
+  1089→---
+  1090→Task ID: 27
+  1091→Agent: Main Agent
+  1092→Task: QA audit + bug fixes + new features (game settings, wealth chart, styling improvements)
+  1093→
+  1094→## Current Project Status Assessment
+  1095→
+  1096→The Pilihan Raya Monopoly 3D game is feature-complete and stable on commit `3bf3f4b`. All core systems work:
+  1097→- ✅ 3D/2D board with transparent trading-card tiles
+  1098→- ✅ Expert-system AI with coalition personalities + 1000 narrations
+  1099→- ✅ Create Your Own Party (custom name, slogan, color, logo upload)
+  1100→- ✅ Party HQ buildings with coalition flags on owned tiles
+  1101→- ✅ Video background hero page + hero music + game music (independent toggles)
+  1102→- ✅ Auto-rotate toggle, 2D/3D toggle, Back to Hero button
+  1103→- ✅ Achievements system (9 achievements), Trade system, Save/Load, Mortgage system
+  1104→- ✅ Cloudflare CI/CD pipeline (GitHub Actions → opennextjs-cloudflare build/deploy)
+  1105→- ✅ Lint clean, no hydration errors, no runtime errors
+  1106→
+  1107→## QA Results (agent-browser + VLM)
+  1108→
+  1109→### Bugs Found & Fixed
+  1110→
+  1111→1. **Dual pop-up overlap (HIGH)** — VLM identified "two overlapping pop-ups for Amanah property" creating clutter.
+  1112→   - **Root cause:** `handleLanding` set `selectedTileId` when entering 'buying' phase, which triggered BOTH the `TileDetail` panel (top-center) AND the buying panel (bottom-center) to show the same property info.
+  1113→   - **Fix:** Removed `selectedTileId: tile.id` from the `set({ phase: 'buying' })` call in `game-store.ts`. The buying panel already shows full property details; setting `selectedTileId` was redundant.
+  1114→   - **Verification:** VLM confirmed "There are no overlapping duplicate panels" after fix.
+  1115→
+  1116→2. **Trade auto-rejects before player proposes (HIGH)** — Clicking "Trade with BN" immediately showed "BN rejected the trade offer!" without letting the player configure an offer.
+  1117→   - **Root cause:** `initiateTrade` auto-called `aiTradeResponse()` after 1500ms, evaluating an empty trade offer (0 properties, 0 cash) which the AI heuristic always rejected.
+  1118→   - **Fix:** Removed the `setTimeout(() => get().aiTradeResponse(), 1500)` call from `initiateTrade`. The AI now only evaluates when the human clicks "Propose Trade" (via `TradePanel.handlePropose`).
+  1119→   - **Verification:** Trade panel opens correctly, no auto-reject, player can configure offer.
+  1120→
+  1121→### Styling Improvements
+  1122→
+  1123→3. **Wealth bar visibility (MEDIUM)** — Wealth bar was h-0.5 (0.5px), hard to see in screenshots.
+  1124→   - **Fix:** Increased to h-1.5 (1.5px), added linear gradient (coalition color), added box-shadow glow, added shimmering sweep animation, added tick marks every RM1000, added "NW: RMxxx" net worth label below player info.
+  1125→
+  1126→4. **2D board text truncation (MEDIUM)** — VLM noted property labels were truncated (e.g., "Kri...", "Am...").
+  1127→   - **Fix:** Replaced `truncate` with 2-line clamp (`-webkit-line-clamp: 2`), added `wordBreak: break-word`, added `title={tile.name}` for hover tooltip, added `textOrientation: mixed` for vertical side-tiles.
+  1128→
+  1129→### New Features Added
+  1130→
+  1131→5. **Game Settings Panel (NEW)** — Added a settings button (gear icon) in the top-right controls.
+  1132→   - Sound Effects toggle (animated switch)
+  1133→   - Volume slider (0-100%, synced with soundManager singleton)
+  1134→   - AI Speed buttons (1× Slow / 2× Med / 3× Fast) with descriptions
+  1135→   - Keyboard Shortcuts reference (Space, B, P, S, Esc)
+  1136→
+  1137→6. **Net Worth History Chart (NEW)** — Added a wealth chart toggle button (trending-up icon) in the bottom-right.
+  1138→   - SVG line chart showing each player's net worth over time
+  1139→   - Color-coded lines per coalition (PH red, PN blue, BN navy, etc.)
+  1140→   - Gridlines at 25%, 50%, 75%
+  1141→   - End-point dots showing current value
+  1142→   - Legend with current net worth per player
+  1143→   - Records net worth snapshot at the end of each turn (max 60 data points)
+  1144→   - Persisted in save/load
+  1145→
+  1146→## Completed Modifications This Round
+  1147→
+  1148→### `src/lib/game-store.ts`
+  1149→- Added `netWorthHistory: { turn: number; netWorths: Record<string, number> }[]` state
+  1150→- Added `showWealthChart: boolean` state
+  1151→- Added `toggleWealthChart()` and `recordNetWorth()` actions
+  1152→- Added initial netWorthHistory in `startGame` (turn 1, all players RM1500)
+  1153→- Added `recordNetWorth()` call in `endTurn` (records snapshot before save)
+  1154→- Added `netWorthHistory` to `saveGame`/`loadGame` (with array validation)
+  1155→- **Bug fix:** Removed `selectedTileId: tile.id` from buying phase (dual pop-up)
+  1156→- **Bug fix:** Removed auto-trigger of `aiTradeResponse` in `initiateTrade` (trade auto-reject)
+  1157→
+  1158→### `src/components/game/GameDashboard.tsx`
+  1159→- **Improved `PlayerCard`:** Wealth bar now h-1.5 (was h-0.5), gradient fill, glow shadow, shimmer animation, tick marks, "NW: RMxxx" label
+  1160→- **New `GameSettingsPanel`:** Settings button + dropdown panel with sound toggle, volume slider, AI speed, keyboard shortcuts
+  1161→- **New `WealthChart`:** SVG line chart showing net worth over time, with legend
+  1162→- Added "Chart" toggle button in bottom-right (next to Hero and Portfolio)
+  1163→- Added `GameSettingsPanel` to top-right controls (both desktop and mobile)
+  1164→
+  1165→### `src/components/game/GameBoard.tsx`
+  1166→- **Improved 2D tile text:** Replaced `truncate` with 2-line clamp, added word-break, added hover tooltip, added text-orientation for vertical side-tiles
+  1167→
+  1168→## Verification Results
+  1169→- Lint: clean ✓
+  1170→- Dev server: no errors ✓
+  1171→- Lobby loads: all coalition cards + CREATE PARTY + hero music ✓
+  1172→- Game start: 3D board renders, all HUD buttons visible ✓
+  1173→- Game Settings panel: opens, all controls work ✓
+  1174→- Wealth Chart: opens, shows correct net worths ✓
+  1175→- Wealth bar: thicker, visible, shows NW label ✓
+  1176→- 2D board: full tile names visible (no truncation) ✓
+  1177→- Trade panel: opens without auto-reject ✓
+  1178→- Dual pop-up: fixed (VLM confirmed no overlap) ✓
+  1179→
+  1180→## Unresolved Issues / Risks
+  1181→1. **Action button disappears after dice roll on loaded save:** When loading a saved game and rolling dice, the action area (roll/buy/pay buttons) becomes empty. This appears to be a pre-existing React state desync issue with the setTimeout chain in rollDice/movePlayer/handleLanding. Starting a fresh game works correctly. Not introduced by this round's changes.
+  1182→2. **3D card text:** still small from the top-down camera distance — would need a zoom-on-hover feature to fully solve
+  1183→3. **Board image alignment:** the uploaded board image's 40 boxes approximately align with 3D tile positions but may need fine-tuning per screen size
+  1184→4. **Physics dice:** not yet implemented (current dice use CSS/Framer Motion animation, not cannon-es physics)
+  1185→5. **Title deed card flip:** not yet implemented (buying shows log entry + building, but no card-flip animation)
+  1186→
+  1187→## Priority Recommendations for Next Phase
+  1188→1. Fix the action button desync on loaded save games (investigate setTimeout preservation across React re-renders)
+  1189→2. Add zoom-on-hover for 3D tiles (click to zoom camera to tile, showing card details)
+  1190→3. Implement cannon-es physics dice for more realistic rolling
+  1191→4. Add title deed card flip animation on property purchase
+  1192→5. Fine-tune board image alignment across viewport sizes
+  1193→
+  1194→---
+  1195→Task ID: 1-a
+  1196→Agent: Research Agent (Explore)
+  1197→Task: Research bankruptcy / sell / mortgage / payRent / endTurn / AI liquidation logic in polinopoly
+  1198→
+  1199→Work Log:
+  1200→- Read /home/z/my-project/worklog.md (prior context: Task 0–27 history).
+  1201→- Grep'd `isBankrupt` across `src/` → 28 hits across game-store.ts, ai-engine.ts, GameDashboard.tsx, Board3D.tsx, GameBoard.tsx, Token3D.tsx.
+  1202→- Read game-store.ts sections: lines 1-100 (types), 193-239 (calculateRent), 250-470 (startGame), 480-700 (handleLanding/buyProperty/payRent), 700-870 (applyCard + bankruptcy sweep), 871-940 (endTurn), 1059-1255 (aiTurn), 1300-1510 (sellProperty + auction), 1600-1700 (mortgage/unmortgage), 1770-2077 (trade + recordNetWorth).
+  1203→- Read ai-engine.ts in full (421 lines).
+  1204→- Grep'd `sellProperty|mortgageProperty|unmortgageProperty` in components → only GameDashboard.tsx wires these to buttons (lines 1352-1354, 1515, 1524, 1537). AI never calls them.
+  1205→
+  1206→# FINDINGS REPORT
+  1207→
+  1208→## 1. BANKRUPTCY HANDLING — every site where `isBankrupt` is set to `true`
+  1209→
+  1210→| # | File:Line | Trigger | Code | Asset transfer? | Removed from turnOrder? |
+  1211→|---|-----------|---------|------|-----------------|-------------------------|
+  1212→| A | game-store.ts:267 | `buildAIContext` synthetic fallback when player not found (defensive) | `isBankrupt: true,` in stub object | N/A (stub) | N/A |
+  1213→| B | game-store.ts:510-513 | `handleLanding` TAX tile (RM200 / RM100) and newMoney < 0 | `const isBankrupt = newMoney < 0;` then `...money:newMoney, isBankrupt` | **NO** — properties stay owned, cash goes negative | **NO** — only skipped via while-loop in endTurn:889 |
+  1214→| C | game-store.ts:679-684 | `payRent` — payer.money − amount < 0 | `if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 }` | **NO** — payer's properties NOT transferred to payee (creditor). Payee still receives full `amount` (goes positive). | **NO** |
+  1215→| D | game-store.ts:735-738 | `applyCard` `effect.type === 'money'` and newMoney < 0 | `p.id === currentPlayerId ? { ...p, money: newMoney, isBankrupt: newMoney < 0 }` | **NO** | **NO** |
+  1216→| E | game-store.ts:847-860 | `applyCard` `collect_all` / `pay_all` — any player with money<0 after | `players: state.players.map(p => p.money < 0 ? { ...p, isBankrupt: true } : p)` | **NO** — bulk flag sweep, no asset transfer | **NO** |
+  1217→| F | game-store.ts:867 | `applyCard` end-of-fn: currentPlayer.money < 0 (re-check) | `set({ phase: 'game_over' });` (does NOT actually set isBankrupt — only ends game) | N/A | N/A |
+  1218→| G | game-store.ts:1984-1994 | `acceptTrade` — any player with money<0 after trade | `p.money < 0 ? { ...p, isBankrupt: true } : p` | **NO** | **NO** |
+  1219→
+  1220→**Critical bug identified:** In every real-bankruptcy path (B, C, D, E, G), the bankrupt player's `properties[]` array is left untouched and the corresponding `tiles[].owner` field is NOT cleared. Their portfolio is orphaned — no one can buy or rent those tiles ever again. Per official Monopoly rules, when a player bankrupts to a creditor, all their assets should transfer to the creditor; when they bankrupt to the Bank, all properties should be returned to the Bank (auction-able or unmortgaged+returned). Neither happens.
+  1221→
+  1222→The player is also NEVER removed from `turnOrder[]`. Instead, `endTurn` (line 889) uses a `while (nextPlayer?.isBankrupt && safety < 10)` loop to skip them. This is functionally correct for turn rotation but means `turnOrder.length` still includes dead players (relevant for the round-count formula in GameDashboard.tsx:1723 which divides by `players.filter(p => !p.isBankrupt).length`).
+  1223→
+  1224→## 2. `sellProperty` (game-store.ts:1304-1334)
+  1225→
+  1226→```ts
+  1227→sellProperty: (tileId: number) => {
+  1228→  const state = get();
+  1229→  const tile = state.tiles.find(t => t.id === tileId);
+  1230→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1231→  if (!tile || !player || tile.owner !== 'player') return;
+  1232→
+  1233→  // If mortgaged, sell price is reduced (only get mortgage value, not 80% of price)
+  1234→  const isMortgaged = state.mortgagedTiles.includes(tileId);
+  1235→  const sellPrice = isMortgaged
+  1236→    ? Math.round((tile.mortgageValue || tile.price || 0) * 0.5)        // 50% if mortgaged
+  1237→    : Math.round((tile.mortgageValue || tile.price || 0) * 0.8);       // 80% if free
+  1238→  const houseRefund = (tile.houses || 0) * Math.round((tile.housePrice || 0) * 0.5);  // houses @ 50%
+  1239→
+  1240→  set(state => ({
+  1241→    players: state.players.map(p =>
+  1242→      p.id === 'player'
+  1243→        ? { ...p, money: p.money + sellPrice + houseRefund, properties: p.properties.filter(pid => pid !== tileId) }
+  1244→        : p
+  1245→    ),
+  1246→    tiles: state.tiles.map(t =>
+  1247→      t.id === tileId ? { ...t, owner: undefined, houses: 0 } : t       // ← RETURNED TO BANK
+  1248→    ),
+  1249→    mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1250→  }));
+  1251→  get().addLog({ ... message: `📉 Sold ${tile.name} for RM${sellPrice + houseRefund}` });
+  1252→},
+  1253→```
+  1254→
+  1255→- **Behaviour:** Returns property to the Bank (`owner: undefined`, houses wiped). NOT auctioned. Removes from `mortgagedTiles` list.
+  1256→- **Refund:** `sellPrice + houseRefund` where:
+  1257→  - sellPrice = 80% of (mortgageValue || price) if free, 50% if mortgaged
+  1258→  - houseRefund = houses × 50% of housePrice
+  1259→- **AI access:** **NO.** Hardcoded `p.id === 'player'`. AI never calls `sellProperty` (confirmed by grep).
+  1260→
+  1261→## 3. `mortgageProperty` (game-store.ts:1625-1650)
+  1262→
+  1263→```ts
+  1264→mortgageProperty: (tileId: number) => {
+  1265→  const state = get();
+  1266→  const tile = state.tiles.find(t => t.id === tileId);
+  1267→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1268→  if (!tile || !player || tile.owner !== 'player') return;
+  1269→  if (state.mortgagedTiles.includes(tileId)) return;
+  1270→  if ((tile.houses || 0) > 0) return;                                  // can't mortgage if houses
+  1271→
+  1272→  const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1273→  set(state => ({
+  1274→    players: state.players.map(p =>
+  1275→      p.id === 'player' ? { ...p, money: p.money + mortgageValue } : p
+  1276→    ),
+  1277→    mortgagedTiles: [...state.mortgagedTiles, tileId],
+  1278→  }));
+  1279→  get().addLog({ ... message: `🏦 ... menggadai ${tile.name} for RM${mortgageValue}!` });
+  1280→},
+  1281→```
+  1282→
+  1283→## `unmortgageProperty` (game-store.ts:1652-1677)
+  1284→
+  1285→```ts
+  1286→unmortgageProperty: (tileId: number) => {
+  1287→  const state = get();
+  1288→  const tile = state.tiles.find(t => t.id === tileId);
+  1289→  const player = state.players.find(p => p.id === 'player');           // ← HARDCODED to human
+  1290→  if (!tile || !player || tile.owner !== 'player') return;
+  1291→  if (!state.mortgagedTiles.includes(tileId)) return;
+  1292→
+  1293→  const mortgageValue = tile.mortgageValue || Math.floor((tile.price || 0) / 2);
+  1294→  const cost = Math.round(mortgageValue * 1.1);                        // 10% INTEREST
+  1295→  if (player.money < cost) return;
+  1296→
+  1297→  set(state => ({
+  1298→    players: state.players.map(p =>
+  1299→      p.id === 'player' ? { ...p, money: p.money - cost } : p
+  1300→    ),
+  1301→    mortgagedTiles: state.mortgagedTiles.filter(id => id !== tileId),
+  1302→  }));
+  1303→  get().addLog({ ... message: `🏦 ... membuka gadai ${tile.name} for RM${cost} (incl. 10% interest)!` });
+  1304→},
+  1305→```
+  1306→
+  1307→- **Interest:** 10% flat (`mortgageValue * 1.1`). Standard Monopoly uses 10% — matches.
+  1308→- **AI access:** **NO** for both. Hardcoded to `'player'`. ai-engine.ts has no `decideMortgage` / `decideUnmortgage` / `decideSell` function. aiTurn never calls these.
+  1309→
+  1310→## 4. `payRent` (game-store.ts:665-697)
+  1311→
+  1312→```ts
+  1313→payRent: () => {
+  1314→  const state = get();
+  1315→  if (!state.currentRentPayment) return;
+  1316→
+  1317→  const { from, to, amount } = state.currentRentPayment;
+  1318→  const payer = state.players.find(p => p.id === from);
+  1319→  const payee = state.players.find(p => p.id === to);
+  1320→  if (!payer || !payee) return;
+  1321→
+  1322→  const payerNew = payer.money - amount;
+  1323→  const payeeNew = payee.money + amount;
+  1324→
+  1325→  set(state => ({
+  1326→    players: state.players.map(p => {
+  1327→      if (p.id === from) return { ...p, money: payerNew, isBankrupt: payerNew < 0 };
+  1328→      if (p.id === to)   return { ...p, money: payeeNew };
+  1329→      return p;
+  1330→    }),
+  1331→    currentRentPayment: null,
+  1332→    phase: payerNew < 0 ? 'game_over' : 'landed',                       // ← triggers game-over immediately
+  1333→  }));
+  1334→
+  1335→  // Achievement: high_roller (only when 'player' is payer, amount > 500)
+  1336→  if (from === 'player' && amount > 500) { ... }
+  1337→},
+  1338→```
+  1339→
+  1340→- **Can't afford rent:** `payerNew` goes negative. Payer is immediately flagged `isBankrupt: true`. Phase jumps to `'game_over'` (no chance to mortgage/sell first).
+  1341→- **Bankruptcy creditor:** The `to` (payee) gets the full rent added (`payeeNew = payee.money + amount`) — i.e., the creditor is "paid in full" even though the payer couldn't afford it. **However, the payer's properties are NOT transferred to the payee** (per Monopoly rules, they should be).
+  1342→- **No liquidation window:** Unlike real Monopoly, where a player can mortgage/sell/trade to raise cash before declaring bankruptcy, this implementation instantly ends the game the moment `money` dips below 0.
+  1343→- **The `game_over` phase is set immediately** rather than going through `endTurn`'s winner-check. This means if the bankrupt player was NOT the only non-bankrupt player, the game still ends abruptly — `endTurn`'s check (`activePlayers.length <= 1`) never runs because phase is already `game_over`.
+  1344→
+  1345→## 5. `endTurn` + winner detection (game-store.ts:871-937)
+  1346→
+  1347→```ts
+  1348→endTurn: () => {
+  1349→  const state = get();
+  1350→
+  1351→  // Check game over
+  1352→  const activePlayers = state.players.filter(p => !p.isBankrupt);
+  1353→  if (activePlayers.length <= 1) {
+  1354→    const winner = activePlayers[0]?.id || null;                        // ← winner = last man standing
+  1355→    set({ phase: 'game_over', winner });
+  1356→    return;
+  1357→  }
+  1358→
+  1359→  // Next player
+  1360→  let nextIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
+  1361→  let nextPlayerId = state.turnOrder[nextIndex];
+  1362→  let nextPlayer = state.players.find(p => p.id === nextPlayerId);
+  1363→
+  1364→  // Skip bankrupt players
+  1365→  let safety = 0;
+  1366→  while (nextPlayer?.isBankrupt && safety < 10) {                       // ← skip dead players
+  1367→    nextIndex = (nextIndex + 1) % state.turnOrder.length;
+  1368→    nextPlayerId = state.turnOrder[nextIndex];
+  1369→    nextPlayer = state.players.find(p => p.id === nextPlayerId);
+  1370→    safety++;
+  1371→  }
+  1372→
+  1373→  const isNextTurn = nextIndex <= state.currentTurnIndex;
+  1374→  const newTurnCount = isNextTurn ? state.turnCount + 1 : state.turnCount;
+  1375→
+  1376→  set({
+  1377→    currentTurnIndex: nextIndex,
+  1378→    turnCount: newTurnCount,
+  1379→    diceValues: null,
+  1380→    isDoubles: false,
+  1381→    consecutiveDoubles: 0,
+  1382→    phase: 'playing',
+  1383→    selectedTileId: null,
+  1384→  });
+  1385→
+  1386→  // ... achievements, recordNetWorth, saveGame, simulateMarket ...
+  1387→  // ... if next player is AI, setTimeout aiTurn ...
+  1388→},
+  1389→```
+  1390→
+  1391→- **Winner determination:** Last non-bankrupt player standing. `winner = activePlayers[0]?.id || null`. If all players are bankrupt, `winner = null`.
+  1392→- **Property-count-based win condition:** **NONE.** No code path checks for `properties.length >= N` to declare a winner.
+  1393→- **Exact end-game condition:** `activePlayers.length <= 1` (1 survivor → win; 0 survivors → game over with no winner).
+  1394→- **Other end-game triggers** (do NOT set winner):
+  1395→  - `handleLanding:515` — tax bankruptcy → `phase: 'game_over'` (no winner set!)
+  1396→  - `payRent:684` — rent bankruptcy → `phase: 'game_over'` (no winner set!)
+  1397→  - `applyCard:738` — money-card bankruptcy → `phase: 'game_over'` (no winner set!)
+  1398→  - `applyCard:867` — re-check after card → `set({ phase: 'game_over' })` (no winner set!)
+  1399→  - `applyCard:857` — collect_all/pay_all bankruptcy sweep → `phase: 'game_over', winner: activePlayers[0]?.id || null` (winner SET)
+  1400→  - `acceptTrade:1993` — post-trade bankruptcy sweep → `phase: 'game_over', winner: activePlayers[0]?.id || null` (winner SET)
+  1401→  - `endTurn:878` — turn-end check → `phase: 'game_over', winner` (winner SET)
+  1402→
+  1403→**Inconsistency:** When bankruptcy comes from tax / rent / money-card, the code sets `phase: 'game_over'` WITHOUT setting `winner` — even if other active players exist. The UI will show a "game over" screen with no winner, even though 3 players might still be alive. This is a bug. The bankruptcy should only flag `isBankrupt` and let `endTurn` decide if the game is actually over.
+  1404→
+  1405→## 6. AI EMERGENCY LIQUIDATION
+  1406→
+  1407→**Search results:** None found.
+  1408→
+  1409→- `ai-engine.ts` exposes 4 decision functions: `decideBuy`, `decideBuild`, `decideJail`, `decideAuctionBid`. There is **no** `decideMortgage`, `decideSell`, `decideUnmortgage`, or `raiseEmergencyCash` function.
+  1410→- `aiTurn` (game-store.ts:1059-1255) follows this rigid pipeline:
+  1411→  1. Jail decision
+  1412→  2. Roll dice
+  1413→  3. Buy decision (on unowned property)
+  1414→  4. Pay rent — calls `get().payRent()` which instantly bankrupts if `money < 0` (no liquidation attempt)
+  1415→  5. Draw card — calls `get().applyCard(card)` which instantly bankrupts on negative money
+  1416→  6. Auction — only as bidder, never as liquidator
+  1417→  7. Build houses — only if `money - housePrice >= 80` buffer (no sale to fund builds)
+  1418→  8. End turn
+  1419→- AI never calls `sellProperty`, `mortgageProperty`, or `unmortgageProperty` (confirmed by grep — those functions are only referenced in GameDashboard.tsx button onClick handlers, lines 1515/1524/1537).
+  1420→- AI never trades as initiator (only as responder via `aiTradeResponse`).
+  1421→
+  1422→**Consequence:** When an AI lands on a high-rent property and can't afford it, they instantly go bankrupt — no attempt to mortgage properties, sell houses, or trade to raise cash. The AI is brittle and dies easily in the late game.
+  1423→
+  1424→---
+  1425→
+  1426→# SUMMARY OF BUGS / GAPS FOR NEXT AGENT
+  1427→
+  1428→| Priority | Issue | Location | Fix direction |
+  1429→|----------|-------|----------|---------------|
+  1430→| **HIGH** | Bankrupt player's properties are orphaned (not transferred to creditor nor returned to Bank) | game-store.ts:510, 679, 735, 851, 1988 | In each bankruptcy path, either (a) transfer `properties[]` and `tiles[].owner` to creditor (payRent case), or (b) reset `tiles[].owner = undefined` and clear `houses` (tax/card/trade cases). Also clear from `mortgagedTiles`. |
+  1431→| **HIGH** | `payRent` sets `phase: 'game_over'` immediately, bypassing `endTurn` winner check — leaves `winner: null` even with survivors | game-store.ts:684 (also 515, 738, 867) | Set only `isBankrupt: true` and `phase: 'landed'`, then let `endTurn` decide. OR explicitly call a `checkGameOver()` helper that sets winner if `activePlayers.length <= 1`. |
+  1432→| **HIGH** | No liquidation window — player can't mortgage/sell to avoid bankruptcy | payRent, applyCard, handleLanding | Before flagging bankrupt, check if `player.money + liquidatableValue >= amount`. If yes, transition to a `'liquidating'` phase (UI lets player choose what to sell/mortgage). If no, declare bankrupt. |
+  1433→| **HIGH** | AI never liquidates — instant bankruptcy on rent it can't afford | aiTurn, ai-engine.ts | Add `decideLiquidation(ctx, shortfall): {mortgage:[], sell:[]}` to ai-engine.ts. In aiTurn before payRent, check `player.money < rent`; if so, call liquidation decision, apply it, then re-check. |
+  1434→| **MEDIUM** | `sellProperty`, `mortgageProperty`, `unmortgageProperty` hardcoded to `'player'` | game-store.ts:1307, 1628, 1655 | Accept `playerId?` param, default to current turn player. Lets AI call them. |
+  1435→| **MEDIUM** | Bankrupt players remain in `turnOrder[]` forever | game-store.ts (no removal) | Optionally `turnOrder = turnOrder.filter(id => id !== bankruptPlayerId)` after bankruptcy; ensures `turnOrder.length` reflects living players. |
+  1436→| **LOW** | `applyCard:867` sets `phase: 'game_over'` but never sets `isBankrupt: true` on the player — they remain "active" with negative money | game-store.ts:866-868 | Set `isBankrupt: true` alongside the phase change, or remove this redundant check (the per-effect handlers already set isBankrupt correctly). |
+  1437→| **LOW** | `buildAIContext` stub at line 267 sets `isBankrupt: true` for missing player — defensive but masks real bugs | game-store.ts:267 | Consider throwing or returning null instead. |
+  1438→
+  1439→Stage Summary:
+  1440→- Mapped all 7 sites where `isBankrupt` is set to `true` (1 defensive stub + 6 real bankruptcy paths).
+  1441→- Confirmed `sellProperty`/`mortgageProperty`/`unmortgageProperty` are all hardcoded to `p.id === 'player'` — AI cannot use any of them.
+  1442→- Confirmed `payRent` instantly ends the game on negative money — no liquidation window, no creditor asset transfer.
+  1443→- Confirmed `endTurn` uses last-man-standing winner detection with no property-count condition.
+  1444→- Confirmed AI engine has ZERO liquidation logic (ai-engine.ts has 4 decision functions; none for sell/mortgage).
+  1445→- Identified 4 HIGH-priority bugs for the next implementation agent to fix: orphaned assets on bankruptcy, premature game-over phase, no liquidation window, AI never liquidates.
+  1446→- No files modified — research only.
+  1447→
