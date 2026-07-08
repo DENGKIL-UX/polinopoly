@@ -2380,3 +2380,88 @@ Task: Research polinopoly-review-report.md, implement high-priority fixes, test 
 2. Implement AI-initiated trading to break stalemates
 3. Add Coalition Alliance system (Tier 2.1)
 4. Add shareable victory card (Tier 1.8)
+
+---
+Task ID: 29
+Agent: Main Agent
+Task: QA + new features (AI-initiated trading, shareable victory card, game duration tracking)
+
+## Current Project Status Assessment
+
+The game is stable after the dice roll freeze fix (commit 6eb6153). All core systems work:
+- ✅ Dice roll → buying panel → buy/pass → end turn → AI turns → player's turn (full cycle verified)
+- ✅ No action button desync (the selectedTile fix resolved the UI freeze)
+- ✅ Lint clean, no runtime errors (after fixing `tiles` scope in game-over IIFE)
+
+## QA Results
+- Dice roll works: phase transitions playing → rolling → moving → buying → landed ✓
+- Buy/Pass buttons appear correctly after landing on unowned property ✓
+- End turn works, AI plays automatically ✓
+- Player can roll again after AI turns complete ✓
+- Game runs through 30+ turns without freezing ✓
+
+## Completed Modifications This Round
+
+### 1. AI-Initiated Trading (game-store.ts)
+**Problem:** AI never initiated trades — only responded. This caused stalemates when all properties were owned but no one had a monopoly.
+
+**Fix:** Added AI trade logic in `aiTurn` step 7.5:
+- After turn 5, AI scans for color groups where it owns all but one property
+- If the missing property is owned by the human player, AI proposes a trade
+- AI offers: 120% of property value in cash + a property from a different group (won't give human a monopoly)
+- AI won't offer properties that would complete the human's color group
+- Only one trade proposal per AI turn (prevents spam)
+- Added `pendingAITrade` state + `acceptAITrade()` / `rejectAITrade()` actions
+
+### 2. AI Trade Proposal UI (GameDashboard.tsx)
+- New panel shown when `pendingAITrade` is set and target is human player
+- Shows AI coalition logo, name, and reason ("wants X to complete Y color group")
+- Two-column layout: "AI Offers" (green) vs "AI Wants" (red)
+- Terima (Accept) / Tolak (Reject) buttons
+- Property names with color group labels, cash amounts
+
+### 3. Shareable Victory Card (GameDashboard.tsx)
+**Problem:** No social virality — game over screen had no share button.
+
+**Fix:** Added shareable victory card on game-over screen:
+- "DEWAN RAKYAT CHAMP" header with winner's coalition logo and color
+- 2×2 grid: Seats (X/28), Net Worth (RM), Duration (Xm Ys), Turns
+- "Share Victory Card" button — uses `navigator.share()` if available, falls back to clipboard copy
+- Share text includes all key stats + "Can you do better? Play Pilihan Raya Monopoly!"
+
+### 4. Game Duration Tracking (game-store.ts)
+- Added `gameStartTime: number | null` state, set to `Date.now()` in `startGame()`
+- Game-over screen shows duration as "Xm Ys" format
+- Persisted in save/load
+
+### 5. Enhanced Game-Over Screen (GameDashboard.tsx)
+- Added house count per player in leaderboard (🏠N)
+- Added total houses built in footer stats
+- Victory card section with gradient border and gold styling
+- Share button below the action buttons
+
+### 6. Bug Fix: `tiles` not in scope (GameDashboard.tsx)
+- Game-over IIFE used `tiles.reduce()` but `tiles` wasn't declared in the main component scope
+- Added `const tiles = useGameStore(s => s.tiles)` to the main `GameDashboard` component
+- This caused a runtime ReferenceError that prevented the game-over screen from rendering
+
+## Verification Results
+- Lint: clean ✓
+- Dev server: no errors ✓
+- Dice roll → buy → end turn → AI → player cycle: works ✓
+- Victory card: all elements visible (TAMAT, CHAMP, Share, Duration, Seats, Net Worth, Turns) ✓
+- AI trade logic: compiles, runs (requires turn > 5 + near-monopoly to trigger) ✓
+- Game-over screen renders correctly with enhanced stats ✓
+
+## Unresolved Issues / Risks
+1. AI trade only triggers when AI is 1 property away from a monopoly AND the human owns that property — may be rare in practice
+2. AI trade only targets human player (AI-AI trades not implemented — would need complex negotiation logic)
+3. `navigator.share()` may not work in all browsers (clipboard fallback covers this)
+4. Game can still reach stable equilibrium if no AI gets close to a monopoly
+
+## Priority Recommendations for Next Phase
+1. Monitor AI trade frequency — may need to lower the threshold or add random trade proposals
+2. Add AI-AI trading for more dynamic property concentration
+3. Implement Coalition Alliance system (Tier 2.1 from review report)
+4. Add turn timer to prevent stalling
+5. Add sound effect for AI trade proposal

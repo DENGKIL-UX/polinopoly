@@ -13,7 +13,7 @@ import {
   ChevronRight, SkipForward, DollarSign, Building2, Crown,
   Briefcase, Hammer, Home, X, Landmark, HelpCircle, RotateCw,
   Volume2, VolumeX, Zap, Save, FolderOpen, Medal, Settings,
-  Banknote, ShieldDown, Shield, Gauge, Star, Handshake, Keyboard,
+  Banknote, ShieldDown, Shield, Gauge, Star, Handshake, Keyboard, Check, Share2,
 } from 'lucide-react';
 import { soundManager, useSoundEnabled } from '@/lib/sound-effects';
 import { CoalitionLogo } from '@/components/game/CoalitionLogo';
@@ -1643,6 +1643,7 @@ function AchievementToast() {
 export default function GameDashboard() {
   const phase = useGameStore(s => s.phase);
   const players = useGameStore(s => s.players);
+  const tiles = useGameStore(s => s.tiles);
   const turnOrder = useGameStore(s => s.turnOrder);
   const currentTurnIndex = useGameStore(s => s.currentTurnIndex);
   const diceValues = useGameStore(s => s.diceValues);
@@ -1670,6 +1671,10 @@ export default function GameDashboard() {
   const rejectTrade = useGameStore(s => s.rejectTrade);
   const pendingTaxChoice = useGameStore(s => s.pendingTaxChoice);
   const resolveTaxChoice = useGameStore(s => s.resolveTaxChoice);
+  const pendingAITrade = useGameStore(s => s.pendingAITrade);
+  const acceptAITrade = useGameStore(s => s.acceptAITrade);
+  const rejectAITrade = useGameStore(s => s.rejectAITrade);
+  const gameStartTime = useGameStore(s => s.gameStartTime);
   const [, toggleSound] = useSoundEnabled();
 
   /* ─── Keyboard Shortcuts ─── */
@@ -1994,7 +1999,98 @@ export default function GameDashboard() {
             </motion.div>
           )}
 
-          {phase === 'game_over' && (
+          {/* AI-Initiated Trade Proposal — shown when AI offers a trade to human */}
+          {pendingAITrade && pendingAITrade.toPlayerId === 'player' && (() => {
+            const fromPlayer = players.find(p => p.id === pendingAITrade.fromPlayerId);
+            const fromCoal = fromPlayer ? COALITIONS[fromPlayer.coalitionId] : null;
+            const offeredProps = pendingAITrade.offeredProperties.map(id => BOARD_TILES[id]).filter(Boolean);
+            const requestedProps = pendingAITrade.requestedProperties.map(id => BOARD_TILES[id]).filter(Boolean);
+            return (
+            <motion.div key="ai-trade" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="max-w-sm mx-auto w-full">
+              <Card className="bg-slate-900/95 border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+                <CardHeader className="p-3 pb-1.5">
+                  <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                    <Handshake className="h-3.5 w-3.5" />
+                    Cadangan Dagangan / Trade Proposal
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-1.5 space-y-2.5">
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40">
+                    <div className="w-7 h-7 rounded-full overflow-hidden bg-white border border-white/20 flex-shrink-0">
+                      <CoalitionLogo coalitionId={fromPlayer?.coalitionId || 'PH'} size={24} circular alt={fromPlayer?.name || ''} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold" style={{ color: fromCoal?.color }}>{fromPlayer?.name}</p>
+                      <p className="text-[8px] text-slate-400 leading-tight">{pendingAITrade.reason}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* AI Offers */}
+                    <div className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/20">
+                      <p className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider mb-1">AI Offers</p>
+                      {offeredProps.map(t => (
+                        <div key={t.id} className="text-[9px] text-slate-300 truncate">
+                          🏛️ {t.name}
+                          {t.colorGroup && <span className="text-slate-500"> ({t.colorGroup})</span>}
+                        </div>
+                      ))}
+                      {pendingAITrade.offeredCash > 0 && (
+                        <div className="text-[9px] text-amber-400 font-bold">RM{pendingAITrade.offeredCash}</div>
+                      )}
+                    </div>
+                    {/* AI Wants */}
+                    <div className="p-2 rounded-lg bg-red-950/30 border border-red-500/20">
+                      <p className="text-[8px] font-bold text-red-400 uppercase tracking-wider mb-1">AI Wants</p>
+                      {requestedProps.map(t => (
+                        <div key={t.id} className="text-[9px] text-slate-300 truncate">
+                          🏛️ {t.name}
+                          {t.colorGroup && <span className="text-slate-500"> ({t.colorGroup})</span>}
+                        </div>
+                      ))}
+                      {pendingAITrade.requestedCash > 0 && (
+                        <div className="text-[9px] text-amber-400 font-bold">RM{pendingAITrade.requestedCash}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button onClick={() => { soundManager.playBuy(); acceptAITrade(); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold h-9 shadow-lg shadow-emerald-600/20">
+                      <Check className="h-3.5 w-3.5 mr-1" />Terima
+                    </Button>
+                    <Button onClick={() => { soundManager.playAuction(); rejectAITrade(); }} variant="outline" className="flex-1 border-red-600/40 text-red-300 text-xs h-9 hover:bg-red-900/30">
+                      <X className="h-3.5 w-3.5 mr-1" />Tolak
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            );
+          })()}
+
+          {phase === 'game_over' && (() => {
+            const winnerPlayer = players.find(p => p.id === winner);
+            const winnerCoal = winnerPlayer ? COALITIONS[winnerPlayer.coalitionId] : null;
+            const durationMs = gameStartTime ? Date.now() - gameStartTime : 0;
+            const durationMin = Math.floor(durationMs / 60000);
+            const durationSec = Math.floor((durationMs % 60000) / 1000);
+            const durationStr = `${durationMin}m ${durationSec}s`;
+            const totalHouses = tiles.reduce((s, t) => s + (t.houses ?? 0), 0);
+            const winnerNetWorth = winnerPlayer ? winnerPlayer.money + winnerPlayer.properties.reduce((s, pid) => s + (BOARD_TILES[pid]?.price || 0), 0) : 0;
+            const shareText = `🏆 DEWAN RAKYAT CHAMP!\n\nCoalition: ${winnerPlayer?.name || '?'}\nSeats: ${winnerPlayer?.properties.length || 0}/28\nNet Worth: RM${winnerNetWorth.toLocaleString()}\nDuration: ${durationStr}\nTurns: ${turnCount}\n\nCan you do better? Play Pilihan Raya Monopoly!`;
+            const handleShare = () => {
+              if (navigator.share) {
+                navigator.share({ title: 'Dewan Rakyat Champion', text: shareText }).catch(() => {
+                  navigator.clipboard?.writeText(shareText);
+                  alert('Victory card copied to clipboard!');
+                });
+              } else {
+                navigator.clipboard?.writeText(shareText);
+                alert('Victory card copied to clipboard!');
+              }
+            };
+            return (
             <motion.div key="over" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto">
               <Card className="bg-gradient-to-br from-yellow-900/80 via-amber-900/60 to-yellow-900/80 border-yellow-500/50 shadow-2xl shadow-yellow-500/10 backdrop-blur-sm">
                 <CardContent className="p-5 text-center space-y-3">
@@ -2002,10 +2098,10 @@ export default function GameDashboard() {
                     <Trophy className="h-12 w-12 text-yellow-400 mx-auto drop-shadow-lg" />
                   </motion.div>
                   <h2 className="text-xl font-black text-yellow-400 tracking-tight">PILIHAN RAYA TAMAT!</h2>
-                  {winner && (
+                  {winnerPlayer && (
                     <p className="text-sm text-slate-200">
-                      <span className="font-black text-base" style={{ color: COALITIONS[players.find(p => p.id === winner)?.coalitionId || 'PH']?.color }}>
-                        {players.find(p => p.id === winner)?.name}
+                      <span className="font-black text-base" style={{ color: winnerCoal?.color }}>
+                        {winnerPlayer.name}
                       </span>
                       <br /><span className="text-slate-400 text-xs">memenangi pilihan raya!</span>
                     </p>
@@ -2013,6 +2109,42 @@ export default function GameDashboard() {
                   <p className="text-[10px] text-slate-400">
                     {winner === 'player' ? '🎉 Tahniah YAB! Kerajaan terbentuk!' : '😞 Pembangkang menang. Tunggu GE16!'}
                   </p>
+
+                  {/* Victory Card — Shareable Summary */}
+                  <div className="border border-yellow-500/30 rounded-lg p-3 bg-gradient-to-br from-yellow-950/40 to-amber-950/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {winnerPlayer && (
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-white border border-yellow-400/40 flex-shrink-0">
+                            <CoalitionLogo coalitionId={winnerPlayer.coalitionId} size={28} circular alt={winnerPlayer.name} />
+                          </div>
+                        )}
+                        <div className="text-left">
+                          <p className="text-[9px] text-yellow-400/60 uppercase tracking-wider font-bold">DEWAN RAKYAT CHAMP</p>
+                          <p className="text-sm font-black" style={{ color: winnerCoal?.color }}>{winnerPlayer?.name}</p>
+                        </div>
+                      </div>
+                      <span className="text-2xl">🏆</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-[9px]">
+                      <div className="flex justify-between bg-yellow-500/5 rounded px-2 py-1">
+                        <span className="text-slate-500">Seats</span>
+                        <span className="font-bold text-yellow-400">{winnerPlayer?.properties.length || 0}/28</span>
+                      </div>
+                      <div className="flex justify-between bg-yellow-500/5 rounded px-2 py-1">
+                        <span className="text-slate-500">Net Worth</span>
+                        <span className="font-bold text-amber-400">RM{winnerNetWorth.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between bg-yellow-500/5 rounded px-2 py-1">
+                        <span className="text-slate-500">Duration</span>
+                        <span className="font-bold text-slate-300">{durationStr}</span>
+                      </div>
+                      <div className="flex justify-between bg-yellow-500/5 rounded px-2 py-1">
+                        <span className="text-slate-500">Turns</span>
+                        <span className="font-bold text-slate-300">{turnCount}</span>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Game Statistics */}
                   <div className="border-t border-yellow-500/20 pt-3 mt-2">
@@ -2027,6 +2159,7 @@ export default function GameDashboard() {
                         })
                         .map((p, idx) => {
                           const totalValue = p.money + p.properties.reduce((s, pid) => s + (BOARD_TILES[pid]?.price || 0), 0);
+                          const housesOwned = p.properties.reduce((s, pid) => s + (tiles.find(t => t.id === pid)?.houses ?? 0), 0);
                           return (
                             <div key={p.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10px] ${p.id === winner ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-slate-800/30'}`}>
                               <div className="flex items-center gap-2">
@@ -2037,8 +2170,9 @@ export default function GameDashboard() {
                                 <span className="font-bold" style={{ color: COALITIONS[p.coalitionId]?.color }}>{p.name}</span>
                                 {p.isAI && <span className="text-slate-600 text-[8px]">AI</span>}
                               </div>
-                              <div className="flex items-center gap-3 text-[9px]">
+                              <div className="flex items-center gap-2 text-[9px]">
                                 <span className="text-slate-400"><span className="text-amber-400 font-bold">{p.properties.length}</span> seats</span>
+                                {housesOwned > 0 && <span className="text-green-400">🏠{housesOwned}</span>}
                                 <span className="text-slate-400">RM<span className="font-bold text-slate-200">{totalValue.toLocaleString()}</span></span>
                                 {p.id === winner && <span className="text-yellow-400">👑</span>}
                               </div>
@@ -2046,13 +2180,19 @@ export default function GameDashboard() {
                           );
                         })}
                     </div>
-                    <p className="text-[8px] text-slate-600 mt-2">Total turns: {turnCount} · {gameLog.length} events logged</p>
+                    <p className="text-[8px] text-slate-600 mt-2">Total turns: {turnCount} · {gameLog.length} events · {totalHouses} houses built</p>
                   </div>
 
                   <div className="flex gap-2">
                     <Button onClick={() => { soundManager.playGameOver(); window.location.reload(); }} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold shadow-lg">Pilihan Raya Baru</Button>
                     <Button onClick={() => { useGameStore.setState({ phase: 'lobby' }); }} variant="outline" className="flex-1 border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800">Hero Page</Button>
                   </div>
+
+                  {/* Share Victory Card */}
+                  <Button onClick={handleShare} variant="outline" className="w-full border-yellow-500/40 text-yellow-300 text-[10px] font-bold hover:bg-yellow-900/30">
+                    <Share2 className="h-3 w-3 mr-1" />Share Victory Card
+                  </Button>
+
                   {/* Achievements summary in game over */}
                   <div className="border-t border-yellow-500/10 pt-2 mt-1">
                     <p className="text-[8px] text-amber-400/40 font-bold uppercase tracking-wider mb-1.5">Pencapaian / Achievements Unlocked</p>
@@ -2070,7 +2210,8 @@ export default function GameDashboard() {
                 </CardContent>
               </Card>
             </motion.div>
-          )}
+            );
+          })()}
         </AnimatePresence>
       </div>
 

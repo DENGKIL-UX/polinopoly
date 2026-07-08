@@ -145,6 +145,20 @@ export interface GameState {
   // Income tax choice pending — when player lands on tile 4, they choose 10% or RM200
   pendingTaxChoice: { tileId: number; playerId: string } | null;
 
+  // Game start timestamp (for duration tracking on victory screen)
+  gameStartTime: number | null;
+
+  // Pending AI-initiated trade offer (shown to human player)
+  pendingAITrade: {
+    fromPlayerId: string;
+    toPlayerId: string;
+    offeredProperties: number[];
+    offeredCash: number;
+    requestedProperties: number[];
+    requestedCash: number;
+    reason: string;
+  } | null;
+
   // Actions
   startGame: (coalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => void;
   rollDice: () => void;
@@ -192,6 +206,9 @@ export interface GameState {
   handleBankruptcy: (bankruptPlayerId: string, creditorId?: string) => void;
   resolveTaxChoice: (useFlat: boolean) => void;
   checkAutoWin: () => boolean;
+  aiInitiateTrade: () => void;
+  acceptAITrade: () => void;
+  rejectAITrade: () => void;
 }
 
 function shuffleDeck<T>(deck: T[]): T[] {
@@ -347,6 +364,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   hotelsAvailable: 12,
   centerPot: 0,
   pendingTaxChoice: null,
+  gameStartTime: null,
+  pendingAITrade: null,
 
   startGame: (playerCoalitionId: string, customParty?: { name: string; fullName: string; slogan: string; color: string; logo: string }) => {
     // If custom party, register it in COALITIONS at runtime
@@ -422,6 +441,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       hotelsAvailable: 12,
       centerPot: 0,
       pendingTaxChoice: null,
+      gameStartTime: Date.now(),
+      pendingAITrade: null,
     });
   },
 
@@ -1355,6 +1376,79 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    // ── 7.5 AI-INITIATED TRADE (break stalemates, pursue monopolies) ──
+    if (phase === 'landed' || phase === 'playing') {
+      const ctx = buildAIContext(get(), currentPlayerId);
+      const aiPlayer = get().players.find(p => p.id === currentPlayerId);
+      if (aiPlayer && ctx.turnCount > 5) {
+        // Find a color group where AI owns all but one property
+        const colorGroups: Record<string, number[]> = {};
+        for (const tid of aiPlayer.properties) {
+          const tile = BOARD_TILES[tid];
+          if (tile.colorGroup) {
+            if (!colorGroups[tile.colorGroup]) colorGroups[tile.colorGroup] = [];
+            colorGroups[tile.colorGroup].push(tid);
+          }
+        }
+        for (const [group, ownedTileIds] of Object.entries(colorGroups)) {
+          const groupTiles = BOARD_TILES.filter(t => t.colorGroup === group);
+          if (ownedTileIds.length === groupTiles.length - 1) {
+            // AI is one property away from monopoly — find the missing one
+            const missingTile = groupTiles.find(t => !aiPlayer.properties.includes(t.id));
+            if (missingTile && missingTile.owner && missingTile.owner !== currentPlayerId) {
+              const target = get().players.find(p => p.id === missingTile!.owner);
+              if (target && !target.isBankrupt) {
+                // Only trade with human player (AI-AI trades are too complex for now)
+                if (target.id === 'player') {
+                  // Calculate offer: property value + 20% premium
+                  const offerCash = Math.round((missingTile.price || 0) * 1.2);
+                  // Request: a property the AI can use, or cash if AI can't offer enough
+                  const aiOfferableProps = aiPlayer.properties
+                    .filter(tid => {
+                      const t = BOARD_TILES[tid];
+                      // Don't offer properties that would give human a monopoly
+                      if (!t.colorGroup) return false;
+                      const humanGroupCount = target.properties
+                        .filter(pid => BOARD_TILES[pid].colorGroup === t.colorGroup).length;
+                      const groupTotal = BOARD_TILES.filter(gt => gt.colorGroup === t.colorGroup).length;
+                      return humanGroupCount + 1 < groupTotal; // human won't get monopoly
+                    })
+                    .sort((a, b) => (BOARD_TILES[b].price || 0) - (BOARD_TILES[a].price || 0));
+
+                  // Offer the AI's cheapest property from a different group + some cash
+                  const offeredProp = aiOfferableProps[aiOfferableProps.length - 1]; // cheapest
+                  const totalOffer = offerCash + (offeredProp ? Math.round((BOARD_TILES[offeredProp].price || 0) * 0.8) : 0);
+
+                  // Only propose if AI can afford it
+                  if (aiPlayer.money >= offerCash && totalOffer >= (missingTile.price || 0) * 1.1) {
+                    set({
+                      pendingAITrade: {
+                        fromPlayerId: currentPlayerId,
+                        toPlayerId: 'player',
+                        offeredProperties: offeredProp ? [offeredProp] : [],
+                        offeredCash: offerCash,
+                        requestedProperties: [missingTile.id],
+                        requestedCash: 0,
+                        reason: `${aiPlayer.name} wants ${missingTile.name} to complete the ${group} color group!`,
+                      },
+                    });
+                    get().addLog({
+                      playerId: currentPlayerId,
+                      playerName: aiPlayer.name,
+                      message: `🤝 ${aiPlayer.name} proposes a trade: wants ${missingTile.name} for ${offeredProp ? BOARD_TILES[offeredProp].name + ' + ' : ''}RM${offerCash}!`,
+                      type: 'system',
+                    });
+                    await delay(1000);
+                  }
+                }
+                break; // Only one trade proposal per turn
+              }
+            }
+          }
+        }
+      }
+    }
+
     // ── 8. END TURN ──
     get().setAIThinking(false);
     const finalPhase = get().phase;
@@ -1907,6 +2001,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         housesAvailable: state.housesAvailable,
         hotelsAvailable: state.hotelsAvailable,
         centerPot: state.centerPot,
+        gameStartTime: state.gameStartTime,
       };
       localStorage.setItem('dewan-rakyat-save', JSON.stringify(saveData));
     } catch {
@@ -1959,6 +2054,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         hotelsAvailable: typeof saveData.hotelsAvailable === 'number' ? saveData.hotelsAvailable : 12,
         centerPot: typeof saveData.centerPot === 'number' ? saveData.centerPot : 0,
         pendingTaxChoice: null,
+        gameStartTime: typeof saveData.gameStartTime === 'number' ? saveData.gameStartTime : Date.now(),
+        pendingAITrade: null,
       });
       return true;
     } catch {
@@ -2449,6 +2546,97 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
     return false;
+  },
+
+  // ─── AI-Initiated Trade: Human accepts the AI's trade proposal ────────
+  acceptAITrade: () => {
+    const state = get();
+    const trade = state.pendingAITrade;
+    if (!trade) return;
+
+    const fromPlayer = state.players.find(p => p.id === trade.fromPlayerId);
+    const toPlayer = state.players.find(p => p.id === trade.toPlayerId);
+    if (!fromPlayer || !toPlayer) return;
+
+    // Validate: both players still own the properties being traded
+    const fromOwnsOffered = trade.offeredProperties.every(id => fromPlayer.properties.includes(id));
+    const toOwnsRequested = trade.requestedProperties.every(id => toPlayer.properties.includes(id));
+    if (!fromOwnsOffered || !toOwnsRequested) {
+      get().addLog({ playerId: 'system', playerName: 'System', message: `❌ Trade cancelled — property ownership changed.`, type: 'system' });
+      set({ pendingAITrade: null });
+      return;
+    }
+
+    // Validate cash
+    if (fromPlayer.money < trade.offeredCash) {
+      get().addLog({ playerId: 'system', playerName: 'System', message: `❌ Trade cancelled — ${fromPlayer.name} can't afford the cash offer.`, type: 'system' });
+      set({ pendingAITrade: null });
+      return;
+    }
+
+    // Execute trade
+    set(s => ({
+      players: s.players.map(p => {
+        if (p.id === trade.fromPlayerId) {
+          return {
+            ...p,
+            money: p.money - trade.offeredCash + trade.requestedCash,
+            properties: [
+              ...p.properties.filter(id => !trade.offeredProperties.includes(id)),
+              ...trade.requestedProperties,
+            ],
+          };
+        }
+        if (p.id === trade.toPlayerId) {
+          return {
+            ...p,
+            money: p.money + trade.offeredCash - trade.requestedCash,
+            properties: [
+              ...p.properties.filter(id => !trade.requestedProperties.includes(id)),
+              ...trade.offeredProperties,
+            ],
+          };
+        }
+        return p;
+      }),
+      tiles: s.tiles.map(t => {
+        if (trade.offeredProperties.includes(t.id)) return { ...t, owner: trade.toPlayerId };
+        if (trade.requestedProperties.includes(t.id)) return { ...t, owner: trade.fromPlayerId };
+        return t;
+      }),
+      pendingAITrade: null,
+    }));
+
+    get().addLog({
+      playerId: 'system',
+      playerName: 'System',
+      message: `🤝 ${toPlayer.name} ACCEPTED ${fromPlayer.name}'s trade! ${trade.offeredProperties.length > 0 ? `${trade.offeredProperties.map(id => BOARD_TILES[id].name).join(', ')} + ` : ''}RM${trade.offeredCash} ↔ ${trade.requestedProperties.map(id => BOARD_TILES[id].name).join(', ')}`,
+      type: 'system',
+    });
+
+    // Check auto-win after trade
+    get().checkAutoWin();
+  },
+
+  // ─── AI-Initiated Trade: Human rejects the AI's trade proposal ───────
+  rejectAITrade: () => {
+    const state = get();
+    const trade = state.pendingAITrade;
+    if (!trade) return;
+    const fromPlayer = state.players.find(p => p.id === trade.fromPlayerId);
+    get().addLog({
+      playerId: 'system',
+      playerName: 'System',
+      message: `🚫 ${fromPlayer?.name}'s trade proposal was REJECTED.`,
+      type: 'system',
+    });
+    set({ pendingAITrade: null });
+  },
+
+  // ─── AI scans for trade opportunities (called during AI turn) ────────
+  aiInitiateTrade: () => {
+    // This is a placeholder — the actual AI trade logic is inline in aiTurn step 7.5
+    // This function exists for future extensibility (e.g., AI-AI trades)
   },
 }));
 
