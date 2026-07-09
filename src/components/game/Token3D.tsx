@@ -6,6 +6,7 @@ import { Text, Sphere, Cylinder, RoundedBox, Billboard, useTexture } from '@reac
 import * as THREE from 'three';
 import { COALITIONS, getTilePosition } from '@/lib/game-data';
 import { useGameStore, type Player } from '@/lib/game-store';
+import { gameFeel, squash, easeOutBack } from '@/lib/game-feel';
 
 // ───────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -161,6 +162,7 @@ function SingleToken({ player, isActive, indexOnTile, offset }: SingleTokenProps
   const hopProgress = useRef(0); // 0..1 for the current hop
   const renderedTile = useRef(player.position); // tile the token is currently sitting on / leaving
   const lastPlayerPos = useRef(player.position);
+  const wasMoving = useRef(false); // tracks landing for squash-and-stretch
 
   // When player.position changes, build a forward path of hops.
   useEffect(() => {
@@ -175,6 +177,7 @@ function SingleToken({ player, isActive, indexOnTile, offset }: SingleTokenProps
     if (newPath.length > 0) {
       pathRef.current = newPath;
       hopProgress.current = 0;
+      wasMoving.current = true;
     }
     lastPlayerPos.current = player.position;
   }, [player.position]);
@@ -200,6 +203,11 @@ function SingleToken({ player, isActive, indexOnTile, offset }: SingleTokenProps
       if (path.length === 0) {
         hopProgress.current = 0;
         currentTile = renderedTile.current;
+        // Token just landed — trigger squash-and-stretch
+        if (wasMoving.current && groupRef.current && !gameFeel.reducedMotion) {
+          squash(groupRef.current, 0.85, 0.18);
+        }
+        wasMoving.current = false;
       } else {
         currentTile = renderedTile.current;
         const nextTile = path[0];

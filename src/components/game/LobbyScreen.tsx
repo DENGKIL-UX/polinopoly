@@ -695,6 +695,35 @@ export default function LobbyScreen() {
             AI controls the other 5 coalitions.
           </p>
         </motion.div>
+
+        {/* Feature highlights */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.4 }}
+          className="mt-6 w-full max-w-3xl mx-auto z-10"
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {[
+              { icon: '🎲', label: '3D Dice', desc: 'Real-time rolling' },
+              { icon: '🏛️', label: '40 Tiles', desc: 'Political parties' },
+              { icon: '🤖', label: '5 AI Players', desc: 'Expert system' },
+              { icon: '💬', label: '1000+ Narrations', desc: 'Political satire' },
+            ].map((feat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 1.5 + i * 0.08 }}
+                className="flex flex-col items-center gap-1 p-2.5 rounded-lg bg-slate-800/30 border border-slate-700/20 backdrop-blur-sm"
+              >
+                <span className="text-xl">{feat.icon}</span>
+                <span className="text-[10px] font-bold text-amber-300">{feat.label}</span>
+                <span className="text-[8px] text-slate-500 text-center">{feat.desc}</span>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* Hero music audio element + toggle */}

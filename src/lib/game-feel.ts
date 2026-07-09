@@ -162,6 +162,17 @@ export class Hitstop {
   }
 }
 
+// ─── Reduced Motion Detection ─────────────────────────────────────────────────
+
+/**
+ * Check if the user prefers reduced motion. When true, screenshake and FOV
+ * punch are suppressed. Flash overlays are kept but shortened.
+ */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
 // ─── Game Feel Orchestrator (Singleton) ──────────────────────────────────────
 
 class GameFeel {
@@ -169,9 +180,21 @@ class GameFeel {
   readonly shakeRig = new ShakeRig();
   readonly fovPunch: FovPunch;
   readonly hitstop = new Hitstop();
+  private _reducedMotion = false;
 
   constructor() {
     this.fovPunch = new FovPunch(42); // default, updated when camera mounts
+    // Check reduced motion preference on construction
+    this._reducedMotion = prefersReducedMotion();
+    // Listen for changes (e.g. user toggles setting)
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      mq.addEventListener?.('change', (e) => { this._reducedMotion = e.matches; });
+    }
+  }
+
+  get reducedMotion(): boolean {
+    return this._reducedMotion;
   }
 
   /**
@@ -180,7 +203,7 @@ class GameFeel {
    */
   update(delta: number, camera: THREE.PerspectiveCamera | null): void {
     this.tweens.update(delta);
-    if (camera) {
+    if (camera && !this._reducedMotion) {
       this.shakeRig.update(delta, camera);
       this.fovPunch.update(delta, camera);
     }
@@ -190,45 +213,57 @@ class GameFeel {
 
   /** Dice roll: light shake + FOV punch + whoosh feel */
   onDiceRoll(): void {
+    if (this._reducedMotion) return;
     this.shakeRig.addTrauma(0.12);
     this.fovPunch.punch(3);
+    rumble(100, 0.3, 0.15);
   }
 
   /** Property purchased: pickup pop + small shake */
   onPropertyBought(): void {
+    if (this._reducedMotion) return;
     this.shakeRig.addTrauma(0.1);
     this.fovPunch.punch(2);
+    rumble(120, 0.3, 0.15);
   }
 
   /** Rent paid: moderate shake + brief hitstop */
   onRentPaid(amount: number): void {
+    if (this._reducedMotion) return;
     const trauma = Math.min(0.5, 0.15 + amount / 1000);
     this.shakeRig.addTrauma(trauma);
     if (amount > 200) {
       this.hitstop.hitstop(60, 0.1);
+      rumble(180, 0.6, 0.3);
     }
   }
 
   /** Bankruptcy: heavy shake + long hitstop + FOV punch */
   onBankruptcy(): void {
+    if (this._reducedMotion) { flashScreen('#ef4444', 0.3, 100); return; }
     this.shakeRig.addTrauma(0.7);
     this.hitstop.hitstop(90, 0.05);
     this.fovPunch.punch(8);
+    rumble(250, 0.9, 0.5);
   }
 
   /** Monopoly completed: celebration shake + FOV punch */
   onMonopoly(): void {
+    if (this._reducedMotion) return;
     this.shakeRig.addTrauma(0.3);
     this.fovPunch.punch(5);
+    rumble(150, 0.4, 0.2);
   }
 
   /** Card drawn: light shake */
   onCardDrawn(): void {
+    if (this._reducedMotion) return;
     this.shakeRig.addTrauma(0.08);
   }
 
   /** Jail: medium shake */
   onJail(): void {
+    if (this._reducedMotion) return;
     this.shakeRig.addTrauma(0.25);
     this.fovPunch.punch(3);
   }
@@ -238,6 +273,30 @@ class GameFeel {
     this.shakeRig.addTrauma(0);
     this.hitstop.hitstop(0);
     this.fovPunch.punch(0);
+  }
+}
+
+// ─── Gamepad Rumble ───────────────────────────────────────────────────────────
+
+/**
+ * Trigger gamepad vibration if supported. Feature-detects vibrationActuator;
+ * playEffect returns a promise that may reject on unsupported hardware.
+ */
+export function rumble(durationMs: number, strong = 0.6, weak = 0.3): void {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  for (const pad of pads) {
+    const actuator = pad?.vibrationActuator;
+    if (!actuator) continue;
+    try {
+      void actuator.playEffect('dual-rumble', {
+        duration: durationMs,
+        strongMagnitude: strong,
+        weakMagnitude: weak,
+      });
+    } catch {
+      // Swallow — unsupported hardware
+    }
   }
 }
 

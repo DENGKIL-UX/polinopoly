@@ -2542,3 +2542,84 @@ Created a comprehensive game feel system inspired by threejs-game-skills `game-f
 3. Add tile-specific impact flash (per-tile material emissive pulse)
 4. Add gamepad rumble support for supported browsers
 5. Add reduced-motion preference check (prefers-reduced-motion)
+
+---
+Task ID: 32
+Agent: Main Agent
+Task: QA + game feel polish (reduced-motion, squash-and-stretch, gamepad rumble, lobby styling)
+
+## Current Project Status Assessment
+
+The game is stable after the stale index.html fix (commit 4bd7019). All core systems work:
+- ✅ Dice roll → buying panel → buy/pass → end turn → AI turns → player's turn
+- ✅ Game feel effects (screenshake, FOV punch, hitstop, pitch variance) from commit 41c04c4
+- ✅ Lint clean, no runtime errors
+- ✅ Cloudflare production deployment successful (build log confirms clean deploy)
+
+## QA Results
+- Dev server running on port 3000 ✓
+- Lobby loads with all coalition cards + CREATE PARTY ✓
+- Dice roll works: phase transitions playing → rolling → moving → buying ✓
+- Buy/Pass buttons appear correctly ✓
+- 15-turn game loop: completed without crashes ✓
+- No console errors ✓
+
+## Completed Modifications This Round
+
+### 1. Reduced-Motion Support (`game-feel.ts`)
+- Added `prefersReducedMotion()` check using `window.matchMedia('(prefers-reduced-motion: reduce)')`
+- GameFeel singleton checks preference on construction and listens for changes
+- All event helpers (`onDiceRoll`, `onPropertyBought`, `onRentPaid`, `onBankruptcy`, `onMonopoly`, `onCardDrawn`, `onJail`) skip shake/FOV punch when reduced motion is preferred
+- Bankruptcy still shows a shortened red flash (100ms instead of 200ms) for accessibility
+- `update()` method skips shake/FOV application when reduced motion is active
+
+### 2. Squash-and-Stretch on Token Landing (`Token3D.tsx`)
+- Added `wasMoving` ref to track when token is in motion
+- Set `wasMoving.current = true` when path is populated (token starts moving)
+- When path becomes empty (token lands), trigger `squash(groupRef.current, 0.85, 0.18)` — volume-preserving squash with easeOutBack overshoot
+- Skipped when `gameFeel.reducedMotion` is true
+- Import: `import { gameFeel, squash, easeOutBack } from '@/lib/game-feel'`
+
+### 3. Gamepad Rumble Support (`game-feel.ts`)
+- Added `rumble(durationMs, strong, weak)` function with feature detection
+- Feature-detects `navigator.getGamepads()` and `pad.vibrationActuator`
+- Uses `playEffect('dual-rumble', ...)` with promise that may reject on unsupported hardware
+- Applied to all major events:
+  - Dice roll: 100ms, 0.3 strong, 0.15 weak (light)
+  - Property bought: 120ms, 0.3 strong, 0.15 weak (light)
+  - Rent paid (>RM200): 180ms, 0.6 strong, 0.3 weak (medium)
+  - Bankruptcy: 250ms, 0.9 strong, 0.5 weak (heavy)
+  - Monopoly: 150ms, 0.4 strong, 0.2 weak (celebration)
+
+### 4. Lobby Feature Highlights (`LobbyScreen.tsx`)
+- Added 4-card feature grid below the rules section:
+  - 🎲 3D Dice — Real-time rolling
+  - 🏛️ 40 Tiles — Political parties
+  - 🤖 5 AI Players — Expert system
+  - 💬 1000+ Narrations — Political satire
+- Each card has staggered entrance animation (delay 1.5s + i*0.08s)
+- Cards use backdrop-blur with subtle border for glass-morphism effect
+- Responsive: 2 columns on mobile, 4 columns on desktop
+
+## Verification Results
+- Lint: clean ✓
+- Dev server: no errors ✓
+- Lobby feature highlights visible: "3D Dice", "40 Tiles", "5 AI Players", "1000+ Narrations" ✓
+- Dice roll → buying panel appears ✓
+- 15-turn game loop: completed without crashes ✓
+- No console errors ✓
+- Reduced-motion support: all event helpers check `_reducedMotion` flag ✓
+- Squash-and-stretch: triggers on token landing (visible in 3D mode) ✓
+
+## Unresolved Issues / Risks
+1. Squash-and-stretch only visible in 3D mode (2D board has no 3D tokens)
+2. Gamepad rumble only works with connected gamepads (most desktop users don't have one)
+3. Tile-specific impact flash not yet implemented (would require per-tile material refs)
+4. Particle burst on property purchase not yet implemented
+
+## Priority Recommendations for Next Phase
+1. Add tile-specific emissive pulse on purchase/rent
+2. Add particle burst on property purchase
+3. Add Coalition Alliance system (Tier 2.1 from review report)
+4. Add sound effect for AI trade proposal
+5. Add visual indicator when reduced-motion is active
