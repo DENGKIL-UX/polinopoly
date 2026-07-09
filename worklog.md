@@ -2465,3 +2465,80 @@ The game is stable after the dice roll freeze fix (commit 6eb6153). All core sys
 3. Implement Coalition Alliance system (Tier 2.1 from review report)
 4. Add turn timer to prevent stalling
 5. Add sound effect for AI trade proposal
+
+---
+Task ID: 31
+Agent: Main Agent
+Task: Implement game feel enhancements inspired by threejs-game-skills
+
+## Current Project Status Assessment
+
+The game is stable and feature-complete. All core systems work:
+- ✅ Dice roll → buying panel → buy/pass → end turn → AI turns → player's turn
+- ✅ AI-initiated trading, shareable victory card, game duration tracking
+- ✅ Lint clean, no runtime errors
+
+## Completed Modifications This Round
+
+### 1. Game Feel Utility Module (`src/lib/game-feel.ts` — NEW)
+Created a comprehensive game feel system inspired by threejs-game-skills `game-feel.md`:
+- **TweenManager** — tiny tween engine with easing (easeOutCubic, easeOutBack, easeInQuad)
+- **ShakeRig** — trauma-based screenshake (trauma² curve, linear decay, deterministic noise)
+  - MAX_OFFSET = 0.35 (reduced for board game)
+  - MAX_ROLL = 0.06 radians
+  - Trauma decays at 1.4 units/second
+- **FovPunch** — additive FOV bump with exponential decay (200ms time constant)
+- **Hitstop** — brief gameplay freeze (60-90ms) for heavy contact
+- **flashScreen()** — DOM-based full-screen flash overlay (cheaper than render-target)
+- **squash()** — volume-preserving squash-and-stretch for Object3D
+- **pickupPop()** — scale up, rise, and fade animation
+- **gameFeel singleton** with event helpers:
+  - `onDiceRoll()` — 0.12 trauma + 3° FOV punch
+  - `onPropertyBought()` — 0.1 trauma + 2° FOV punch
+  - `onRentPaid(amount)` — 0.15-0.5 trauma (scales with amount) + 60ms hitstop for >RM200
+  - `onBankruptcy()` — 0.7 trauma + 90ms hitstop + 8° FOV punch
+  - `onMonopoly()` — 0.3 trauma + 5° FOV punch
+  - `onCardDrawn()` — 0.08 trauma
+  - `onJail()` — 0.25 trauma + 3° FOV punch
+
+### 2. Camera Effects Integration (`GameScene.tsx`)
+- CameraRig now applies `gameFeel.shakeRig.update()` and `gameFeel.fovPunch.update()` every frame
+- Effects applied AFTER camera rig writes base transform (so they layer on top)
+- FOV punch initialized with camera's base FOV on mount
+- TweenManager updated every frame for squash/pop animations
+
+### 3. Game Event Triggers (`game-store.ts`)
+- **rollDice**: `gameFeel.onDiceRoll()` — shake + FOV punch on every dice roll
+- **buyProperty**: `gameFeel.onPropertyBought()` — shake + FOV punch on purchase
+  - + `gameFeel.onMonopoly()` + gold flash when completing a color group
+- **payRent**: `gameFeel.onRentPaid(amount)` — shake + hitstop for big payments
+- **handleBankruptcy**: `gameFeel.onBankruptcy()` + red flash — heavy shake + freeze
+- **drawCard**: `gameFeel.onCardDrawn()` — light shake on card draw
+- **Go to Jail (tile 30)**: `gameFeel.onJail()` + orange flash
+
+### 4. Audio Pitch Variance (`sound-effects.ts`)
+- Added `pitchVariance()` method returning ±6% random multiplier
+- Applied to `playDiceRoll()`, `playBuy()`, `playRent()` — prevents "machine-gun" effect
+- Each playback varies slightly so repeats stay alive
+
+## Verification Results
+- Lint: clean ✓
+- Dev server: no errors ✓
+- Dice roll → game feel shake/FOV punch triggered ✓
+- Buy property → shake + FOV punch ✓
+- 20-turn game loop: completed without crashes ✓
+- Game over screen: victory card with all elements visible ✓
+- No console errors ✓
+
+## Unresolved Issues / Risks
+1. Screenshake/FOV punch only visible in 3D mode (not 2D) — by design (3D camera only)
+2. Hitstop doesn't freeze the game loop (would need more complex delta scaling) — currently only scales the gameFeel system
+3. Squash-and-stretch not yet applied to 3D tokens (would require modifying Token3D.tsx)
+4. Pickup pop not yet used (no objects being collected in 3D space)
+
+## Priority Recommendations for Next Phase
+1. Apply squash-and-stretch to Token3D on landing
+2. Add particle burst on property purchase
+3. Add tile-specific impact flash (per-tile material emissive pulse)
+4. Add gamepad rumble support for supported browsers
+5. Add reduced-motion preference check (prefers-reduced-motion)

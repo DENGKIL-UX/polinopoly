@@ -21,6 +21,7 @@ import {
   type AIContext,
 } from './ai-engine';
 import { NARRATIONS } from './narrations';
+import { gameFeel, flashScreen } from './game-feel';
 
 // --- Types ---
 export interface Player {
@@ -460,6 +461,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase: 'rolling',
     });
 
+    // Game feel: dice roll shake + FOV punch
+    gameFeel.onDiceRoll();
+
     // Check for 3 consecutive doubles = go to jail
     if (newConsecutive >= 3) {
       const cp = state.players.find(p => p.id === state.turnOrder[state.currentTurnIndex]);
@@ -542,6 +546,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         message: `⛓️ ${player.name} disyorkan ke SPR! Off to Tahanan!`,
         type: 'jail',
       });
+      // Game feel: sent to jail — medium shake + FOV punch
+      gameFeel.onJail();
+      flashScreen('#f97316', 0.4, 150); // orange flash
       return;
     }
 
@@ -596,6 +603,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         message: `🃏 ${player.name} draws: "${card.title}"`,
         type: 'card',
       });
+      // Game feel: card drawn — light shake
+      gameFeel.onCardDrawn();
       return;
     }
 
@@ -714,6 +723,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       type: 'buy',
     });
 
+    // Game feel: property purchased — shake + FOV punch
+    gameFeel.onPropertyBought();
+
     // Achievement: first_property (only for human player)
     if (currentPlayerId === 'player') {
       get().unlockAchievement('first_property');
@@ -725,6 +737,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       const ownsAll = colorGroupTiles.every(t => newProperties.includes(t.id));
       if (ownsAll) {
         get().unlockAchievement('landlord');
+        // Game feel: monopoly completed — celebration shake
+        gameFeel.onMonopoly();
+        flashScreen('#fbbf24', 0.3, 150); // gold flash
       }
     }
 
@@ -798,6 +813,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         currentRentPayment: null,
         phase: 'landed',
       }));
+      // Game feel: rent paid — shake + hitstop for big payments
+      gameFeel.onRentPaid(amount);
     }
 
     // Achievement: high_roller — player pays > RM500 rent in a single payment
@@ -2469,6 +2486,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         type: 'system',
       });
     }
+
+    // Game feel: bankruptcy — heavy shake + hitstop + FOV punch + red flash
+    gameFeel.onBankruptcy();
+    flashScreen('#ef4444', 0.6, 200); // red flash
 
     // 7. Check game over / auto-win
     const activePlayers = get().players.filter(p => !p.isBankrupt);

@@ -71,6 +71,15 @@ class SoundManager {
     return this.ctx;
   }
 
+  /**
+   * Returns a random pitch multiplier in [0.94, 1.06] (±6%).
+   * Used to avoid the "machine-gun" effect of identical repeated samples.
+   * Inspired by threejs-game-skills game-feel.md audio coupling.
+   */
+  private pitchVariance(): number {
+    return 1 + (Math.random() - 0.5) * 0.12;
+  }
+
   // -- Volume / mute --------------------------------------------------------
 
   get volume(): number {
@@ -114,10 +123,12 @@ class SoundManager {
     const burstCount = 8;
     const burstDuration = 0.025;
     const gap = 0.22 / burstCount;
+    const pitch = this.pitchVariance();
 
     for (let i = 0; i < burstCount; i++) {
       const src = ctx.createBufferSource();
       src.buffer = createNoiseBuffer(ctx, burstDuration);
+      src.playbackRate.value = pitch; // pitch variance per roll
       const g = ctx.createGain();
       const t = now + i * gap;
       // Each burst slightly louder then quieter towards the end
@@ -144,17 +155,18 @@ class SoundManager {
     const ctx = this.ensureCtx();
     const out = this.dest(ctx);
     const now = ctx.currentTime;
+    const pitch = this.pitchVariance();
 
-    // First note — E5 (659 Hz)
-    tone(ctx, out, 659, now, 0.1, 'sine', 0.3);
+    // First note — E5 (659 Hz) with pitch variance
+    tone(ctx, out, 659 * pitch, now, 0.1, 'sine', 0.3);
     // Second note — G5 (784 Hz) slightly delayed, brighter
-    tone(ctx, out, 784, now + 0.08, 0.15, 'triangle', 0.35);
+    tone(ctx, out, 784 * pitch, now + 0.08, 0.15, 'triangle', 0.35);
 
     // Add a subtle shimmer (high harmonic)
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1568, now + 0.06); // G6
+    osc.frequency.setValueAtTime(1568 * pitch, now + 0.06); // G6
     g.gain.setValueAtTime(0.08, now + 0.06);
     g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
     osc.connect(g);
@@ -168,13 +180,14 @@ class SoundManager {
     const ctx = this.ensureCtx();
     const out = this.dest(ctx);
     const now = ctx.currentTime;
+    const pitch = this.pitchVariance();
 
     // First descending tone: Bb3 → Ab3
     const osc1 = ctx.createOscillator();
     const g1 = ctx.createGain();
     osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(233, now); // Bb3
-    osc1.frequency.linearRampToValueAtTime(208, now + 0.2); // Ab3
+    osc1.frequency.setValueAtTime(233 * pitch, now); // Bb3
+    osc1.frequency.linearRampToValueAtTime(208 * pitch, now + 0.2); // Ab3
     g1.gain.setValueAtTime(0.18, now);
     g1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
     osc1.connect(g1);
@@ -186,18 +199,14 @@ class SoundManager {
     const osc2 = ctx.createOscillator();
     const g2 = ctx.createGain();
     osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(196, now + 0.18); // G3
-    osc2.frequency.linearRampToValueAtTime(175, now + 0.38); // F3
+    osc2.frequency.setValueAtTime(196 * pitch, now + 0.18); // G3
+    osc2.frequency.linearRampToValueAtTime(175 * pitch, now + 0.38); // F3
     g2.gain.setValueAtTime(0.18, now + 0.18);
     g2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     osc2.connect(g2);
     g2.connect(out);
     osc2.start(now + 0.18);
     osc2.stop(now + 0.55);
-
-    // Low-pass filter on both for muffled feel
-    // (applied via a shared filter)
-    // We already connected directly — the sawtooth with LP is close enough
   }
 
   /** Whoosh / swoosh — filtered noise sweep. */

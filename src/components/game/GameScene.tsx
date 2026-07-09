@@ -12,13 +12,15 @@ import Token3D from './Token3D';
 import Dice3D from './Dice3D';
 import { useGameStore } from '@/lib/game-store';
 import { getTilePosition } from '@/lib/game-data';
+import { gameFeel, flashScreen } from '@/lib/game-feel';
 
 const BOARD_SIZE = 20;
 
 /* ───────────────────────────────────────────────────────────────────
    CAMERA RIG — smoothly focuses the orbit target on the active
    player or the selected tile. Pauses auto-rotate while the user
-   is dragging. (Inspired by itaylayzer/Monopoly property navigation.)
+   is dragging. Also applies trauma-based screenshake and FOV punch
+   from the game-feel system.
    ─────────────────────────────────────────────────────────────────── */
 function CameraRig({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const players = useGameStore((s) => s.players);
@@ -26,8 +28,16 @@ function CameraRig({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const currentTurnIndex = useGameStore((s) => s.currentTurnIndex);
   const selectedTileId = useGameStore((s) => s.selectedTileId);
   const phase = useGameStore((s) => s.phase);
+  const { camera } = useThree();
 
   const focusVec = useMemo(() => new THREE.Vector3(0, 0, 0), []);
+
+  // Initialize FOV punch with the camera's base FOV
+  useEffect(() => {
+    if (camera instanceof THREE.PerspectiveCamera) {
+      gameFeel.fovPunch.reset(camera.fov);
+    }
+  }, [camera]);
 
   useFrame((_, delta) => {
     const controls = controlsRef.current;
@@ -47,6 +57,17 @@ function CameraRig({ controlsRef }: { controlsRef: React.RefObject<any> }) {
 
     controls.target.lerp(target, Math.min(delta * 2.5, 1));
     controls.update();
+
+    // Apply game feel effects: screenshake + FOV punch
+    // These are applied AFTER the camera rig writes the base transform,
+    // so they layer on top without being overwritten.
+    if (camera instanceof THREE.PerspectiveCamera) {
+      gameFeel.shakeRig.update(delta, camera);
+      gameFeel.fovPunch.update(delta, camera);
+    }
+
+    // Update tween manager (for squash-and-stretch, pickup pop, etc.)
+    gameFeel.tweens.update(delta);
   });
 
   return null;
