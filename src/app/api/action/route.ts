@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const res = await fetch('http://localhost:3000/full-page', {
+    // Build the URL relative to the current request origin so it works
+    // in both dev (localhost:3000) and production (Cloudflare Workers).
+    const origin = request.nextUrl.origin;
+    const res = await fetch(`${origin}/api/full-page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: request.body,
