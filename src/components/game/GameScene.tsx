@@ -244,7 +244,7 @@ export default function GameScene() {
     <div className="w-full h-full">
       <Canvas
         camera={camera}
-        shadows
+        shadows="percentage"
         dpr={[1, 2]}
         gl={{
           antialias: true,
