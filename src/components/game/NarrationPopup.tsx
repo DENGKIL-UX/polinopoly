@@ -56,7 +56,7 @@ export function NarrationPopup({ narration, isVisible }: NarrationPopupProps) {
           style={{ maxWidth: '90vw', width: '480px' }}
         >
           <div
-            className="relative rounded-xl overflow-hidden shadow-2xl border-2 backdrop-blur-md"
+            className="relative rounded-xl overflow-hidden shadow-lg border-2"
             style={{
               borderColor: style.color,
               background: `linear-gradient(135deg, rgba(10,10,30,0.95) 0%, rgba(20,20,50,0.92) 100%)`,

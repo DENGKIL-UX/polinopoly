@@ -432,7 +432,7 @@ export default function LobbyScreen() {
             >
               {selectedCoalition === 'CUSTOM' ? (
                 /* ── Create Your Own Party form ── */
-                <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-sm">
+                <Card className="bg-slate-800/80 border-slate-700/50">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2 mb-2">
                       <Plus className="h-4 w-4" style={{ color: partyColor }} />
@@ -562,7 +562,7 @@ export default function LobbyScreen() {
                 </Card>
               ) : (
                 /* ── Preset coalition info ── */
-                <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-sm">
+                <Card className="bg-slate-800/80 border-slate-700/50">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <div
@@ -665,7 +665,7 @@ export default function LobbyScreen() {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <Card className="mt-3 bg-slate-800/40 border-slate-700/30 backdrop-blur-sm">
+                <Card className="mt-3 bg-slate-800/60 border-slate-700/30">
                   <CardContent className="p-4 text-[11px] text-slate-400 space-y-2 leading-relaxed">
                     <p><b className="text-amber-300">Objektif:</b> Jadilah gabungan terakhir yang berdiri! Beli hartanah, kutip sewa, dan bankrapkan lawan anda.</p>
                     <p><b className="text-amber-300">Objective:</b> Be the last coalition standing! Buy properties, collect rent, and bankrupt your opponents.</p>
@@ -715,7 +715,7 @@ export default function LobbyScreen() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 1.5 + i * 0.08 }}
-                className="flex flex-col items-center gap-1 p-2.5 rounded-lg bg-slate-800/30 border border-slate-700/20 backdrop-blur-sm"
+                className="flex flex-col items-center gap-1 p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/20"
               >
                 <span className="text-xl">{feat.icon}</span>
                 <span className="text-[10px] font-bold text-amber-300">{feat.label}</span>

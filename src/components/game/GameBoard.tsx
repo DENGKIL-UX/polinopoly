@@ -468,7 +468,7 @@ export default function GameBoard() {
               <div className="relative">
                 <div className="absolute inset-0 blur-md bg-amber-400/20" />
                 <div className="relative text-xl md:text-3xl font-black tracking-tighter">
-                  <span className="bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-200 bg-clip-text text-transparent drop-shadow-lg"
+                  <span className="text-amber-400 drop-shadow-lg"
                     style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>
                     DEWAN RAKYAT
                   </span>

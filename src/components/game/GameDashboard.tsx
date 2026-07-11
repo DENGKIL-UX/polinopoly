@@ -36,7 +36,7 @@ function SoundToggleButton() {
   return (
     <button
       onClick={toggle}
-      className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors backdrop-blur-sm"
+      className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors "
       title={enabled ? 'Mute sounds' : 'Enable sounds'}
     >
       {enabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
@@ -51,7 +51,7 @@ function HowToPlayButton() {
     <div className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        className="pointer-events-auto w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-yellow-400 hover:border-yellow-500/40 transition-colors backdrop-blur-sm"
+        className="pointer-events-auto w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-yellow-400 hover:border-yellow-500/40 transition-colors "
       >
         <HelpCircle className="h-4 w-4" />
       </button>
@@ -63,7 +63,7 @@ function HowToPlayButton() {
             exit={{ opacity: 0, scale: 0.9, y: -4 }}
             className="absolute top-10 right-0 w-64 z-40 pointer-events-auto"
           >
-            <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 backdrop-blur-sm">
+            <Card className="bg-slate-900/95 border-slate-600/40 shadow-lg shadow-black/30">
               <CardHeader className="p-3 pb-1.5">
                 <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                   <HelpCircle className="h-3.5 w-3.5" />Cara Bermain / How to Play
@@ -153,7 +153,7 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
   const netWorth = player.money + propertyValue;
 
   return (
-    <div className={`relative overflow-hidden flex items-center gap-2 px-2.5 py-2 pt-2.5 rounded-xl border transition-all text-xs backdrop-blur-sm flex-shrink-0 ${
+    <div className={`relative overflow-hidden flex items-center gap-2 px-2.5 py-2 pt-2.5 rounded-xl border transition-all text-xs flex-shrink-0 ${
       isCurrentTurn
         ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5'
         : 'border-slate-700/30 bg-slate-800/30'
@@ -256,7 +256,7 @@ function TurnBanner() {
         className="absolute top-[20%] left-1/2 -translate-x-1/2 z-50 pointer-events-none"
       >
         <div
-          className="px-6 py-2.5 rounded-full backdrop-blur-md shadow-2xl border-2"
+          className="px-6 py-2.5 rounded-full shadow-lg border-2"
           style={{
             borderColor: bannerColor,
             background: `linear-gradient(135deg, rgba(10,10,30,0.92) 0%, rgba(20,20,50,0.88) 100%)`,
@@ -301,7 +301,7 @@ function MarketTicker() {
     { l: 'INF', v: `×${ticks.inflation}`, c: (ticks.inflation - 1) * 50 },
   ];
   return (
-    <div className="flex items-center gap-3 md:gap-4 overflow-x-auto px-3 py-1.5 bg-slate-950/90 border-b border-slate-700/30 text-[10px] backdrop-blur-sm">
+    <div className="flex items-center gap-3 md:gap-4 overflow-x-auto px-3 py-1.5 bg-slate-950/90 border-b border-slate-700/30 text-[10px] ">
       <span className="font-bold text-yellow-500 flex items-center gap-1.5 flex-shrink-0">
         <TrendingUp className="h-3 w-3" />
         <span className="hidden sm:inline">BURSA MALAYSIA</span>
@@ -376,7 +376,7 @@ function GameLogPanel() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [gameLog.length]);
   return (
-    <Card className="bg-slate-950/80 border-slate-700/20 backdrop-blur-md">
+    <Card className="bg-slate-950/80 border-slate-700/20 ">
       <CardHeader className="p-2 pb-1">
         <CardTitle className="text-[10px] font-bold text-amber-400/80 flex items-center gap-1 tracking-wide uppercase">
           <Landmark className="h-3 w-3" />Hansard Log
@@ -411,7 +411,7 @@ function AIQuoteBubble() {
         exit={{ opacity: 0, x: -20 }}
         className="absolute bottom-20 left-2 right-2 md:left-auto md:right-2 md:w-72 z-30"
       >
-        <Card className="bg-slate-900/95 border-yellow-500/20 shadow-xl shadow-black/20 backdrop-blur-sm">
+        <Card className="bg-slate-900/95 border-yellow-500/20 shadow-xl shadow-black/20 ">
           <CardContent className="p-3">
             {aiThinking && !latest ? (
               <div className="flex items-center gap-2">
@@ -469,7 +469,7 @@ function TileDetail() {
         exit={{ opacity: 0, scale: 0.9, y: -10 }}
         className="absolute top-28 left-1/2 -translate-x-1/2 z-30"
       >
-        <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 min-w-60 backdrop-blur-sm">
+        <Card className="bg-slate-900/95 border-slate-600/40 shadow-lg shadow-black/30 min-w-60 ">
           <CardContent className="p-3.5">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -593,7 +593,7 @@ function AuctionPanel() {
   };
 
   return (
-    <Card className="bg-slate-900/95 border-amber-500/30 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+    <Card className="bg-slate-900/95 border-amber-500/30 shadow-lg shadow-amber-500/10">
       <CardHeader className="p-3 pb-2">
         <CardTitle className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
           <Gavel className="h-3.5 w-3.5" />
@@ -756,7 +756,7 @@ function GameSettingsPanel() {
       <motion.button
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(v => !v)}
-        className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors backdrop-blur-sm"
+        className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors "
         title="Game Settings"
       >
         <Settings className="h-4 w-4" />
@@ -769,7 +769,7 @@ function GameSettingsPanel() {
             exit={{ opacity: 0, scale: 0.9, y: -4 }}
             className="absolute top-10 right-0 w-64 z-40 pointer-events-auto"
           >
-            <Card className="bg-slate-900/95 border-slate-600/40 shadow-2xl shadow-black/30 backdrop-blur-sm">
+            <Card className="bg-slate-900/95 border-slate-600/40 shadow-lg shadow-black/30">
               <CardHeader className="p-3 pb-1.5 flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-[11px] font-bold text-cyan-400 flex items-center gap-1.5">
                   <Settings className="h-3.5 w-3.5" />Tetapan / Settings
@@ -889,7 +889,7 @@ function WealthChart() {
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className="absolute top-16 right-1 z-30 w-72 pointer-events-auto"
     >
-      <Card className="bg-slate-900/95 border-slate-600/30 shadow-2xl shadow-black/30 backdrop-blur-sm">
+      <Card className="bg-slate-900/95 border-slate-600/30 shadow-lg shadow-black/30">
         <CardHeader className="p-3 pb-2 flex-row items-center justify-between space-y-0">
           <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5" />Carta Kekayaan
@@ -965,7 +965,7 @@ function AchievementsPanel() {
       <motion.button
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-800/60 border border-slate-700/30 text-[10px] text-slate-400 font-medium backdrop-blur-sm hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-800/60 border border-slate-700/30 text-[10px] text-slate-400 font-medium hover:text-amber-400 hover:border-amber-500/30 transition-colors"
       >
         <Medal className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">Achievements</span>
@@ -979,7 +979,7 @@ function AchievementsPanel() {
             exit={{ opacity: 0, scale: 0.9, y: -4 }}
             className="absolute top-10 right-0 w-72 z-50"
           >
-            <Card className="bg-slate-900/98 border-amber-500/20 shadow-2xl shadow-black/40 backdrop-blur-sm">
+            <Card className="bg-slate-900/98 border-amber-500/20 shadow-lg shadow-black/40">
               <CardHeader className="p-3 pb-1.5">
                 <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                   <Star className="h-3.5 w-3.5" />
@@ -1039,7 +1039,7 @@ function TradeButton() {
       <motion.button
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
         onClick={() => setDropdownOpen(v => !v)}
-        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors backdrop-blur-sm"
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors "
         title="Trade with another player"
       >
         <Handshake className="h-3.5 w-3.5" />
@@ -1052,7 +1052,7 @@ function TradeButton() {
             exit={{ opacity: 0, scale: 0.9, y: -4 }}
             className="absolute top-10 right-0 w-52 z-50"
           >
-            <Card className="bg-slate-900/98 border-amber-500/20 shadow-2xl shadow-black/40 backdrop-blur-sm">
+            <Card className="bg-slate-900/98 border-amber-500/20 shadow-lg shadow-black/40">
               <CardHeader className="p-3 pb-1.5">
                 <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                   <Handshake className="h-3.5 w-3.5" />Pilih Rakan Dagangan
@@ -1159,7 +1159,7 @@ function TradePanel() {
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
       className="max-w-md mx-auto w-full"
     >
-      <Card className="bg-slate-900/95 border-amber-500/30 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+      <Card className="bg-slate-900/95 border-amber-500/30 shadow-lg shadow-amber-500/10">
         <CardHeader className="p-3 pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
@@ -1339,12 +1339,12 @@ function SaveLoadButtons() {
   return (
     <div className="flex items-center gap-1 relative">
       <button onClick={handleSave}
-        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors backdrop-blur-sm"
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors "
         title="Save game">
         <Save className="h-3.5 w-3.5" />
       </button>
       <button onClick={handleLoad} disabled={!hasSavedGame()}
-        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-500/40 transition-colors backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed"
+        className="w-7 h-7 rounded-full bg-slate-800/80 border border-slate-600/40 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-500/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         title={!hasSavedGame() ? 'No saved game' : 'Load game'}>
         <FolderOpen className="h-3.5 w-3.5" />
       </button>
@@ -1417,7 +1417,7 @@ function PropertyPortfolio() {
               useGameStore.setState({ phase: 'lobby' });
             }
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-amber-600/40 text-[10px] text-amber-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-amber-600/40 text-[10px] text-amber-300 font-medium shadow-lg hover:bg-slate-700/80 transition-colors"
           title="Back to hero page"
         >
           <Home className="h-3.5 w-3.5" />
@@ -1426,7 +1426,7 @@ function PropertyPortfolio() {
         <motion.button
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
           onClick={() => useGameStore.getState().toggleWealthChart()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-emerald-600/40 text-[10px] text-emerald-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-emerald-600/40 text-[10px] text-emerald-300 font-medium shadow-lg hover:bg-slate-700/80 transition-colors"
           title="Toggle wealth chart"
         >
           <TrendingUp className="h-3.5 w-3.5" />
@@ -1435,7 +1435,7 @@ function PropertyPortfolio() {
         <motion.button
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
           onClick={togglePortfolio}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium backdrop-blur-sm shadow-lg hover:bg-slate-700/80 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-600/40 text-[10px] text-slate-300 font-medium shadow-lg hover:bg-slate-700/80 transition-colors"
         >
           <Briefcase className="h-3.5 w-3.5" />
           <span>Portfolio</span>
@@ -1457,7 +1457,7 @@ function PropertyPortfolio() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="absolute top-16 left-1 z-30 w-72 max-h-[65vh] pointer-events-auto"
           >
-            <Card className="bg-slate-900/95 border-slate-600/30 shadow-2xl shadow-black/30 backdrop-blur-sm">
+            <Card className="bg-slate-900/95 border-slate-600/30 shadow-lg shadow-black/30">
               <CardHeader className="p-3 pb-2 flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                   <Crown className="h-3.5 w-3.5" />Portfolio Hartanah
@@ -1626,7 +1626,7 @@ function AchievementToast() {
         exit={{ opacity: 0, y: 20, scale: 0.9 }}
         className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
       >
-        <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-900/90 to-yellow-900/90 border border-amber-500/40 shadow-2xl shadow-amber-500/20 backdrop-blur-sm animate-achievement-glow">
+        <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-900/90 to-yellow-900/90 border border-amber-500/40 shadow-lg shadow-amber-500/20 animate-achievement-glow">
           <span className="text-2xl">{latestUnlocked.emoji}</span>
           <div>
             <p className="text-[9px] text-amber-400/80 uppercase tracking-widest font-bold">Achievement Unlocked!</p>
@@ -1758,7 +1758,7 @@ export default function GameDashboard() {
 
       {/* Turn / Round indicator badge */}
       <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-        <Badge className="bg-slate-800/80 border-slate-600/40 text-[9px] text-amber-300 backdrop-blur-sm pointer-events-auto">
+        <Badge className="bg-slate-800/80 border-slate-600/40 text-[9px] text-amber-300 pointer-events-auto">
           <RotateCw className="h-2.5 w-2.5 mr-1" />
           {'Round '}{Math.ceil(turnCount / Math.max(players.filter(p => !p.isBankrupt).length, 1))}{' · Turn '}{turnCount}
         </Badge>
@@ -1803,7 +1803,7 @@ export default function GameDashboard() {
             return (
             <motion.div key="buy" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className="max-w-xs mx-auto w-full">
-              <Card className="bg-slate-900/95 border-emerald-500/20 shadow-2xl shadow-black/20 backdrop-blur-sm">
+              <Card className="bg-slate-900/95 border-emerald-500/20 shadow-lg shadow-black/20">
                 <CardContent className="p-3.5 space-y-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xl shadow-inner"
@@ -1853,7 +1853,7 @@ export default function GameDashboard() {
           {phase === 'paying_rent' && currentRentPayment && (
             <motion.div key="rent" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20 }}
               className="max-w-xs mx-auto">
-              <Card className="bg-red-950/80 border-red-500/30 shadow-2xl shadow-red-500/10 backdrop-blur-sm">
+              <Card className="bg-red-950/80 border-red-500/30 shadow-lg shadow-red-500/10">
                 <CardContent className="p-3.5 text-center space-y-2.5">
                   <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: 2 }}><AlertTriangle className="h-6 w-6 text-red-400 mx-auto" /></motion.div>
                   <p className="text-xs font-bold text-red-300">Rent Perlu Dibayar!</p>
@@ -1870,7 +1870,7 @@ export default function GameDashboard() {
             <motion.div key="card" initial={{ opacity: 0, y: 20, rotateY: 60, scale: 0.9 }} animate={{ opacity: 1, y: 0, rotateY: 0, scale: 1 }} exit={{ opacity: 0, y: 20, rotateY: -60, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
               className="max-w-xs mx-auto">
-              <Card className={`shadow-2xl backdrop-blur-sm ${currentCard.effect.value > 0 ? 'bg-emerald-950/80 border-emerald-500/30' : 'bg-red-950/80 border-red-500/30'}`}>
+              <Card className={`shadow-lg ${currentCard.effect.value > 0 ? 'bg-emerald-950/80 border-emerald-500/30' : 'bg-red-950/80 border-red-500/30'}`}>
                 <CardContent className="p-3.5 space-y-2 text-center">
                   <p className={`text-sm font-black ${currentCard.effect.value > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {currentCard.effect.type === 'money' && currentCard.effect.value > 0 && '💰'}
@@ -1895,7 +1895,7 @@ export default function GameDashboard() {
           {phase === 'jail_decision' && isPlayerTurn && currentPlayer?.isInJail && (
             <motion.div key="jail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
               className="max-w-xs mx-auto">
-              <Card className="bg-orange-950/80 border-orange-500/30 shadow-2xl backdrop-blur-sm">
+              <Card className="bg-orange-950/80 border-orange-500/30 shadow-lg">
                 <CardContent className="p-3.5 space-y-2.5 text-center">
                   <p className="text-xs font-bold text-orange-300">⛓️ Tahanan SPRM</p>
                   <p className="text-[10px] text-slate-400">Turn {currentPlayer.jailTurns}/3 sebelum dibebaskan</p>
@@ -1939,7 +1939,7 @@ export default function GameDashboard() {
           {pendingTaxChoice && pendingTaxChoice.playerId === 'player' && (
             <motion.div key="tax-choice" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className="max-w-sm mx-auto w-full">
-              <Card className="bg-amber-950/80 border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+              <Card className="bg-amber-950/80 border-amber-500/40 shadow-lg shadow-amber-500/10">
                 <CardContent className="p-4 space-y-3">
                   <div className="text-center">
                     <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: 2 }}>
@@ -2008,7 +2008,7 @@ export default function GameDashboard() {
             return (
             <motion.div key="ai-trade" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className="max-w-sm mx-auto w-full">
-              <Card className="bg-slate-900/95 border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-sm">
+              <Card className="bg-slate-900/95 border-amber-500/40 shadow-lg shadow-amber-500/10">
                 <CardHeader className="p-3 pb-1.5">
                   <CardTitle className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
                     <Handshake className="h-3.5 w-3.5" />
@@ -2092,7 +2092,7 @@ export default function GameDashboard() {
             };
             return (
             <motion.div key="over" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto">
-              <Card className="bg-gradient-to-br from-yellow-900/80 via-amber-900/60 to-yellow-900/80 border-yellow-500/50 shadow-2xl shadow-yellow-500/10 backdrop-blur-sm">
+              <Card className="bg-gradient-to-br from-yellow-900/80 via-amber-900/60 to-yellow-900/80 border-yellow-500/50 shadow-lg shadow-yellow-500/10 ">
                 <CardContent className="p-5 text-center space-y-3">
                   <motion.div animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
                     <Trophy className="h-12 w-12 text-yellow-400 mx-auto drop-shadow-lg" />
