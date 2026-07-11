@@ -198,6 +198,24 @@ function PlayerCard({ player, isCurrentTurn }: { player: Player; isCurrentTurn: 
           <span className="flex items-center gap-0.5" title={`Net worth: RM${netWorth.toLocaleString()}`}><Building2 className="h-2.5 w-2.5" />{player.properties.length} props</span>
           {player.hasGetOutOfJailFree && <span className="text-amber-400" title="Get Out of Jail Free">🔑</span>}
         </div>
+        {/* Property color group dots — shows which color groups the player owns */}
+        {player.properties.length > 0 && (() => {
+          const ownedGroups = new Set<string>();
+          for (const tid of player.properties) {
+            const t = BOARD_TILES[tid];
+            if (t.colorGroup) ownedGroups.add(t.colorGroup);
+          }
+          if (ownedGroups.size === 0) return null;
+          return (
+            <div className="flex gap-0.5 mt-0.5">
+              {Array.from(ownedGroups).map(g => (
+                <div key={g} className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: COLOR_GROUP_HEX[g as keyof typeof COLOR_GROUP_HEX] || '#6b7280' }}
+                  title={g} />
+              ))}
+            </div>
+          );
+        })()}
         {/* Net worth label under bar (tiny) */}
         <div className="text-[7px] text-slate-500/80 mt-0.5 font-mono">
           NW: RM{netWorth.toLocaleString()}

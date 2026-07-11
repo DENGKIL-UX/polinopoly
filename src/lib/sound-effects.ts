@@ -628,6 +628,30 @@ class SoundManager {
     noise.start(now);
     noise.stop(now + 0.2);
   }
+
+  /** Trade proposal — two-note chime (rising then falling, like a doorbell). */
+  playTradeProposal(): void {
+    const ctx = this.ensureCtx();
+    const out = this.dest(ctx);
+    const now = ctx.currentTime;
+    const pitch = this.pitchVariance();
+
+    // Rising note — G5 (784 Hz)
+    tone(ctx, out, 784 * pitch, now, 0.12, 'sine', 0.25);
+    // Falling note — C6 (1047 Hz) slightly delayed
+    tone(ctx, out, 1047 * pitch, now + 0.1, 0.18, 'sine', 0.25);
+    // Soft shimmer
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1568 * pitch, now + 0.08);
+    g.gain.setValueAtTime(0.06, now + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(g);
+    g.connect(out);
+    osc.start(now + 0.08);
+    osc.stop(now + 0.32);
+  }
 }
 
 // ---------------------------------------------------------------------------

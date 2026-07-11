@@ -236,14 +236,19 @@ function CornerTile({ tile }: { tile: Tile }) {
 function EdgeTile({ tile }: { tile: Tile }) {
   const pos = getTilePosition(tile.id, BOARD_SIZE);
   const tiles = useGameStore((s) => s.tiles);
+  const players = useGameStore((s) => s.players);
   const selectedTileId = useGameStore((s) => s.selectedTileId);
   const selectTile = useGameStore((s) => s.selectTile);
   const [hovered, setHovered] = useState(false);
   const groupRef = useRef<THREE.Group>(null!);
+  const pulseRef = useRef(0); // tile pulse animation on landing
 
   const tileState = tiles[tile.id];
   const isSelected = selectedTileId === tile.id;
   const color = getTileColor(tile);
+
+  // Track if any player is currently on this tile
+  const playersOnTile = players.filter(p => p.position === tile.id && !p.isBankrupt);
 
   // Per-type material config. All tiles are FLAT (same thin height) like
   // real Monopoly — the color bar on the outer edge provides the visual identity.
@@ -274,10 +279,22 @@ function EdgeTile({ tile }: { tile: Tile }) {
   };
 
   // Hover / select — flat tiles lift slightly + emit glow (no big 3D pop)
-  useFrame((_, delta) => {
+  // Also pulses when a player is on this tile (impact flash on landing)
+  useFrame((state, delta) => {
     if (!groupRef.current) return;
     const targetY = hovered || isSelected ? 0.08 : 0.02;
-    groupRef.current.position.y += (targetY - groupRef.current.position.y) * Math.min(delta * 8, 1);
+    let y = targetY;
+
+    // Pulse when a player is on this tile
+    if (playersOnTile.length > 0) {
+      pulseRef.current += delta * 3;
+      const pulse = Math.sin(pulseRef.current) * 0.04;
+      y = targetY + Math.max(0, pulse); // only lift up, never below
+    } else {
+      pulseRef.current = 0;
+    }
+
+    groupRef.current.position.y += (y - groupRef.current.position.y) * Math.min(delta * 8, 1);
   });
 
   const houseCount = tileState?.houses ?? 0;
@@ -912,6 +929,54 @@ function CardDeck({ position, color, label }: { position: [number, number, numbe
 }
 
 // ───────────────────────────────────────────────────────────────────
+// PURCHASE EFFECT — gold particle burst when a property is bought
+// ───────────────────────────────────────────────────────────────────
+
+function PurchaseEffect() {
+  const tiles = useGameStore((s) => s.tiles);
+  const prevOwnersRef = useRef<Record<number, string | undefined>>({});
+  const effectsRef = useRef<{ id: number; tileId: number; ts: number }[]>([]);
+  const effectIdRef = useRef(0);
+  const [, forceUpdate] = useState(0);
+
+  // Detect new property purchases by comparing tile owners
+  let hasNew = false;
+  for (const tile of tiles) {
+    const prevOwner = prevOwnersRef.current[tile.id];
+    const currOwner = tile.owner;
+    if (prevOwner === undefined && currOwner !== undefined && currOwner !== '') {
+      effectsRef.current.push({ id: effectIdRef.current++, tileId: tile.id, ts: Date.now() });
+      hasNew = true;
+    }
+    prevOwnersRef.current[tile.id] = currOwner;
+  }
+
+  if (hasNew) {
+    const currentIds = effectsRef.current.slice(-3).map((e) => e.id);
+    queueMicrotask(() => {
+      setTimeout(() => {
+        effectsRef.current = effectsRef.current.filter((e) => !currentIds.includes(e.id));
+        forceUpdate((n) => n + 1);
+      }, 2000);
+    });
+  }
+
+  return (
+    <group>
+      {effectsRef.current.map((e) => {
+        const pos = getTilePosition(e.tileId, BOARD_SIZE);
+        return (
+          <group key={e.id}>
+            <ParticleBurst position={[pos.x, 0.8, pos.z]} type="confetti" color="#fbbf24" color2="#fde68a" />
+            <Shockwave position={[pos.x, 0.15, pos.z]} color="#fbbf24" duration={1000} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ───────────────────────────────────────────────────────────────────
 
@@ -954,6 +1019,9 @@ export default function Board3D() {
 
       {/* ── Landing effects (particles + shockwave + beam) ── */}
       <LandingEffects />
+
+      {/* ── Purchase celebration effect (gold burst on property buy) ── */}
+      <PurchaseEffect />
 
       {/* ── All 40 tiles ── */}
       <group>

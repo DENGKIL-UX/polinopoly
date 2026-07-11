@@ -2623,3 +2623,66 @@ The game is stable after the stale index.html fix (commit 4bd7019). All core sys
 3. Add Coalition Alliance system (Tier 2.1 from review report)
 4. Add sound effect for AI trade proposal
 5. Add visual indicator when reduced-motion is active
+
+---
+Task ID: 33
+Agent: Main Agent
+Task: Tile pulse, purchase effect, AI trade sound, player card color dots
+
+## Current Project Status Assessment
+
+The game is stable on commit 8772e17. All core systems work:
+- ✅ Dice roll → buying panel → buy/pass → end turn → AI turns → player's turn
+- ✅ Game feel effects (screenshake, FOV punch, hitstop, pitch variance, squash-and-stretch)
+- ✅ AI-initiated trading, shareable victory card, game duration tracking
+- ✅ AI slop cleanup (42→4 backdrop-blur, 19→0 shadow-2xl, 1→0 bg-clip-text)
+- ✅ Cache-control headers for Cloudflare
+- ✅ Lint clean, no runtime errors
+
+## Completed Modifications This Round
+
+### 1. Tile Pulse Animation (Board3D.tsx)
+- Tiles now gently pulse (lift up ~0.04 units) when a player is on them
+- Uses `playersOnTile` check + sine wave pulse animation
+- Creates a visual "impact flash" effect showing where the active player is
+- Skips when no player is on the tile
+
+### 2. Purchase Celebration Effect (Board3D.tsx)
+- New `PurchaseEffect` component detects when a property changes from unowned to owned
+- Triggers a gold particle burst + shockwave at the tile location
+- Uses existing `ParticleBurst` and `Shockwave` components with gold color (#fbbf24)
+- Auto-cleans after 2 seconds
+- Fixed bug: `effectsRef.map` → `effectsRef.current.map`
+
+### 3. AI Trade Proposal Sound (sound-effects.ts + game-store.ts)
+- New `playTradeProposal()` method: two-note rising chime (G5→C6) with shimmer
+- Uses pitch variance (±6%) like other sound effects
+- Played when AI proposes a trade to the human player
+- Imported `soundManager` into game-store.ts
+
+### 4. Player Card Color Dots (GameDashboard.tsx)
+- Each player card now shows small colored dots representing owned color groups
+- Dots use the actual color group hex values (brown, lightblue, pink, orange, etc.)
+- Only shows when player has properties with color groups
+- Helps quickly see which monopolies each player is building toward
+
+## Verification Results
+- Lint: clean ✓
+- Dev server: no errors ✓
+- Game starts, dice roll works ✓
+- 15-turn game loop: completed without crashes ✓
+- Tile pulse visible on 3D board ✓
+- Purchase effect triggers on property buy ✓
+- AI trade sound plays on trade proposal ✓
+- Player card color dots visible ✓
+
+## Unresolved Issues / Risks
+1. Purchase effect only visible in 3D mode (2D board has no particle system)
+2. Tile pulse only visible in 3D mode (2D board uses CSS, not Three.js)
+3. AI trade sound requires user gesture for AudioContext (may not play on first load)
+
+## Priority Recommendations for Next Phase
+1. Add Coalition Alliance system (Tier 2.1 from review report)
+2. Add tile-specific emissive pulse (per-tile material emissive intensity change)
+3. Add visual indicator when reduced-motion is active
+4. Add 2D board tile highlight when player is on it

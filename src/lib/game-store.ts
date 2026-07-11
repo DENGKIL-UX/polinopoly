@@ -22,6 +22,7 @@ import {
 } from './ai-engine';
 import { NARRATIONS } from './narrations';
 import { gameFeel, flashScreen } from './game-feel';
+import { soundManager } from './sound-effects';
 
 // --- Types ---
 export interface Player {
@@ -1455,6 +1456,8 @@ export const useGameStore = create<GameState>((set, get) => ({
                       message: `🤝 ${aiPlayer.name} proposes a trade: wants ${missingTile.name} for ${offeredProp ? BOARD_TILES[offeredProp].name + ' + ' : ''}RM${offerCash}!`,
                       type: 'system',
                     });
+                    // Play trade proposal sound
+                    try { soundManager.playTradeProposal(); } catch {}
                     await delay(1000);
                   }
                 }
